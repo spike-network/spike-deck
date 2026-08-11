@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Type tag badge
         let typeLabel = memberInfo && memberInfo.type ? memberInfo.type : '';
         if (subGroupTarget) {
-          typeLabel = `group:${subGroupTarget.kind || 'select'}`;
+          typeLabel = subGroupTarget.kind || 'select';
         }
 
         const typeTag = typeLabel
