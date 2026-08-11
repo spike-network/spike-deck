@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let instances = [];
   let activeInstanceId = '';
   let editingId = null;
+  let isCreating = false;
 
   async function loadData() {
     instances = await StorageManager.getInstances();
@@ -30,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeInstanceId = active.id;
 
     renderInstancesList();
-    if (!editingId && instances.length > 0) {
+    if (!editingId && !isCreating && instances.length > 0) {
       selectInstanceForEdit(active.id);
     }
   }
@@ -38,9 +39,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderInstancesList() {
     instancesContainer.replaceChildren();
 
+    // Render existing instances
     instances.forEach((inst) => {
       const isActive = inst.id === activeInstanceId;
-      const isEditing = inst.id === editingId;
+      const isEditing = !isCreating && inst.id === editingId;
 
       const nameSpan = document.createElement('span');
       nameSpan.className = 'instance-name';
@@ -55,30 +57,79 @@ document.addEventListener('DOMContentLoaded', async () => {
       infoDiv.appendChild(nameSpan);
       infoDiv.appendChild(urlSpan);
 
-      const card = document.createElement('div');
-      card.className = `instance-card ${isEditing ? 'active' : ''}`;
-
-      card.appendChild(infoDiv);
+      const actionGroup = document.createElement('div');
+      actionGroup.className = 'instance-actions';
 
       if (isActive) {
         const badge = document.createElement('span');
         badge.className = 'active-badge';
         badge.textContent = '当前激活';
-        card.appendChild(badge);
+        actionGroup.appendChild(badge);
+      } else {
+        const setBtn = document.createElement('button');
+        setBtn.className = 'btn-set-active';
+        setBtn.textContent = '设为激活';
+        setBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await StorageManager.setActiveInstanceId(inst.id);
+          activeInstanceId = inst.id;
+          renderInstancesList();
+          chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
+        });
+        actionGroup.appendChild(setBtn);
       }
 
+      const card = document.createElement('div');
+      card.className = `instance-card ${isEditing ? 'active' : ''}`;
+      card.appendChild(infoDiv);
+      card.appendChild(actionGroup);
+
       card.addEventListener('click', () => {
+        isCreating = false;
         selectInstanceForEdit(inst.id);
       });
 
       instancesContainer.appendChild(card);
     });
+
+    // Render new draft card when creating a new instance
+    if (isCreating) {
+      const draftName = instNameInput.value.trim() || '新 Spike 实例 (未保存)';
+      const draftUrl = instUrlInput.value.trim() || 'http://127.0.0.1:9090';
+
+      const draftNameSpan = document.createElement('span');
+      draftNameSpan.className = 'instance-name';
+      draftNameSpan.id = 'draft-card-name';
+      draftNameSpan.textContent = draftName;
+
+      const draftUrlSpan = document.createElement('span');
+      draftUrlSpan.className = 'instance-url';
+      draftUrlSpan.id = 'draft-card-url';
+      draftUrlSpan.textContent = draftUrl;
+
+      const draftInfoDiv = document.createElement('div');
+      draftInfoDiv.className = 'instance-info';
+      draftInfoDiv.appendChild(draftNameSpan);
+      draftInfoDiv.appendChild(draftUrlSpan);
+
+      const draftBadge = document.createElement('span');
+      draftBadge.className = 'draft-badge';
+      draftBadge.textContent = '新建中...';
+
+      const draftCard = document.createElement('div');
+      draftCard.className = 'instance-card active draft-card';
+      draftCard.appendChild(draftInfoDiv);
+      draftCard.appendChild(draftBadge);
+
+      instancesContainer.appendChild(draftCard);
+    }
   }
 
   function selectInstanceForEdit(id) {
     const inst = instances.find((i) => i.id === id);
     if (!inst) return;
 
+    isCreating = false;
     editingId = inst.id;
     formTitle.textContent = `编辑实例: ${inst.name}`;
 
@@ -95,6 +146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   btnAddInstance.addEventListener('click', () => {
+    isCreating = true;
     editingId = null;
     formTitle.textContent = '添加新 Spike 实例';
 
@@ -108,6 +160,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnDeleteInst.style.display = 'none';
     hideTestResult();
     renderInstancesList();
+    instNameInput.focus();
+  });
+
+  // Real-time update draft card preview when typing name/URL
+  instNameInput.addEventListener('input', () => {
+    if (isCreating) {
+      const el = document.getElementById('draft-card-name');
+      if (el) el.textContent = instNameInput.value.trim() || '新 Spike 实例 (未保存)';
+    }
+  });
+
+  instUrlInput.addEventListener('input', () => {
+    if (isCreating) {
+      const el = document.getElementById('draft-card-url');
+      if (el) el.textContent = instUrlInput.value.trim() || 'http://127.0.0.1:9090';
+    }
   });
 
   instanceForm.addEventListener('submit', async (e) => {
@@ -121,11 +189,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       socksProxy: instSocksProxyInput.value.trim()
     };
 
-    if (editingId) {
-      await StorageManager.updateInstance(editingId, formData);
-    } else {
+    if (isCreating) {
       const newInst = await StorageManager.addInstance(formData);
+      isCreating = false;
       editingId = newInst.id;
+    } else if (editingId) {
+      await StorageManager.updateInstance(editingId, formData);
     }
 
     await loadData();
@@ -139,6 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         await StorageManager.deleteInstance(editingId);
         editingId = null;
+        isCreating = false;
         await loadData();
         chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
       } catch (err) {
