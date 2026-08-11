@@ -2,7 +2,7 @@ import { StorageManager } from './lib/storage.js';
 import { SpikeApiClient } from './lib/spike-client.js';
 
 // Local latency test cache to retain ping values during runtime session
-const latencyMap = new Map(); // key: `${groupName}:${memberName}`, value: { ms, ok, err }
+const latencyMap = new Map(); // key: `${groupName}:${memberName}`, value: { ms, ok, err, at }
 
 /** Helper to create DOM elements cleanly without innerHTML */
 function el(tag, attributes = {}, ...children) {
@@ -219,16 +219,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         id: `members-${cssSafe(group.name)}`
       });
 
+      // Build member_info map if available from Spike API commit 5008853
+      const memberInfoMap = new Map();
+      if (Array.isArray(group.member_info)) {
+        group.member_info.forEach((info) => {
+          if (info && info.name) memberInfoMap.set(info.name, info);
+        });
+      }
+
       (group.members || []).forEach((member) => {
         const isSelected = member === currentSelected;
-        const latencyInfo = latencyMap.get(`${group.name}:${member}`);
+        const memberInfo = memberInfoMap.get(member);
+
+        // Extract persisted latency from Spike 5008853 member_info
+        let persistedTest = null;
+        if (memberInfo && typeof memberInfo.last_test_ok === 'boolean') {
+          persistedTest = {
+            ms: memberInfo.last_test_ms,
+            ok: memberInfo.last_test_ok,
+            at: memberInfo.last_test_at_unix_ms,
+            err: memberInfo.last_test_ok ? null : 'Timeout'
+          };
+        }
+
+        // Prefer local trigger test result, fallback to Spike persisted probe result
+        const latencyInfo = latencyMap.get(`${group.name}:${member}`) || persistedTest;
 
         const checkMark = el('span', { className: 'check-mark' }, isSelected ? '✓' : '');
         const memberNameEl = el('span', { className: 'member-name' }, member);
 
+        // Display node protocol type badge if available (e.g. shadowsocks, trojan, etc.)
+        const typeTag = memberInfo && memberInfo.type
+          ? el('span', { className: 'member-type-tag' }, memberInfo.type)
+          : null;
+
+        const titleText = latencyInfo && latencyInfo.at 
+          ? `上次测试时间: ${new Date(latencyInfo.at).toLocaleTimeString()}`
+          : '点击测试该节点';
+
         const latencyBadge = el('span', {
           className: `latency-badge ${getLatencyClass(latencyInfo)}`,
-          id: `lat-${cssSafe(group.name)}-${cssSafe(member)}`
+          id: `lat-${cssSafe(group.name)}-${cssSafe(member)}`,
+          title: titleText
         }, formatLatencyText(latencyInfo));
 
         const memberItem = el('div', {
@@ -238,7 +270,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await selectMember(group.name, member);
           }
         },
-          el('div', { className: 'member-left' }, checkMark, memberNameEl),
+          el('div', { className: 'member-left' }, checkMark, memberNameEl, typeTag),
           el('div', { className: 'member-right' }, latencyBadge)
         );
 
@@ -290,9 +322,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const res = await SpikeApiClient.testGroup(activeInstance, groupName);
       if (res && res.results) {
+        const nowMs = Date.now();
         res.results.forEach((r) => {
           const key = `${groupName}:${r.member}`;
-          const latData = { ms: r.latency_ms, ok: r.ok, err: r.error };
+          const latData = { ms: r.latency_ms, ok: r.ok, err: r.error, at: nowMs };
           latencyMap.set(key, latData);
           updateLatencyBadgeDOM(groupName, r.member, latData);
         });
@@ -324,6 +357,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (badgeEl) {
       badgeEl.className = `latency-badge ${getLatencyClass(latData)}`;
       badgeEl.textContent = formatLatencyText(latData);
+      if (latData && latData.at) {
+        badgeEl.title = `测试时间: ${new Date(latData.at).toLocaleTimeString()}`;
+      }
     }
   }
 
