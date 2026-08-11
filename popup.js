@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnToggleHidden = document.getElementById('btn-toggle-hidden');
 
   let showHiddenGroups = await StorageManager.getShowHiddenGroups();
+  let groupExpandMode = await StorageManager.getGroupExpandMode();
   updateHiddenToggleUI();
 
   btnToggleHidden.addEventListener('click', async () => {
@@ -248,7 +249,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     groupsContainer.replaceChildren();
 
     visibleGroups.forEach((group, idx) => {
-      const isExpand = idx < 2 || group.kind === 'select';
+      let isExpand = false;
+      if (groupExpandMode === 'expand-all') {
+        isExpand = true;
+      } else if (groupExpandMode === 'collapse-all') {
+        isExpand = false;
+      } else {
+        isExpand = idx < 2 || group.kind === 'select';
+      }
+
       const currentSelected = group.override_member || group.selected || (group.members && group.members[0]) || '-';
 
       // Chevron Icon SVG

@@ -20,10 +20,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnDeleteInst = document.getElementById('btn-delete-inst');
   const testResultEl = document.getElementById('test-result');
 
+  const prefExpandModeSelect = document.getElementById('pref-expand-mode');
+  const prefShowHiddenCheckbox = document.getElementById('pref-show-hidden');
+
   let instances = [];
   let activeInstanceId = '';
   let editingId = null;
   let isCreating = false;
+
+  // Load preferences
+  const currentExpandMode = await StorageManager.getGroupExpandMode();
+  prefExpandModeSelect.value = currentExpandMode;
+
+  const currentShowHidden = await StorageManager.getShowHiddenGroups();
+  prefShowHiddenCheckbox.checked = currentShowHidden;
+
+  prefExpandModeSelect.addEventListener('change', async (e) => {
+    await StorageManager.setGroupExpandMode(e.target.value);
+  });
+
+  prefShowHiddenCheckbox.addEventListener('change', async (e) => {
+    const show = e.target.checked;
+    await StorageManager.setShowHiddenGroups(show);
+  });
 
   async function loadData() {
     instances = await StorageManager.getInstances();

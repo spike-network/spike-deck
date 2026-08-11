@@ -218,7 +218,7 @@ label {
   color: var(--text-muted);
 }
 
-input[type="text"], input[type="url"], input[type="password"] {
+input[type="text"], input[type="url"], input[type="password"], .select-input {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   color: var(--text-main);
@@ -227,6 +227,31 @@ input[type="text"], input[type="url"], input[type="password"] {
   font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+
+.right-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.margin-top-12 {
+  margin-top: 12px;
 }
 
 input:focus {

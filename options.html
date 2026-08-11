@@ -31,56 +31,85 @@
         </div>
       </section>
 
-      <!-- Right Panel: Edit Form -->
-      <section class="panel instance-form-panel">
-        <div class="panel-header">
-          <h2 id="form-title">编辑实例</h2>
-        </div>
-
-        <form id="instance-form" class="instance-form">
-          <input type="hidden" id="inst-id">
-
-          <div class="form-group">
-            <label for="inst-name">实例名称 *</label>
-            <input type="text" id="inst-name" placeholder="例如: 本地开发实例 / HK Edge" required>
+      <!-- Right Panel: Edit Form & Preferences -->
+      <div class="right-column">
+        <section class="panel instance-form-panel">
+          <div class="panel-header">
+            <h2 id="form-title">编辑实例</h2>
           </div>
 
-          <div class="form-group">
-            <label for="inst-url">Control API Base URL *</label>
-            <input type="url" id="inst-url" placeholder="http://127.0.0.1:9090" required>
-            <span class="help-text">Spike 控制面 HTTP 监听地址（默认端口 9090）</span>
-          </div>
+          <form id="instance-form" class="instance-form">
+            <input type="hidden" id="inst-id">
 
-          <div class="form-group">
-            <label for="inst-secret">Control Secret (密码/密钥)</label>
-            <input type="password" id="inst-secret" placeholder="未设置控制密码可留空">
-          </div>
+            <div class="form-group">
+              <label for="inst-name">实例名称 *</label>
+              <input type="text" id="inst-name" placeholder="例如: 本地开发实例 / HK Edge" required>
+            </div>
 
-          <fieldset class="fieldset">
-            <legend>浏览器代理端口配置 (可选)</legend>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label for="inst-http-proxy">HTTP 代理地址</label>
-                <input type="text" id="inst-http-proxy" placeholder="127.0.0.1:6152">
+            <div class="form-group">
+              <label for="inst-url">Control API Base URL *</label>
+              <input type="url" id="inst-url" placeholder="http://127.0.0.1:9090" required>
+              <span class="help-text">Spike 控制面 HTTP 监听地址（默认端口 9090）</span>
+            </div>
+
+            <div class="form-group">
+              <label for="inst-secret">Control Secret (密码/密钥)</label>
+              <input type="password" id="inst-secret" placeholder="未设置控制密码可留空">
+            </div>
+
+            <fieldset class="fieldset">
+              <legend>浏览器代理端口配置 (可选)</legend>
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="inst-http-proxy">HTTP 代理地址</label>
+                  <input type="text" id="inst-http-proxy" placeholder="127.0.0.1:6152">
+                </div>
+                <div class="form-group flex-1">
+                  <label for="inst-socks-proxy">SOCKS5 代理地址</label>
+                  <input type="text" id="inst-socks-proxy" placeholder="127.0.0.1:6153">
+                </div>
               </div>
-              <div class="form-group flex-1">
-                <label for="inst-socks-proxy">SOCKS5 代理地址</label>
-                <input type="text" id="inst-socks-proxy" placeholder="127.0.0.1:6153">
+              <span class="help-text">用于在 Popup 中开启“浏览器代理托管”时接入 Chrome。</span>
+            </fieldset>
+
+            <div class="form-actions">
+              <button type="button" id="btn-test-conn" class="btn btn-secondary">⚡ 测试连接</button>
+              <div class="right-actions">
+                <button type="button" id="btn-delete-inst" class="btn btn-danger" style="display:none;">删除实例</button>
+                <button type="submit" id="btn-save-inst" class="btn btn-primary">保存实例</button>
               </div>
             </div>
-            <span class="help-text">用于在 Popup 中开启“浏览器代理托管”时接入 Chrome。</span>
-          </fieldset>
+            <div id="test-result" class="test-result"></div>
+          </form>
+        </section>
 
-          <div class="form-actions">
-            <button type="button" id="btn-test-conn" class="btn btn-secondary">⚡ 测试连接</button>
-            <div class="right-actions">
-              <button type="button" id="btn-delete-inst" class="btn btn-danger" style="display:none;">删除实例</button>
-              <button type="submit" id="btn-save-inst" class="btn btn-primary">保存实例</button>
+        <!-- Global Preferences Panel -->
+        <section class="panel preferences-panel" style="margin-top: 16px;">
+          <div class="panel-header">
+            <h2>策略组展示偏好 (Group Display Preferences)</h2>
+          </div>
+
+          <div class="preference-form">
+            <div class="form-group">
+              <label for="pref-expand-mode">策略组默认展开/收起状态</label>
+              <select id="pref-expand-mode" class="select-input">
+                <option value="smart">智能展开 (仅自动展开前 2 个组与 select 组)</option>
+                <option value="expand-all">默认全部展开 (Expand All)</option>
+                <option value="collapse-all">默认全部收起 (Collapse All)</option>
+              </select>
+              <span class="help-text">控制在 Popup 中打开策略组面板时，所有组卡片的默认展开状态。</span>
+            </div>
+
+            <div class="form-group margin-top-12">
+              <label class="checkbox-label">
+                <input type="checkbox" id="pref-show-hidden">
+                <span>默认展示被隐藏的策略组 (Show Hidden Groups)</span>
+              </label>
+              <span class="help-text">开启后，带有 <code>hidden: true</code> 标记的调试/默认隐藏组将默认呈现在面板中。</span>
             </div>
           </div>
-          <div id="test-result" class="test-result"></div>
-        </form>
-      </section>
+        </section>
+      </div>
     </main>
 
     <footer class="options-footer">
