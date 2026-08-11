@@ -90,11 +90,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   function handleGroupTestTask(task) {
     const metadata = activeGroupTests.get(task.id) || {
       groupName: task.group,
-      targetMember: task.member || null
+      targetMember: task.member || null,
+      completedMembers: new Set()
     };
+    metadata.completedMembers = new Set(
+      (task.results || []).map((result) => result.member)
+    );
+    activeGroupTests.set(task.id, metadata);
     if (Array.isArray(task.results) && task.results.length > 0) {
-      recordProbeResults(task.results);
+      const recordedAt = task.completed_at_unix_ms
+        || task.started_at_unix_ms
+        || task.created_at_unix_ms
+        || Date.now();
+      recordProbeResults(task.results, recordedAt);
     }
+    updateAllLatencyBadgesDOM();
     if (terminalGroupTestStatuses.has(task.status)) {
       finishGroupTestTask(task.id);
       void refreshProbeSnapshots();
@@ -127,6 +137,45 @@ document.addEventListener('DOMContentLoaded', async () => {
       updateAllLatencyBadgesDOM();
     } catch {
       // Progressive task results already populated the UI; retry on refresh.
+    }
+  }
+
+  async function restoreRecentGroupTests() {
+    try {
+      const response = await SpikeApiClient.getGroupTestTasks(activeInstance, 100);
+      const tasks = Array.isArray(response.tasks)
+        ? response.tasks.slice().sort((left, right) => left.id - right.id)
+        : [];
+      for (const task of tasks) {
+        const recordedAt = task.completed_at_unix_ms
+          || task.started_at_unix_ms
+          || task.created_at_unix_ms
+          || Date.now();
+        recordProbeResults(task.results, recordedAt);
+        if (!terminalGroupTestStatuses.has(task.status)) {
+          activeGroupTests.set(task.id, {
+            groupName: task.group,
+            targetMember: task.member || null,
+            completedMembers: new Set(
+              (task.results || []).map((result) => result.member)
+            )
+          });
+        }
+      }
+      updateAllLatencyBadgesDOM();
+      scheduleGroupTestPoll();
+    } catch (err) {
+      if (err.status !== 404) {
+        console.warn(`Unable to restore group tests: ${err.message}`);
+      }
+    }
+  }
+
+  function resetGroupTestTracking() {
+    activeGroupTests.clear();
+    if (groupTestPollTimer !== null) {
+      clearTimeout(groupTestPollTimer);
+      groupTestPollTimer = null;
     }
   }
 
@@ -172,6 +221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   instanceSelect.addEventListener('change', async (e) => {
     const selectedId = e.target.value;
     await StorageManager.setActiveInstanceId(selectedId);
+    resetGroupTestTracking();
     activeInstance = await StorageManager.getActiveInstance();
     chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
     loadDashboard();
@@ -221,6 +271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ingestPersistedMemberInfo(currentGroupsData);
 
       renderGroups(currentGroupsData);
+      void restoreRecentGroupTests();
     } catch (err) {
       setStatus('offline', '未连接');
       profileName.textContent = '-';
@@ -250,6 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newAt = info.last_test_at_unix_ms || 0;
             if (!existing || !existing.at || newAt >= existing.at) {
               leafProbeResults.set(info.name, {
+                sourceMember: info.name,
                 ms: info.last_test_ms ?? null,
                 ok: info.last_test_ok === true,
                 err: info.last_test_ok ? null : 'Timeout',
@@ -262,14 +314,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function recordProbeResults(results) {
-    const nowMs = Date.now();
+  function recordProbeResults(results, recordedAt = Date.now()) {
     (results || []).forEach((result) => {
+      const existing = leafProbeResults.get(result.member);
+      if (existing && existing.at && recordedAt < existing.at) return;
       leafProbeResults.set(result.member, {
+        sourceMember: result.member,
         ms: result.latency_ms ?? null,
         ok: result.ok === true,
         err: result.error || (result.ok ? null : 'Timeout'),
-        at: nowMs
+        at: recordedAt
       });
     });
   }
@@ -528,7 +582,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       if (result.mode === 'async') {
         asyncTaskStarted = true;
-        activeGroupTests.set(result.task.id, { groupName, targetMember });
+        activeGroupTests.set(result.task.id, {
+          groupName,
+          targetMember,
+          completedMembers: new Set()
+        });
         handleGroupTestTask(result.task);
         scheduleGroupTestPoll();
       } else {
@@ -592,12 +650,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /** Update latency badges across all visible groups and members in DOM */
+  function memberProbeIsPending(groupName, memberName, latencyInfo) {
+    return Array.from(activeGroupTests.values()).some((task) => {
+      if (task.groupName !== groupName) return false;
+      if (task.targetMember && task.targetMember !== memberName) return false;
+      if (task.completedMembers.has(memberName)) return false;
+      return !latencyInfo?.sourceMember
+        || !task.completedMembers.has(latencyInfo.sourceMember);
+    });
+  }
+
   function updateAllLatencyBadgesDOM() {
     (currentGroupsData || []).forEach((group) => {
       (group.members || []).forEach((member) => {
         const latData = resolveMemberLatency(member);
         const badgeEl = document.getElementById(`lat-${cssSafe(group.name)}-${cssSafe(member)}`);
         if (badgeEl) {
+          if (memberProbeIsPending(group.name, member, latData)) {
+            badgeEl.className = 'latency-badge lat-testing';
+            if (!badgeEl.querySelector('.mini-spinner')) {
+              badgeEl.replaceChildren(el('span', { className: 'mini-spinner' }));
+            }
+            return;
+          }
           badgeEl.className = `latency-badge ${getLatencyClass(latData)}`;
           badgeEl.textContent = formatLatencyText(latData);
 
