@@ -53,6 +53,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnRefresh = document.getElementById('btn-refresh');
   const btnOptions = document.getElementById('btn-options');
   const toggleProxy = document.getElementById('toggle-chrome-proxy');
+  const btnToggleHidden = document.getElementById('btn-toggle-hidden');
+
+  let showHiddenGroups = await StorageManager.getShowHiddenGroups();
+  updateHiddenToggleUI();
+
+  btnToggleHidden.addEventListener('click', async () => {
+    showHiddenGroups = !showHiddenGroups;
+    await StorageManager.setShowHiddenGroups(showHiddenGroups);
+    updateHiddenToggleUI();
+    renderGroups(currentGroupsData);
+  });
+
+  function updateHiddenToggleUI() {
+    if (showHiddenGroups) {
+      btnToggleHidden.classList.add('active');
+    } else {
+      btnToggleHidden.classList.remove('active');
+    }
+  }
 
   // Populate Instance Selector
   function renderInstanceSelector() {
@@ -217,7 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Render Policy Groups
   function renderGroups(groups) {
-    const visibleGroups = (groups || []).filter((g) => !g.hidden);
+    const visibleGroups = (groups || []).filter((g) => showHiddenGroups || !g.hidden);
 
     if (visibleGroups.length === 0) {
       groupsContainer.replaceChildren(
@@ -269,11 +288,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         id: `selected-${cssSafe(group.name)}`
       }, currentSelected);
 
+      const hiddenBadge = group.hidden
+        ? el('span', { className: 'hidden-kind-badge' }, 'hidden')
+        : null;
+
       const headerEl = el('div', { className: 'group-header' },
         el('div', { className: 'group-title-wrapper' },
           svgIcon,
           el('span', { className: 'group-name' }, group.name),
-          el('span', { className: 'group-kind-badge' }, group.kind || 'select')
+          el('span', { className: 'group-kind-badge' }, group.kind || 'select'),
+          hiddenBadge
         ),
         el('div', { className: 'group-summary' },
           selectedSummaryEl,
