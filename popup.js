@@ -5,6 +5,7 @@ import { SpikeApiClient } from './lib/spike-client.js';
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
 const leafProbeResults = new Map();
 let currentGroupsData = [];
+const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
 
 /** Helper to create DOM elements cleanly without innerHTML */
 function el(tag, attributes = {}, ...children) {
@@ -57,7 +58,77 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let showHiddenGroups = await StorageManager.getShowHiddenGroups();
   let groupExpandMode = await StorageManager.getGroupExpandMode();
+  const activeGroupTests = new Map();
+  let groupTestPollTimer = null;
   updateHiddenToggleUI();
+
+  function scheduleGroupTestPoll(delay = 350) {
+    if (groupTestPollTimer !== null || activeGroupTests.size === 0) return;
+    groupTestPollTimer = setTimeout(() => {
+      groupTestPollTimer = null;
+      void pollGroupTests();
+    }, delay);
+  }
+
+  async function pollGroupTests() {
+    const taskIds = Array.from(activeGroupTests.keys());
+    await Promise.all(taskIds.map(async (taskId) => {
+      try {
+        const task = await SpikeApiClient.getGroupTestTask(activeInstance, taskId);
+        handleGroupTestTask(task);
+      } catch (err) {
+        if (err.status === 404) {
+          finishGroupTestTask(taskId);
+        } else {
+          console.warn(`Unable to poll group test ${taskId}: ${err.message}`);
+        }
+      }
+    }));
+    scheduleGroupTestPoll(700);
+  }
+
+  function handleGroupTestTask(task) {
+    const metadata = activeGroupTests.get(task.id) || {
+      groupName: task.group,
+      targetMember: task.member || null
+    };
+    if (Array.isArray(task.results) && task.results.length > 0) {
+      recordProbeResults(task.results);
+    }
+    if (terminalGroupTestStatuses.has(task.status)) {
+      finishGroupTestTask(task.id);
+      void refreshProbeSnapshots();
+    } else {
+      activeGroupTests.set(task.id, metadata);
+    }
+  }
+
+  function finishGroupTestTask(taskId) {
+    const metadata = activeGroupTests.get(taskId);
+    activeGroupTests.delete(taskId);
+    if (metadata) {
+      const stillTestingGroup = Array.from(activeGroupTests.values())
+        .some((task) => task.groupName === metadata.groupName);
+      if (!stillTestingGroup) {
+        const button = document.querySelector(
+          `.btn-test-group[data-group="${CSS.escape(metadata.groupName)}"]`
+        );
+        if (button) button.classList.remove('testing');
+      }
+    }
+    updateAllLatencyBadgesDOM();
+  }
+
+  async function refreshProbeSnapshots() {
+    try {
+      const groupsData = await SpikeApiClient.getGroups(activeInstance);
+      currentGroupsData = groupsData.groups || [];
+      ingestPersistedMemberInfo(currentGroupsData);
+      updateAllLatencyBadgesDOM();
+    } catch {
+      // Progressive task results already populated the UI; retry on refresh.
+    }
+  }
 
   btnToggleHidden.addEventListener('click', async () => {
     showHiddenGroups = !showHiddenGroups;
@@ -191,6 +262,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  function recordProbeResults(results) {
+    const nowMs = Date.now();
+    (results || []).forEach((result) => {
+      leafProbeResults.set(result.member, {
+        ms: result.latency_ms ?? null,
+        ok: result.ok === true,
+        err: result.error || (result.ok ? null : 'Timeout'),
+        at: nowMs
+      });
+    });
+  }
+
   function setStatus(state, text) {
     statusDot.className = `status-dot ${state}`;
     statusText.textContent = text;
@@ -200,29 +283,36 @@ document.addEventListener('DOMContentLoaded', async () => {
    * Resolve latency information for any member (leaf node or sub-group).
    * Supports recursive lookup for nested policy groups.
    */
-  function resolveMemberLatency(memberName, depth = 0) {
-    if (depth > 5) return null; // Avoid cyclic references
-
+  function resolveMemberLatency(memberName, visited = new Set(), depth = 0) {
     // 1. Direct leaf node match
     const directResult = leafProbeResults.get(memberName);
     if (directResult) return directResult;
 
+    if (depth >= 64) return null;
+
     // 2. Sub-group match
-    const subGroup = currentGroupsData.find((g) => g.name === memberName);
+    const memberIdentity = memberName.toLocaleLowerCase();
+    const subGroup = currentGroupsData.find(
+      (g) => g.name.toLocaleLowerCase() === memberIdentity
+    );
     if (!subGroup) return null;
+    const groupIdentity = subGroup.name.toLocaleLowerCase();
+    if (visited.has(groupIdentity)) return null;
+    const nextVisited = new Set(visited);
+    nextVisited.add(groupIdentity);
 
     // 2a. Check latency of current selected member of subGroup
     const selectedMember = subGroup.override_member || subGroup.selected || (subGroup.members && subGroup.members[0]);
-    if (selectedMember && selectedMember !== memberName) {
-      const selectedRes = resolveMemberLatency(selectedMember, depth + 1);
+    if (selectedMember && selectedMember.toLocaleLowerCase() !== memberIdentity) {
+      const selectedRes = resolveMemberLatency(selectedMember, nextVisited, depth + 1);
       if (selectedRes) return selectedRes;
     }
 
     // 2b. Fallback to best (lowest RTT) member latency in subGroup
     let bestResult = null;
     (subGroup.members || []).forEach((child) => {
-      if (child === memberName) return;
-      const res = resolveMemberLatency(child, depth + 1);
+      if (child.toLocaleLowerCase() === memberIdentity) return;
+      const res = resolveMemberLatency(child, nextVisited, depth + 1);
       if (res && res.ok && typeof res.ms === 'number') {
         if (!bestResult || !bestResult.ok || bestResult.ms === null || res.ms < bestResult.ms) {
           bestResult = res;
@@ -286,6 +376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const testBtn = el('button', { 
         className: 'btn-test-group',
         title: '测试该组延迟',
+        dataset: { group: group.name },
         onClick: async (e) => {
           e.stopPropagation();
           await runTestGroup(group.name);
@@ -428,18 +519,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update target badges to "Testing..." spinner status immediately
     setGroupBadgesTesting(groupName, targetMember);
 
+    let asyncTaskStarted = false;
     try {
-      const res = await SpikeApiClient.testGroup(activeInstance, groupName, targetMember);
-      if (res && res.results) {
-        const nowMs = Date.now();
-        res.results.forEach((r) => {
-          leafProbeResults.set(r.member, {
-            ms: r.latency_ms,
-            ok: r.ok,
-            err: r.error,
-            at: nowMs
-          });
-        });
+      const result = await SpikeApiClient.startGroupTest(
+        activeInstance,
+        groupName,
+        targetMember
+      );
+      if (result.mode === 'async') {
+        asyncTaskStarted = true;
+        activeGroupTests.set(result.task.id, { groupName, targetMember });
+        handleGroupTestTask(result.task);
+        scheduleGroupTestPoll();
+      } else {
+        recordProbeResults(result.results);
         updateAllLatencyBadgesDOM();
       }
     } catch (err) {
@@ -450,7 +543,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       updateAllLatencyBadgesDOM();
     } finally {
-      if (testBtn) testBtn.classList.remove('testing');
+      if (!asyncTaskStarted && testBtn) testBtn.classList.remove('testing');
     }
   }
 
