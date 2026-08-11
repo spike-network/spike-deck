@@ -437,9 +437,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }, flashIcon);
 
-      const selectedSummaryEl = el('span', { 
-        className: 'current-selected',
-        id: `selected-${cssSafe(group.name)}`
+      const selectedSummaryEl = el('span', {
+        className: 'current-selected'
       }, currentSelected);
 
       const hiddenBadge = group.hidden
@@ -460,9 +459,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
 
       // Members List
-      const membersContainer = el('div', { 
-        className: 'group-members',
-        id: `members-${cssSafe(group.name)}`
+      const membersContainer = el('div', {
+        className: 'group-members'
       });
 
       const memberInfoMap = new Map();
@@ -503,7 +501,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const latencyBadge = el('span', {
           className: `latency-badge ${getLatencyClass(latencyInfo)}`,
-          id: `lat-${cssSafe(group.name)}-${cssSafe(member)}`,
           title: titleText,
           onClick: async (e) => {
             e.stopPropagation();
@@ -661,32 +658,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function updateAllLatencyBadgesDOM() {
-    (currentGroupsData || []).forEach((group) => {
-      (group.members || []).forEach((member) => {
-        const latData = resolveMemberLatency(member);
-        const badgeEl = document.getElementById(`lat-${cssSafe(group.name)}-${cssSafe(member)}`);
-        if (badgeEl) {
-          if (memberProbeIsPending(group.name, member, latData)) {
-            badgeEl.className = 'latency-badge lat-testing';
-            if (!badgeEl.querySelector('.mini-spinner')) {
-              badgeEl.replaceChildren(el('span', { className: 'mini-spinner' }));
-            }
-            return;
-          }
-          badgeEl.className = `latency-badge ${getLatencyClass(latData)}`;
-          badgeEl.textContent = formatLatencyText(latData);
+    groupsContainer.querySelectorAll('.member-item').forEach((memberItem) => {
+      const groupName = memberItem.dataset.group;
+      const member = memberItem.dataset.member;
+      const badgeEl = memberItem.querySelector('.latency-badge');
+      if (!groupName || !member || !badgeEl) return;
 
-          const subGroupTarget = currentGroupsData.find((g) => g.name === member);
-          if (subGroupTarget) {
-            const subSel = subGroupTarget.override_member || subGroupTarget.selected;
-            badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''} - 点击测试`;
-          } else if (latData && latData.at) {
-            badgeEl.title = `测试时间: ${new Date(latData.at).toLocaleTimeString()} - 点击重新测试`;
-          } else {
-            badgeEl.title = '点击单独测试该节点';
-          }
+      const latData = resolveMemberLatency(member);
+      if (memberProbeIsPending(groupName, member, latData)) {
+        badgeEl.className = 'latency-badge lat-testing';
+        if (!badgeEl.querySelector('.mini-spinner')) {
+          badgeEl.replaceChildren(el('span', { className: 'mini-spinner' }));
         }
-      });
+        return;
+      }
+      badgeEl.className = `latency-badge ${getLatencyClass(latData)}`;
+      badgeEl.textContent = formatLatencyText(latData);
+
+      const subGroupTarget = currentGroupsData.find((g) => g.name === member);
+      if (subGroupTarget) {
+        const subSel = subGroupTarget.override_member || subGroupTarget.selected;
+        badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''} - 点击测试`;
+      } else if (latData && latData.at) {
+        badgeEl.title = `测试时间: ${new Date(latData.at).toLocaleTimeString()} - 点击重新测试`;
+      } else {
+        badgeEl.title = '点击单独测试该节点';
+      }
     });
   }
 
@@ -704,10 +701,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!latInfo.ok) return latInfo.err || 'Timeout';
     if (typeof latInfo.ms === 'number') return `${latInfo.ms}ms`;
     return '—';
-  }
-
-  function cssSafe(str) {
-    return (str || '').replace(/[^a-zA-Z0-9_-]/g, '_');
   }
 
   // Initial load
