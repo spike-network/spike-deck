@@ -432,8 +432,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!targetMember || member === targetMember) {
         badge.className = 'latency-badge lat-testing';
         badge.replaceChildren(
-          el('span', { className: 'mini-spinner' }),
-          ' 测速中'
+          el('span', { className: 'mini-spinner' })
         );
       }
     });
@@ -450,8 +449,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     allBadges.forEach((badge) => {
       badge.className = 'latency-badge lat-testing';
       badge.replaceChildren(
-        el('span', { className: 'mini-spinner' }),
-        ' 测速中'
+        el('span', { className: 'mini-spinner' })
       );
     });
 
