@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpikeDeck - Spike Proxy Manager</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <img src="icons/icon48.png" alt="SpikeDeck" class="logo">
+        <div class="title-group">
+          <span class="title">SpikeDeck</span>
+          <div class="status-indicator" id="status-indicator">
+            <span class="status-dot offline" id="status-dot"></span>
+            <span class="status-text" id="status-text">未连接</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <button id="btn-test-all" class="icon-btn action-btn" title="全组测速">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <span class="btn-label">测速</span>
+        </button>
+        <button id="btn-refresh" class="icon-btn" title="刷新列表">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M23 4v6h-6"></path>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
+        <button id="btn-options" class="icon-btn" title="管理实例与设置">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Instance Selector & Proxy Bar -->
+    <div class="control-bar">
+      <div class="instance-selector-wrapper">
+        <label for="instance-select" class="selector-label">实例:</label>
+        <select id="instance-select" class="instance-select">
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+
+      <div class="proxy-toggle-wrapper" id="proxy-toggle-wrapper">
+        <label class="switch-label" title="开启后将 Chrome 浏览器代理指向当前实例">
+          <input type="checkbox" id="toggle-chrome-proxy">
+          <span class="slider"></span>
+          <span class="switch-text">浏览器代理</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Status & Info Card -->
+    <div class="info-card" id="info-card">
+      <div class="info-row">
+        <span class="info-label">Profile:</span>
+        <span class="info-value" id="profile-name">-</span>
+      </div>
+      <div class="info-meta" id="info-meta">
+        <span class="badge" id="badge-groups">组: -</span>
+        <span class="badge" id="badge-nodes">节点: -</span>
+        <span class="badge" id="badge-rules">规则: -</span>
+      </div>
+    </div>
+
+    <!-- Policy Groups Section -->
+    <main class="main-content">
+      <div class="section-title">
+        <span>策略组 (Policy Groups)</span>
+      </div>
+      
+      <div id="groups-container" class="groups-container">
+        <!-- Skeleton loading or dynamic groups -->
+        <div class="loading-placeholder">
+          <div class="spinner"></div>
+          <span>正在连接 Spike 实例...</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Global Footer -->
+    <footer class="footer">
+      <span class="footer-tip">💡 点击策略组节点可实时切路</span>
+    </footer>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

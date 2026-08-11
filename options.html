@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpikeDeck 设置 - 实例管理</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="options-container">
+    <header class="options-header">
+      <div class="brand">
+        <img src="icons/icon48.png" alt="Logo" class="logo">
+        <div>
+          <h1>SpikeDeck 设置</h1>
+          <p class="subtitle">管理多个 Spike 实例与浏览器代理托管配置</p>
+        </div>
+      </div>
+    </header>
+
+    <main class="options-main">
+      <!-- Left Panel: Instance List -->
+      <section class="panel instance-list-panel">
+        <div class="panel-header">
+          <h2>Spike 实例列表</h2>
+          <button id="btn-add-instance" class="btn btn-primary">+ 添加新实例</button>
+        </div>
+
+        <div id="instances-container" class="instances-container">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- Right Panel: Edit Form -->
+      <section class="panel instance-form-panel">
+        <div class="panel-header">
+          <h2 id="form-title">编辑实例</h2>
+        </div>
+
+        <form id="instance-form" class="instance-form">
+          <input type="hidden" id="inst-id">
+
+          <div class="form-group">
+            <label for="inst-name">实例名称 *</label>
+            <input type="text" id="inst-name" placeholder="例如: 本地开发实例 / HK Edge" required>
+          </div>
+
+          <div class="form-group">
+            <label for="inst-url">Control API Base URL *</label>
+            <input type="url" id="inst-url" placeholder="http://127.0.0.1:9090" required>
+            <span class="help-text">Spike 控制面 HTTP 监听地址（默认端口 9090）</span>
+          </div>
+
+          <div class="form-group">
+            <label for="inst-secret">Control Secret (密码/密钥)</label>
+            <input type="password" id="inst-secret" placeholder="未设置控制密码可留空">
+          </div>
+
+          <fieldset class="fieldset">
+            <legend>浏览器代理端口配置 (可选)</legend>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="inst-http-proxy">HTTP 代理地址</label>
+                <input type="text" id="inst-http-proxy" placeholder="127.0.0.1:6152">
+              </div>
+              <div class="form-group flex-1">
+                <label for="inst-socks-proxy">SOCKS5 代理地址</label>
+                <input type="text" id="inst-socks-proxy" placeholder="127.0.0.1:6153">
+              </div>
+            </div>
+            <span class="help-text">用于在 Popup 中开启“浏览器代理托管”时接入 Chrome。</span>
+          </fieldset>
+
+          <div class="form-actions">
+            <button type="button" id="btn-test-conn" class="btn btn-secondary">⚡ 测试连接</button>
+            <div class="right-actions">
+              <button type="button" id="btn-delete-inst" class="btn btn-danger" style="display:none;">删除实例</button>
+              <button type="submit" id="btn-save-inst" class="btn btn-primary">保存实例</button>
+            </div>
+          </div>
+          <div id="test-result" class="test-result"></div>
+        </form>
+      </section>
+    </main>
+
+    <footer class="options-footer">
+      <span>SpikeDeck v1.0.0 &bull; Surge-inspired Proxy & Instance Manager for Spike</span>
+    </footer>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
