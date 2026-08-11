@@ -155,7 +155,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (Array.isArray(g.member_info)) {
         g.member_info.forEach((info) => {
           if (info && info.name && typeof info.last_test_ok === 'boolean') {
-            // Only set if not present or newer
             const existing = leafProbeResults.get(info.name);
             const newAt = info.last_test_at_unix_ms || 0;
             if (!existing || !existing.at || newAt >= existing.at) {
@@ -306,7 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const checkMark = el('span', { className: 'check-mark' }, isSelected ? '✓' : '');
         const memberNameEl = el('span', { className: 'member-name' }, member);
 
-        // Type tag badge: if it's a sub-group, show group kind (e.g. select/url-test), otherwise protocol type
+        // Type tag badge
         let typeLabel = memberInfo && memberInfo.type ? memberInfo.type : '';
         if (subGroupTarget) {
           typeLabel = `group:${subGroupTarget.kind || 'select'}`;
@@ -316,18 +315,22 @@ document.addEventListener('DOMContentLoaded', async () => {
           ? el('span', { className: 'member-type-tag' }, typeLabel)
           : null;
 
-        let titleText = '点击选择/测试';
+        let titleText = '点击单独测试该节点';
         if (subGroupTarget) {
           const subSel = subGroupTarget.override_member || subGroupTarget.selected;
-          titleText = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''}`;
+          titleText = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''} - 点击测试`;
         } else if (latencyInfo && latencyInfo.at) {
-          titleText = `测试时间: ${new Date(latencyInfo.at).toLocaleTimeString()}`;
+          titleText = `测试时间: ${new Date(latencyInfo.at).toLocaleTimeString()} - 点击重新测试`;
         }
 
         const latencyBadge = el('span', {
           className: `latency-badge ${getLatencyClass(latencyInfo)}`,
           id: `lat-${cssSafe(group.name)}-${cssSafe(member)}`,
-          title: titleText
+          title: titleText,
+          onClick: async (e) => {
+            e.stopPropagation();
+            await runTestGroup(group.name, member);
+          }
         }, formatLatencyText(latencyInfo));
 
         const memberItem = el('div', {
@@ -384,13 +387,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Latency Testing
-  async function runTestGroup(groupName) {
+  // Latency Testing with visual feedback
+  async function runTestGroup(groupName, targetMember = null) {
     const testBtn = document.querySelector(`.btn-test-group[data-group="${CSS.escape(groupName)}"]`);
-    if (testBtn) testBtn.style.opacity = '0.4';
+    if (testBtn) testBtn.classList.add('testing');
+
+    // Update target badges to "Testing..." spinner status immediately
+    setGroupBadgesTesting(groupName, targetMember);
 
     try {
-      const res = await SpikeApiClient.testGroup(activeInstance, groupName);
+      const res = await SpikeApiClient.testGroup(activeInstance, groupName, targetMember);
       if (res && res.results) {
         const nowMs = Date.now();
         res.results.forEach((r) => {
@@ -405,14 +411,49 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch (err) {
       console.error(`Group test failed: ${err.message}`);
+      // Mark as error if failed
+      if (targetMember) {
+        leafProbeResults.set(targetMember, { ok: false, err: 'Failed', at: Date.now() });
+      }
+      updateAllLatencyBadgesDOM();
     } finally {
-      if (testBtn) testBtn.style.opacity = '1';
+      if (testBtn) testBtn.classList.remove('testing');
     }
+  }
+
+  function setGroupBadgesTesting(groupName, targetMember = null) {
+    const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
+    if (!groupCard) return;
+
+    const badges = groupCard.querySelectorAll('.latency-badge');
+    badges.forEach((badge) => {
+      const parentItem = badge.closest('.member-item');
+      const member = parentItem ? parentItem.dataset.member : null;
+      if (!targetMember || member === targetMember) {
+        badge.className = 'latency-badge lat-testing';
+        badge.replaceChildren(
+          el('span', { className: 'mini-spinner' }),
+          ' 测速中'
+        );
+      }
+    });
   }
 
   async function runTestAll() {
     btnTestAll.disabled = true;
-    btnTestAll.style.opacity = '0.6';
+    btnTestAll.classList.add('testing');
+    const labelSpan = btnTestAll.querySelector('.btn-label');
+    if (labelSpan) labelSpan.textContent = '测速中...';
+
+    // Mark all visible group badges as testing
+    const allBadges = document.querySelectorAll('.latency-badge');
+    allBadges.forEach((badge) => {
+      badge.className = 'latency-badge lat-testing';
+      badge.replaceChildren(
+        el('span', { className: 'mini-spinner' }),
+        ' 测速中'
+      );
+    });
 
     const groupCards = document.querySelectorAll('.group-card');
     const groupNames = Array.from(groupCards).map((card) => card.dataset.group);
@@ -422,7 +463,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     btnTestAll.disabled = false;
-    btnTestAll.style.opacity = '1';
+    btnTestAll.classList.remove('testing');
+    if (labelSpan) labelSpan.textContent = '测速';
   }
 
   /** Update latency badges across all visible groups and members in DOM */
@@ -434,12 +476,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (badgeEl) {
           badgeEl.className = `latency-badge ${getLatencyClass(latData)}`;
           badgeEl.textContent = formatLatencyText(latData);
+
           const subGroupTarget = currentGroupsData.find((g) => g.name === member);
           if (subGroupTarget) {
             const subSel = subGroupTarget.override_member || subGroupTarget.selected;
-            badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''}`;
+            badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''} - 点击测试`;
           } else if (latData && latData.at) {
-            badgeEl.title = `测试时间: ${new Date(latData.at).toLocaleTimeString()}`;
+            badgeEl.title = `测试时间: ${new Date(latData.at).toLocaleTimeString()} - 点击重新测试`;
+          } else {
+            badgeEl.title = '点击单独测试该节点';
           }
         }
       });
