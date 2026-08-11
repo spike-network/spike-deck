@@ -1,8 +1,10 @@
 import { StorageManager } from './lib/storage.js';
 import { SpikeApiClient } from './lib/spike-client.js';
 
-// Local latency test cache to retain ping values during runtime session
-const latencyMap = new Map(); // key: `${groupName}:${memberName}`, value: { ms, ok, err, at }
+// Global latency cache for leaf nodes by member name
+// key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
+const leafProbeResults = new Map();
+let currentGroupsData = [];
 
 /** Helper to create DOM elements cleanly without innerHTML */
 function el(tag, attributes = {}, ...children) {
@@ -122,7 +124,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       badgeNodes.textContent = `节点: ${status.leaves || 0}`;
       badgeRules.textContent = `规则: ${status.rules || 0}`;
 
-      renderGroups(groupsData.groups || []);
+      currentGroupsData = groupsData.groups || [];
+
+      // Ingest persisted probe results from all group member_info fields
+      ingestPersistedMemberInfo(currentGroupsData);
+
+      renderGroups(currentGroupsData);
     } catch (err) {
       setStatus('offline', '未连接');
       profileName.textContent = '-';
@@ -142,9 +149,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  /** Ingest member_info last_test_* fields into leafProbeResults map */
+  function ingestPersistedMemberInfo(groups) {
+    (groups || []).forEach((g) => {
+      if (Array.isArray(g.member_info)) {
+        g.member_info.forEach((info) => {
+          if (info && info.name && typeof info.last_test_ok === 'boolean') {
+            // Only set if not present or newer
+            const existing = leafProbeResults.get(info.name);
+            const newAt = info.last_test_at_unix_ms || 0;
+            if (!existing || !existing.at || newAt >= existing.at) {
+              leafProbeResults.set(info.name, {
+                ms: info.last_test_ms ?? null,
+                ok: info.last_test_ok === true,
+                err: info.last_test_ok ? null : 'Timeout',
+                at: newAt
+              });
+            }
+          }
+        });
+      }
+    });
+  }
+
   function setStatus(state, text) {
     statusDot.className = `status-dot ${state}`;
     statusText.textContent = text;
+  }
+
+  /**
+   * Resolve latency information for any member (leaf node or sub-group).
+   * Supports recursive lookup for nested policy groups.
+   */
+  function resolveMemberLatency(memberName, depth = 0) {
+    if (depth > 5) return null; // Avoid cyclic references
+
+    // 1. Direct leaf node match
+    const directResult = leafProbeResults.get(memberName);
+    if (directResult) return directResult;
+
+    // 2. Sub-group match
+    const subGroup = currentGroupsData.find((g) => g.name === memberName);
+    if (!subGroup) return null;
+
+    // 2a. Check latency of current selected member of subGroup
+    const selectedMember = subGroup.override_member || subGroup.selected || (subGroup.members && subGroup.members[0]);
+    if (selectedMember && selectedMember !== memberName) {
+      const selectedRes = resolveMemberLatency(selectedMember, depth + 1);
+      if (selectedRes) return selectedRes;
+    }
+
+    // 2b. Fallback to best (lowest RTT) member latency in subGroup
+    let bestResult = null;
+    (subGroup.members || []).forEach((child) => {
+      if (child === memberName) return;
+      const res = resolveMemberLatency(child, depth + 1);
+      if (res && res.ok && typeof res.ms === 'number') {
+        if (!bestResult || !bestResult.ok || bestResult.ms === null || res.ms < bestResult.ms) {
+          bestResult = res;
+        }
+      } else if (res && !bestResult) {
+        bestResult = res;
+      }
+    });
+
+    return bestResult;
   }
 
   // Render Policy Groups
@@ -219,7 +288,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         id: `members-${cssSafe(group.name)}`
       });
 
-      // Build member_info map if available from Spike API commit 5008853
       const memberInfoMap = new Map();
       if (Array.isArray(group.member_info)) {
         group.member_info.forEach((info) => {
@@ -230,32 +298,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       (group.members || []).forEach((member) => {
         const isSelected = member === currentSelected;
         const memberInfo = memberInfoMap.get(member);
+        const subGroupTarget = currentGroupsData.find((g) => g.name === member);
 
-        // Extract persisted latency from Spike 5008853 member_info
-        let persistedTest = null;
-        if (memberInfo && typeof memberInfo.last_test_ok === 'boolean') {
-          persistedTest = {
-            ms: memberInfo.last_test_ms,
-            ok: memberInfo.last_test_ok,
-            at: memberInfo.last_test_at_unix_ms,
-            err: memberInfo.last_test_ok ? null : 'Timeout'
-          };
-        }
-
-        // Prefer local trigger test result, fallback to Spike persisted probe result
-        const latencyInfo = latencyMap.get(`${group.name}:${member}`) || persistedTest;
+        // Resolve latency for leaf node or sub-group
+        const latencyInfo = resolveMemberLatency(member);
 
         const checkMark = el('span', { className: 'check-mark' }, isSelected ? '✓' : '');
         const memberNameEl = el('span', { className: 'member-name' }, member);
 
-        // Display node protocol type badge if available (e.g. shadowsocks, trojan, etc.)
-        const typeTag = memberInfo && memberInfo.type
-          ? el('span', { className: 'member-type-tag' }, memberInfo.type)
+        // Type tag badge: if it's a sub-group, show group kind (e.g. select/url-test), otherwise protocol type
+        let typeLabel = memberInfo && memberInfo.type ? memberInfo.type : '';
+        if (subGroupTarget) {
+          typeLabel = `group:${subGroupTarget.kind || 'select'}`;
+        }
+
+        const typeTag = typeLabel
+          ? el('span', { className: 'member-type-tag' }, typeLabel)
           : null;
 
-        const titleText = latencyInfo && latencyInfo.at 
-          ? `上次测试时间: ${new Date(latencyInfo.at).toLocaleTimeString()}`
-          : '点击测试该节点';
+        let titleText = '点击选择/测试';
+        if (subGroupTarget) {
+          const subSel = subGroupTarget.override_member || subGroupTarget.selected;
+          titleText = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''}`;
+        } else if (latencyInfo && latencyInfo.at) {
+          titleText = `测试时间: ${new Date(latencyInfo.at).toLocaleTimeString()}`;
+        }
 
         const latencyBadge = el('span', {
           className: `latency-badge ${getLatencyClass(latencyInfo)}`,
@@ -309,6 +376,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (check) check.textContent = isTarget ? '✓' : '';
         });
       }
+
+      // Refresh latency display for sub-groups after selection change
+      updateAllLatencyBadgesDOM();
     } catch (err) {
       alert(`切换节点失败: ${err.message}`);
     }
@@ -324,11 +394,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (res && res.results) {
         const nowMs = Date.now();
         res.results.forEach((r) => {
-          const key = `${groupName}:${r.member}`;
-          const latData = { ms: r.latency_ms, ok: r.ok, err: r.error, at: nowMs };
-          latencyMap.set(key, latData);
-          updateLatencyBadgeDOM(groupName, r.member, latData);
+          leafProbeResults.set(r.member, {
+            ms: r.latency_ms,
+            ok: r.ok,
+            err: r.error,
+            at: nowMs
+          });
         });
+        updateAllLatencyBadgesDOM();
       }
     } catch (err) {
       console.error(`Group test failed: ${err.message}`);
@@ -352,15 +425,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnTestAll.style.opacity = '1';
   }
 
-  function updateLatencyBadgeDOM(groupName, memberName, latData) {
-    const badgeEl = document.getElementById(`lat-${cssSafe(groupName)}-${cssSafe(memberName)}`);
-    if (badgeEl) {
-      badgeEl.className = `latency-badge ${getLatencyClass(latData)}`;
-      badgeEl.textContent = formatLatencyText(latData);
-      if (latData && latData.at) {
-        badgeEl.title = `测试时间: ${new Date(latData.at).toLocaleTimeString()}`;
-      }
-    }
+  /** Update latency badges across all visible groups and members in DOM */
+  function updateAllLatencyBadgesDOM() {
+    (currentGroupsData || []).forEach((group) => {
+      (group.members || []).forEach((member) => {
+        const latData = resolveMemberLatency(member);
+        const badgeEl = document.getElementById(`lat-${cssSafe(group.name)}-${cssSafe(member)}`);
+        if (badgeEl) {
+          badgeEl.className = `latency-badge ${getLatencyClass(latData)}`;
+          badgeEl.textContent = formatLatencyText(latData);
+          const subGroupTarget = currentGroupsData.find((g) => g.name === member);
+          if (subGroupTarget) {
+            const subSel = subGroupTarget.override_member || subGroupTarget.selected;
+            badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''}`;
+          } else if (latData && latData.at) {
+            badgeEl.title = `测试时间: ${new Date(latData.at).toLocaleTimeString()}`;
+          }
+        }
+      });
+    });
   }
 
   function getLatencyClass(latInfo) {
