@@ -418,7 +418,9 @@ input:checked + .slider::before {
   border-radius: 3px;
   background: rgba(99, 102, 241, 0.15);
   color: #a5b4fc;
-  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  /* Keep product casing from formatMemberType (Select / URL-Test / …). */
+  text-transform: none;
 }
 
 .group-summary {
@@ -508,6 +510,9 @@ input:checked + .slider::before {
   font-size: 10px;
   color: var(--text-dim);
   margin-left: 4px;
+  letter-spacing: 0.02em;
+  /* Product casing comes from formatMemberType / memberTypeLabel. */
+  text-transform: none;
 }
 
 /* Latency Badge */

@@ -7,6 +7,89 @@ const leafProbeResults = new Map();
 let currentGroupsData = [];
 const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
 
+/** Display labels for protocol / nested-group kinds (product typography, not raw slugs). */
+function formatMemberType(type) {
+  switch (String(type || '').toLowerCase()) {
+    case 'shadowsocks':
+    case 'ss':
+      return 'SS';
+    case 'trojan':
+      return 'Trojan';
+    case 'snell':
+      return 'Snell';
+    case 'vmess':
+      return 'VMess';
+    case 'http':
+      return 'HTTP';
+    case 'https':
+      return 'HTTPS';
+    case 'socks5':
+      return 'SOCKS5';
+    case 'socks5-tls':
+      return 'SOCKS5-TLS';
+    case 'hysteria2':
+      return 'Hysteria2';
+    case 'tuic':
+    case 'tuic-v5':
+      return 'TUIC';
+    case 'anytls':
+      return 'AnyTLS';
+    case 'h2-connect':
+      return 'H2';
+    case 'ssh':
+      return 'SSH';
+    case 'wireguard':
+      return 'WireGuard';
+    case 'tailscale':
+      return 'Tailscale';
+    case 'external':
+      return 'External';
+    case 'tcp':
+      return 'TCP';
+    case 'udp':
+      return 'UDP';
+    case 'direct':
+      return 'DIRECT';
+    case 'reject':
+      return 'REJECT';
+    case 'select':
+      return 'Select';
+    case 'url-test':
+    case 'urltest':
+    case 'url':
+      return 'URL-Test';
+    case 'fallback':
+      return 'Fallback';
+    case 'load-balance':
+    case 'loadbalance':
+      return 'Load-Balance';
+    case 'smart':
+      return 'Smart';
+    case 'other':
+      return 'Other';
+    case 'unknown':
+      return 'Unknown';
+    default:
+      return titleCaseType(type);
+  }
+}
+
+/** Title-case unknown hyphenated type slugs (`foo_bar` → `Foo-Bar`). */
+function titleCaseType(type) {
+  return String(type || '')
+    .split(/[-_\s]+/u)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join('-');
+}
+
+function memberTypeLabel(info, fallbackType = '') {
+  const raw = (info && info.type) || fallbackType;
+  if (!raw) return '';
+  const type = formatMemberType(raw);
+  return info && info.udp ? `${type}/UDP` : type;
+}
+
 /** Helper to create DOM elements cleanly without innerHTML */
 function el(tag, attributes = {}, ...children) {
   const element = document.createElement(tag);
@@ -449,7 +532,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         el('div', { className: 'group-title-wrapper' },
           svgIcon,
           el('span', { className: 'group-name' }, group.name),
-          el('span', { className: 'group-kind-badge' }, group.kind || 'select'),
+          el('span', { className: 'group-kind-badge' }, formatMemberType(group.kind || 'select')),
           hiddenBadge
         ),
         el('div', { className: 'group-summary' },
@@ -481,14 +564,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const checkMark = el('span', { className: 'check-mark' }, isSelected ? '✓' : '');
         const memberNameEl = el('span', { className: 'member-name' }, member);
 
-        // Type tag badge
-        let typeLabel = memberInfo && memberInfo.type ? memberInfo.type : '';
-        if (subGroupTarget) {
-          typeLabel = subGroupTarget.kind || 'select';
-        }
+        // Type tag badge (product casing; nested groups use group kind)
+        const typeLabel = subGroupTarget
+          ? formatMemberType(subGroupTarget.kind || 'select')
+          : memberTypeLabel(memberInfo);
 
         const typeTag = typeLabel
-          ? el('span', { className: 'member-type-tag' }, typeLabel)
+          ? el('span', { className: 'member-type-tag', title: typeLabel }, typeLabel)
           : null;
 
         let titleText = '点击单独测试该节点';
