@@ -13,8 +13,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const instNameInput = document.getElementById('inst-name');
   const instUrlInput = document.getElementById('inst-url');
   const instSecretInput = document.getElementById('inst-secret');
-  const instHttpProxyInput = document.getElementById('inst-http-proxy');
-  const instSocksProxyInput = document.getElementById('inst-socks-proxy');
 
   const btnTestConn = document.getElementById('btn-test-conn');
   const btnDeleteInst = document.getElementById('btn-delete-inst');
@@ -156,8 +154,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     instNameInput.value = inst.name;
     instUrlInput.value = inst.baseUrl;
     instSecretInput.value = inst.secret || '';
-    instHttpProxyInput.value = inst.httpProxy || '';
-    instSocksProxyInput.value = inst.socksProxy || '';
 
     btnDeleteInst.style.display = instances.length > 1 ? 'inline-block' : 'none';
     hideTestResult();
@@ -173,8 +169,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     instNameInput.value = '';
     instUrlInput.value = 'http://127.0.0.1:9090';
     instSecretInput.value = '';
-    instHttpProxyInput.value = '127.0.0.1:6152';
-    instSocksProxyInput.value = '127.0.0.1:6153';
 
     btnDeleteInst.style.display = 'none';
     hideTestResult();
@@ -203,9 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const formData = {
       name: instNameInput.value.trim(),
       baseUrl: instUrlInput.value.trim(),
-      secret: instSecretInput.value.trim(),
-      httpProxy: instHttpProxyInput.value.trim(),
-      socksProxy: instSocksProxyInput.value.trim()
+      secret: instSecretInput.value.trim()
     };
 
     if (isCreating) {
@@ -246,7 +238,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const status = await SpikeApiClient.getStatus(tempInstance);
-      showTestResult('success', `✅ 连接成功！Profile: ${status.profile} (包含 ${status.groups} 个组, ${status.rules} 条规则)`);
+      const listeners = Array.isArray(status.listeners) ? status.listeners : [];
+      const listenerSummary = listeners.length
+        ? listeners.map((item) => `${item.kind}://${item.address}`).join(', ')
+        : '未暴露 listeners（请升级 Spike）';
+      showTestResult(
+        'success',
+        `✅ 连接成功！Profile: ${status.profile} (组 ${status.groups}, 规则 ${status.rules}) · 代理监听: ${listenerSummary}`
+      );
     } catch (err) {
       showTestResult('error', `❌ 连接失败: ${err.message}`);
     }

@@ -21,7 +21,8 @@
    - 绿 / 黄 / 红 动态延迟徽章标识，超时或异常自动标注。
 
 4. **浏览器代理托管模式 (Chrome Proxy Host)**
-   - 可选开关：一键把 Chrome 浏览器的代理托管至当前选择的 Spike 实例本地端口（HTTP: `127.0.0.1:6152` / SOCKS5: `127.0.0.1:6153`）。
+   - 可选开关：一键把 Chrome 浏览器的代理托管至当前 Spike 实例。
+   - 端口不再手工配置：开启时从 Control API `GET /status` 的 `listeners` 字段自动选择（优先 `mixed` / `http`，其次 `socks`）。
 
 ---
 
@@ -41,9 +42,9 @@
 2. 在选项页面中配置你的 Spike 控制面 API 信息：
    - **实例名称**：如 `Local Spike`
    - **Control API Base URL**：默认 `http://127.0.0.1:9090`
-   - **Control Secret**：若在 Spike 配置中启用了 `http-api-web-secret` 控制面密码，填入该 Secret；未设置可留空。
-   - **代理端口**：默认 `127.0.0.1:6152` (HTTP) / `127.0.0.1:6153` (SOCKS5)。
-3. 点击 **⚡ 测试连接** 验证配置，无误后点击 **保存实例**。
+   - **Control Secret**：若在 Spike 配置中启用了控制面密码（`http-api`），填入该 Secret；未设置可留空。
+   - **代理端口**：无需填写。开启浏览器代理时会读取 `/status.listeners`（mixed / HTTP / SOCKS）。
+3. 点击 **⚡ 测试连接** 验证配置（成功时会展示发现的 listeners），无误后点击 **保存实例**。
 
 ### 3. 日常使用
 
