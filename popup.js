@@ -123,6 +123,30 @@ function el(tag, attributes = {}, ...children) {
   return element;
 }
 
+/** Lightning bolt icon used by group test button and empty-node probe affordance. */
+function createFlashIcon(size = 13) {
+  const flashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  flashIcon.setAttribute('viewBox', '0 0 24 24');
+  flashIcon.setAttribute('width', String(size));
+  flashIcon.setAttribute('height', String(size));
+  flashIcon.setAttribute('stroke', 'currentColor');
+  flashIcon.setAttribute('stroke-width', '2');
+  flashIcon.setAttribute('fill', 'none');
+  flashIcon.setAttribute('class', 'flash-icon');
+  const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  polygon.setAttribute('points', '13 2 3 14 12 14 11 22 21 10 12 10 13 2');
+  flashIcon.appendChild(polygon);
+  return flashIcon;
+}
+
+/** Whether a probe result exists (success or failure), vs never tested. */
+function hasLatencyResult(latInfo) {
+  if (!latInfo) return false;
+  if (typeof latInfo.ok === 'boolean') return true;
+  if (typeof latInfo.ms === 'number') return true;
+  return false;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await StorageManager.init();
   const instances = await StorageManager.getInstances();
@@ -616,18 +640,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       polyline.setAttribute('points', '9 18 15 12 9 6');
       svgIcon.appendChild(polyline);
 
-      // Flash Test Icon SVG
-      const flashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      flashIcon.setAttribute('viewBox', '0 0 24 24');
-      flashIcon.setAttribute('width', '13');
-      flashIcon.setAttribute('height', '13');
-      flashIcon.setAttribute('stroke', 'currentColor');
-      flashIcon.setAttribute('stroke-width', '2');
-      flashIcon.setAttribute('fill', 'none');
-      const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-      polygon.setAttribute('points', '13 2 3 14 12 14 11 22 21 10 12 10 13 2');
-      flashIcon.appendChild(polygon);
-
       const testBtn = el('button', { 
         className: 'btn-test-group',
         title: '测试该组延迟',
@@ -636,7 +648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           e.stopPropagation();
           await runTestGroup(group.name);
         }
-      }, flashIcon);
+      }, createFlashIcon(13));
 
       const selectedSummaryEl = el('span', {
         className: 'current-selected'
@@ -691,22 +703,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           ? el('span', { className: 'member-type-tag', title: typeLabel }, typeLabel)
           : null;
 
-        let titleText = '点击单独测试该节点';
-        if (subGroupTarget) {
-          const subSel = subGroupTarget.override_member || subGroupTarget.selected;
-          titleText = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''} - 点击测试`;
-        } else if (latencyInfo && latencyInfo.at) {
-          titleText = `测试时间: ${new Date(latencyInfo.at).toLocaleTimeString()} - 点击重新测试`;
-        }
-
         const latencyBadge = el('span', {
-          className: `latency-badge ${getLatencyClass(latencyInfo)}`,
-          title: titleText,
+          className: 'latency-badge',
           onClick: async (e) => {
             e.stopPropagation();
             await runTestGroup(group.name, member);
           }
-        }, formatLatencyText(latencyInfo));
+        });
+        applyLatencyBadge(latencyBadge, latencyInfo, { member });
 
         const memberItem = el('div', {
           className: `member-item ${isSelected ? 'selected' : ''}`,
@@ -866,30 +870,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!groupName || !member || !badgeEl) return;
 
       const latData = resolveMemberLatency(member);
-      if (memberProbeIsPending(groupName, member, latData)) {
-        badgeEl.className = 'latency-badge lat-testing';
-        if (!badgeEl.querySelector('.mini-spinner')) {
-          badgeEl.replaceChildren(el('span', { className: 'mini-spinner' }));
-        }
+      const pending = memberProbeIsPending(groupName, member, latData);
+      // Avoid rebuilding spinner DOM every poll tick while still testing.
+      if (pending && badgeEl.classList.contains('lat-testing') && badgeEl.querySelector('.mini-spinner')) {
         return;
       }
-      badgeEl.className = `latency-badge ${getLatencyClass(latData)}`;
-      badgeEl.textContent = formatLatencyText(latData);
-
-      const subGroupTarget = currentGroupsData.find((g) => g.name === member);
-      if (subGroupTarget) {
-        const subSel = subGroupTarget.override_member || subGroupTarget.selected;
-        badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''} - 点击测试`;
-      } else if (latData && latData.at) {
-        badgeEl.title = `测试时间: ${new Date(latData.at).toLocaleTimeString()} - 点击重新测试`;
-      } else {
-        badgeEl.title = '点击单独测试该节点';
-      }
+      applyLatencyBadge(badgeEl, latData, { member, pending });
     });
   }
 
+  /**
+   * Paint a member latency badge: spinner / result text / empty (hover flash).
+   */
+  function applyLatencyBadge(badgeEl, latInfo, { member = '', pending = false } = {}) {
+    if (pending) {
+      badgeEl.className = 'latency-badge lat-testing';
+      badgeEl.title = '正在测速...';
+      badgeEl.replaceChildren(el('span', { className: 'mini-spinner' }));
+      return;
+    }
+
+    const subGroupTarget = currentGroupsData.find((g) => g.name === member);
+    if (subGroupTarget) {
+      const subSel = subGroupTarget.override_member || subGroupTarget.selected;
+      badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''} - 点击测试`;
+    } else if (hasLatencyResult(latInfo) && latInfo.at) {
+      badgeEl.title = `测试时间: ${new Date(latInfo.at).toLocaleTimeString()} - 点击重新测试`;
+    } else {
+      badgeEl.title = '点击单独测试该节点';
+    }
+
+    if (!hasLatencyResult(latInfo)) {
+      badgeEl.className = 'latency-badge lat-empty';
+      if (!badgeEl.querySelector('.flash-icon')) {
+        badgeEl.replaceChildren(createFlashIcon(13));
+      }
+      return;
+    }
+
+    badgeEl.className = `latency-badge ${getLatencyClass(latInfo)}`;
+    badgeEl.textContent = formatLatencyText(latInfo);
+  }
+
   function getLatencyClass(latInfo) {
-    if (!latInfo) return '';
+    if (!latInfo) return 'lat-empty';
     if (!latInfo.ok) return 'lat-error';
     if (typeof latInfo.ms !== 'number') return 'lat-error';
     if (latInfo.ms < 120) return 'lat-fast';
@@ -898,10 +922,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function formatLatencyText(latInfo) {
-    if (!latInfo) return '—';
+    if (!hasLatencyResult(latInfo)) return '';
     if (!latInfo.ok) return latInfo.err || 'Timeout';
     if (typeof latInfo.ms === 'number') return `${latInfo.ms}ms`;
-    return '—';
+    return '';
   }
 
   // Initial load

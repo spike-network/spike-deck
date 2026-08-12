@@ -594,6 +594,14 @@ input:checked + .slider::before {
   text-transform: none;
 }
 
+.member-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 28px;
+  min-height: 20px;
+}
+
 /* Latency Badge */
 .latency-badge {
   font-size: 11px;
@@ -605,6 +613,7 @@ input:checked + .slider::before {
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   transition: all 0.2s;
 }
@@ -613,7 +622,29 @@ input:checked + .slider::before {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* No probe result yet: hide dash; reveal flash icon only on row hover. */
+.latency-badge.lat-empty {
+  opacity: 0;
+  pointer-events: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 2px 4px;
+  min-width: 22px;
+  min-height: 20px;
+}
+
+.member-item:hover .latency-badge.lat-empty {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.member-item:hover .latency-badge.lat-empty:hover {
+  color: var(--accent-cyan);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .latency-badge.lat-testing {
+  opacity: 1;
   color: var(--status-testing);
   background: rgba(245, 158, 11, 0.15);
   border: 1px solid rgba(245, 158, 11, 0.3);
@@ -623,18 +654,22 @@ input:checked + .slider::before {
 }
 
 .latency-badge.lat-fast {
+  opacity: 1;
   color: var(--lat-green);
 }
 
 .latency-badge.lat-medium {
+  opacity: 1;
   color: var(--lat-yellow);
 }
 
 .latency-badge.lat-slow {
+  opacity: 1;
   color: var(--lat-red);
 }
 
 .latency-badge.lat-error {
+  opacity: 1;
   color: var(--lat-gray);
 }
 
