@@ -145,9 +145,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleProxy = document.getElementById('toggle-chrome-proxy');
   const proxyToggleWrapper = document.getElementById('proxy-toggle-wrapper');
   const btnToggleHidden = document.getElementById('btn-toggle-hidden');
+  const btnExpandAll = document.getElementById('btn-expand-all');
+  const btnCollapseAll = document.getElementById('btn-collapse-all');
 
   let showHiddenGroups = await StorageManager.getShowHiddenGroups();
   let groupExpandMode = await StorageManager.getGroupExpandMode();
+  let groupExpandStates = await StorageManager.getGroupExpandStates();
   const activeGroupTests = new Map();
   let groupTestPollTimer = null;
   updateHiddenToggleUI();
@@ -276,12 +279,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderGroups(currentGroupsData);
   });
 
+  btnExpandAll.addEventListener('click', () => {
+    void setAllGroupsExpanded(true);
+  });
+
+  btnCollapseAll.addEventListener('click', () => {
+    void setAllGroupsExpanded(false);
+  });
+
   function updateHiddenToggleUI() {
     if (showHiddenGroups) {
       btnToggleHidden.classList.add('active');
     } else {
       btnToggleHidden.classList.remove('active');
     }
+  }
+
+  /**
+   * Expand or collapse every visible group card.
+   * When mode is 'remember', persist the resulting states.
+   */
+  async function setAllGroupsExpanded(expanded) {
+    const cards = groupsContainer.querySelectorAll('.group-card');
+    if (cards.length === 0) return;
+
+    const nextStates = { ...groupExpandStates };
+    cards.forEach((card) => {
+      card.classList.toggle('expanded', expanded);
+      if (card.dataset.group) {
+        nextStates[card.dataset.group] = expanded;
+      }
+    });
+
+    groupExpandStates = nextStates;
+    if (groupExpandMode === 'remember') {
+      await StorageManager.setGroupExpandStates(nextStates);
+    }
+  }
+
+  async function persistGroupExpandState(groupName, expanded) {
+    if (!groupName) return;
+    groupExpandStates = { ...groupExpandStates, [groupName]: Boolean(expanded) };
+    if (groupExpandMode === 'remember') {
+      await StorageManager.setGroupExpandState(groupName, expanded);
+    }
+  }
+
+  function resolveInitialExpand(group, idx) {
+    if (groupExpandMode === 'expand-all') return true;
+    if (groupExpandMode === 'collapse-all') return false;
+    if (groupExpandMode === 'remember') {
+      if (Object.prototype.hasOwnProperty.call(groupExpandStates, group.name)) {
+        return Boolean(groupExpandStates[group.name]);
+      }
+      // Unknown groups fall back to smart defaults until the user toggles them.
+      return idx < 2 || group.kind === 'select';
+    }
+    // smart
+    return idx < 2 || group.kind === 'select';
   }
 
   // Populate Instance Selector
@@ -546,14 +601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     groupsContainer.replaceChildren();
 
     visibleGroups.forEach((group, idx) => {
-      let isExpand = false;
-      if (groupExpandMode === 'expand-all') {
-        isExpand = true;
-      } else if (groupExpandMode === 'collapse-all') {
-        isExpand = false;
-      } else {
-        isExpand = idx < 2 || group.kind === 'select';
-      }
+      const isExpand = resolveInitialExpand(group, idx);
 
       const currentSelected = group.override_member || group.selected || (group.members && group.members[0]) || '-';
 
@@ -682,6 +730,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       headerEl.addEventListener('click', (e) => {
         if (e.target.closest('.btn-test-group')) return;
         groupCard.classList.toggle('expanded');
+        void persistGroupExpandState(group.name, groupCard.classList.contains('expanded'));
       });
 
       groupsContainer.appendChild(groupCard);
