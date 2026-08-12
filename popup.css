@@ -270,6 +270,7 @@ input:checked + .slider::before {
   padding: 8px 10px;
   border: 1px solid var(--card-border);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
 }
@@ -306,6 +307,68 @@ input:checked + .slider::before {
   border-radius: 4px;
   color: var(--text-muted);
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.proxy-listener-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--card-border);
+}
+
+.proxy-listeners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.proxy-listener {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.proxy-listener-kind {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
+.proxy-listener-address {
+  color: var(--text-main);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  user-select: text;
+}
+
+.proxy-listener-empty,
+.proxy-control-state {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.proxy-control-state {
+  width: 100%;
+  margin-top: 5px;
+}
+
+.proxy-control-state.owned {
+  color: var(--status-online);
+}
+
+.proxy-control-state.blocked {
+  color: var(--status-testing);
+}
+
+.proxy-toggle-wrapper.busy {
+  opacity: 0.55;
 }
 
 /* Main Content & Policy Groups */

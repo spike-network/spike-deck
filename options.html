@@ -79,10 +79,24 @@
         <!-- Global Preferences Panel -->
         <section class="panel preferences-panel" style="margin-top: 16px;">
           <div class="panel-header">
-            <h2>策略组展示偏好 (Group Display Preferences)</h2>
+            <h2>全局偏好</h2>
           </div>
 
           <div class="preference-form">
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="pref-control-proxy">
+                <span>使用 Spike 监听地址接管当前浏览器代理</span>
+              </label>
+              <span class="help-text">
+                开启后自动读取当前实例的 Mixed / HTTP / SOCKS5 地址并写入 Chrome。
+                关闭后 SpikeDeck 会清除自己的代理设置，让 SwitchyOmega 等其他扩展接管。
+              </span>
+              <span class="proxy-preference-state" id="proxy-preference-state"></span>
+            </div>
+
+            <div class="preference-divider"></div>
+
             <div class="form-group">
               <label for="pref-expand-mode">策略组默认展开/收起状态</label>
               <select id="pref-expand-mode" class="select-input">

@@ -53,10 +53,10 @@
       </div>
 
       <div class="proxy-toggle-wrapper" id="proxy-toggle-wrapper">
-        <label class="switch-label" title="开启后将 Chrome 浏览器代理指向当前实例">
+        <label class="switch-label" title="开启后由 SpikeDeck 使用当前实例监听地址接管 Chrome 代理；关闭后释放给其他扩展">
           <input type="checkbox" id="toggle-chrome-proxy">
           <span class="slider"></span>
-          <span class="switch-text">浏览器代理</span>
+          <span class="switch-text">接管代理</span>
         </label>
       </div>
     </div>
@@ -72,6 +72,13 @@
         <span class="badge" id="badge-nodes">节点: -</span>
         <span class="badge" id="badge-rules">规则: -</span>
       </div>
+      <div class="proxy-listener-section">
+        <span class="info-label">代理监听:</span>
+        <div class="proxy-listeners" id="proxy-listeners">
+          <span class="proxy-listener-empty">-</span>
+        </div>
+      </div>
+      <div class="proxy-control-state" id="proxy-control-state">未接管浏览器代理</div>
     </div>
 
     <!-- Policy Groups Section -->

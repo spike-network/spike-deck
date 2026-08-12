@@ -1,5 +1,9 @@
 import { StorageManager } from './lib/storage.js';
 import { SpikeApiClient } from './lib/spike-client.js';
+import {
+  proxyListenerSummary,
+  proxyListenersFromStatus
+} from './lib/proxy-listeners.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   await StorageManager.init();
@@ -20,6 +24,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const prefExpandModeSelect = document.getElementById('pref-expand-mode');
   const prefShowHiddenCheckbox = document.getElementById('pref-show-hidden');
+  const prefControlProxyCheckbox = document.getElementById('pref-control-proxy');
+  const proxyPreferenceState = document.getElementById('proxy-preference-state');
 
   let instances = [];
   let activeInstanceId = '';
@@ -33,6 +39,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const currentShowHidden = await StorageManager.getShowHiddenGroups();
   prefShowHiddenCheckbox.checked = currentShowHidden;
 
+  const currentProxyMode = await StorageManager.isProxyModeEnabled();
+  prefControlProxyCheckbox.checked = currentProxyMode;
+  void refreshProxyPreferenceState();
+
   prefExpandModeSelect.addEventListener('change', async (e) => {
     await StorageManager.setGroupExpandMode(e.target.value);
   });
@@ -40,6 +50,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   prefShowHiddenCheckbox.addEventListener('change', async (e) => {
     const show = e.target.checked;
     await StorageManager.setShowHiddenGroups(show);
+  });
+
+  prefControlProxyCheckbox.addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    const previous = !enabled;
+    prefControlProxyCheckbox.disabled = true;
+    proxyPreferenceState.className = 'proxy-preference-state';
+    proxyPreferenceState.textContent = enabled ? '正在接管浏览器代理…' : '正在释放浏览器代理控制权…';
+    try {
+      await StorageManager.setProxyModeEnabled(enabled);
+      const response = await chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
+      if (!response || !response.ok) {
+        throw new Error(response?.error || '无法更新浏览器代理设置');
+      }
+      renderProxyPreferenceState(response, enabled);
+    } catch (err) {
+      await StorageManager.setProxyModeEnabled(previous);
+      prefControlProxyCheckbox.checked = previous;
+      proxyPreferenceState.className = 'proxy-preference-state error';
+      proxyPreferenceState.textContent = `代理设置更新失败: ${err.message}`;
+    } finally {
+      prefControlProxyCheckbox.disabled = false;
+    }
   });
 
   async function loadData() {
@@ -238,9 +271,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const status = await SpikeApiClient.getStatus(tempInstance);
-      const listeners = Array.isArray(status.listeners) ? status.listeners : [];
+      const listeners = proxyListenerSummary(proxyListenersFromStatus(status, tempInstance));
       const listenerSummary = listeners.length
-        ? listeners.map((item) => `${item.kind}://${item.address}`).join(', ')
+        ? listeners.map((item) => `${item.label} ${item.address}`).join(', ')
         : '未暴露 listeners（请升级 Spike）';
       showTestResult(
         'success',
@@ -260,6 +293,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   function hideTestResult() {
     testResultEl.style.display = 'none';
     testResultEl.className = 'test-result';
+  }
+
+  async function refreshProxyPreferenceState() {
+    const enabled = await StorageManager.isProxyModeEnabled();
+    try {
+      const state = await chrome.runtime.sendMessage({ type: 'GET_PROXY_SETTING_STATE' });
+      if (!state || !state.ok) throw new Error(state?.error || '无法读取 Chrome 代理状态');
+      renderProxyPreferenceState(state, enabled);
+    } catch (err) {
+      proxyPreferenceState.className = 'proxy-preference-state error';
+      proxyPreferenceState.textContent = `无法读取代理控制状态: ${err.message}`;
+    }
+  }
+
+  function renderProxyPreferenceState(state, enabled) {
+    if (enabled && state.controlledBySpikeDeck) {
+      proxyPreferenceState.className = 'proxy-preference-state success';
+      proxyPreferenceState.textContent = 'SpikeDeck 正在控制当前浏览器代理。';
+      return;
+    }
+    if (enabled && state.levelOfControl === 'controlled_by_other_extensions') {
+      proxyPreferenceState.className = 'proxy-preference-state warning';
+      proxyPreferenceState.textContent = '当前代理设置由其他扩展控制。';
+      return;
+    }
+    proxyPreferenceState.className = 'proxy-preference-state';
+    proxyPreferenceState.textContent = 'SpikeDeck 未接管代理；其他代理扩展可正常工作。';
   }
 
   loadData();

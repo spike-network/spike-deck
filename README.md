@@ -23,6 +23,8 @@
 4. **浏览器代理托管模式 (Chrome Proxy Host)**
    - 可选开关：一键把 Chrome 浏览器的代理托管至当前 Spike 实例。
    - 端口不再手工配置：开启时从 Control API `GET /status` 的 `listeners` 字段自动选择（优先 `mixed` / `http`，其次 `socks`）。
+   - Popup 展示发现的 Mixed / HTTP / SOCKS5 可达地址。
+   - 关闭托管时清除 SpikeDeck 写入的代理设置并释放控制权，不影响 SwitchyOmega 等其他代理扩展。
 
 ---
 

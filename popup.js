@@ -1,5 +1,9 @@
 import { StorageManager } from './lib/storage.js';
 import { SpikeApiClient } from './lib/spike-client.js';
+import {
+  proxyListenerSummary,
+  proxyListenersFromStatus
+} from './lib/proxy-listeners.js';
 
 // Global latency cache for leaf nodes by member name
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
@@ -131,12 +135,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const badgeGroups = document.getElementById('badge-groups');
   const badgeNodes = document.getElementById('badge-nodes');
   const badgeRules = document.getElementById('badge-rules');
+  const proxyListeners = document.getElementById('proxy-listeners');
+  const proxyControlState = document.getElementById('proxy-control-state');
   const groupsContainer = document.getElementById('groups-container');
 
   const btnTestAll = document.getElementById('btn-test-all');
   const btnRefresh = document.getElementById('btn-refresh');
   const btnOptions = document.getElementById('btn-options');
   const toggleProxy = document.getElementById('toggle-chrome-proxy');
+  const proxyToggleWrapper = document.getElementById('proxy-toggle-wrapper');
   const btnToggleHidden = document.getElementById('btn-toggle-hidden');
 
   let showHiddenGroups = await StorageManager.getShowHiddenGroups();
@@ -293,11 +300,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Proxy toggle state
   const isProxyEnabled = await StorageManager.isProxyModeEnabled();
   toggleProxy.checked = isProxyEnabled;
+  void refreshProxyControlState();
 
   toggleProxy.addEventListener('change', async (e) => {
     const enabled = e.target.checked;
-    await StorageManager.setProxyModeEnabled(enabled);
-    chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
+    const previous = !enabled;
+    toggleProxy.disabled = true;
+    proxyToggleWrapper.classList.add('busy');
+    try {
+      await StorageManager.setProxyModeEnabled(enabled);
+      const response = await chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
+      if (!response || !response.ok) {
+        throw new Error(response?.error || '无法更新浏览器代理设置');
+      }
+      renderProxyControlState(response, enabled);
+    } catch (err) {
+      await StorageManager.setProxyModeEnabled(previous);
+      toggleProxy.checked = previous;
+      proxyControlState.className = 'proxy-control-state blocked';
+      proxyControlState.textContent = `代理控制失败: ${err.message}`;
+    } finally {
+      toggleProxy.disabled = false;
+      proxyToggleWrapper.classList.remove('busy');
+    }
   });
 
   // Instance selector change handler
@@ -347,6 +372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       badgeGroups.textContent = `组: ${status.groups || groupsData.groups?.length || 0}`;
       badgeNodes.textContent = `节点: ${status.leaves || 0}`;
       badgeRules.textContent = `规则: ${status.rules || 0}`;
+      renderProxyListeners(status);
 
       currentGroupsData = groupsData.groups || [];
 
@@ -361,6 +387,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       badgeGroups.textContent = '组: -';
       badgeNodes.textContent = '节点: -';
       badgeRules.textContent = '规则: -';
+      proxyListeners.replaceChildren(el('span', { className: 'proxy-listener-empty' }, '-'));
 
       const retryBtn = el('button', { id: 'btn-retry', className: 'icon-btn', style: { marginTop: '6px' } }, '重试连接');
       retryBtn.addEventListener('click', () => loadDashboard());
@@ -372,6 +399,49 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       groupsContainer.replaceChildren(errorNode);
     }
+  }
+
+  function renderProxyListeners(status) {
+    const listeners = proxyListenerSummary(proxyListenersFromStatus(status, activeInstance));
+    if (listeners.length === 0) {
+      proxyListeners.replaceChildren(
+        el('span', { className: 'proxy-listener-empty' }, '未发现 HTTP / SOCKS5 / Mixed')
+      );
+      return;
+    }
+    proxyListeners.replaceChildren(...listeners.map((listener) =>
+      el('span', { className: 'proxy-listener' },
+        el('span', { className: 'proxy-listener-kind' }, listener.label),
+        el('span', { className: 'proxy-listener-address' }, listener.address)
+      )
+    ));
+  }
+
+  async function refreshProxyControlState() {
+    const enabled = await StorageManager.isProxyModeEnabled();
+    try {
+      const state = await chrome.runtime.sendMessage({ type: 'GET_PROXY_SETTING_STATE' });
+      if (!state || !state.ok) throw new Error(state?.error || '无法读取 Chrome 代理状态');
+      renderProxyControlState(state, enabled);
+    } catch (err) {
+      proxyControlState.className = 'proxy-control-state blocked';
+      proxyControlState.textContent = `代理状态未知: ${err.message}`;
+    }
+  }
+
+  function renderProxyControlState(state, enabled) {
+    if (enabled && state.controlledBySpikeDeck) {
+      proxyControlState.className = 'proxy-control-state owned';
+      proxyControlState.textContent = 'SpikeDeck 正在接管浏览器代理';
+      return;
+    }
+    if (enabled && state.levelOfControl === 'controlled_by_other_extensions') {
+      proxyControlState.className = 'proxy-control-state blocked';
+      proxyControlState.textContent = '浏览器代理当前由其他扩展控制';
+      return;
+    }
+    proxyControlState.className = 'proxy-control-state';
+    proxyControlState.textContent = '未接管；其他代理扩展可控制浏览器';
   }
 
   /** Ingest member_info last_test_* fields into leafProbeResults map */
