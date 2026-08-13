@@ -891,7 +891,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const subGroupTarget = currentGroupsData.find((g) => g.name === member);
-    if (subGroupTarget) {
+    if (hasLatencyResult(latInfo) && !latInfo.ok) {
+      // Failure reason only in native tooltip; badge shows a red "F".
+      badgeEl.title = latInfo.err || 'Timeout';
+    } else if (subGroupTarget) {
       const subSel = subGroupTarget.override_member || subGroupTarget.selected;
       badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ''} - 点击测试`;
     } else if (hasLatencyResult(latInfo) && latInfo.at) {
@@ -923,7 +926,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function formatLatencyText(latInfo) {
     if (!hasLatencyResult(latInfo)) return '';
-    if (!latInfo.ok) return latInfo.err || 'Timeout';
+    if (!latInfo.ok) return 'F';
     if (typeof latInfo.ms === 'number') return `${latInfo.ms}ms`;
     return '';
   }

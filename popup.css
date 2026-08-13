@@ -670,7 +670,8 @@ input:checked + .slider::before {
 
 .latency-badge.lat-error {
   opacity: 1;
-  color: var(--lat-gray);
+  color: var(--lat-red);
+  font-weight: 700;
 }
 
 .mini-spinner {
