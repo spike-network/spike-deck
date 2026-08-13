@@ -28,6 +28,12 @@
           </svg>
           <span class="btn-label">测速</span>
         </button>
+        <button id="btn-refresh-providers" class="icon-btn provider-refresh-btn" title="刷新外部资源" aria-label="刷新外部资源">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"></path>
+            <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"></path>
+          </svg>
+        </button>
         <button id="btn-refresh" class="icon-btn" title="刷新列表">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
             <path d="M23 4v6h-6"></path>
@@ -42,6 +48,8 @@
         </button>
       </div>
     </header>
+
+    <div id="operation-notice" class="operation-notice" role="status" aria-live="polite" hidden></div>
 
     <!-- Instance Selector & Proxy Bar -->
     <div class="control-bar">

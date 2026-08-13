@@ -164,8 +164,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const groupsContainer = document.getElementById('groups-container');
 
   const btnTestAll = document.getElementById('btn-test-all');
+  const btnRefreshProviders = document.getElementById('btn-refresh-providers');
   const btnRefresh = document.getElementById('btn-refresh');
   const btnOptions = document.getElementById('btn-options');
+  const operationNotice = document.getElementById('operation-notice');
   const toggleProxy = document.getElementById('toggle-chrome-proxy');
   const proxyToggleWrapper = document.getElementById('proxy-toggle-wrapper');
   const btnToggleHidden = document.getElementById('btn-toggle-hidden');
@@ -177,7 +179,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   let groupExpandStates = await StorageManager.getGroupExpandStates();
   const activeGroupTests = new Map();
   let groupTestPollTimer = null;
+  let operationNoticeTimer = null;
   updateHiddenToggleUI();
+
+  function showOperationNotice(message, state, timeoutMs = 0) {
+    if (operationNoticeTimer !== null) {
+      clearTimeout(operationNoticeTimer);
+      operationNoticeTimer = null;
+    }
+    operationNotice.hidden = false;
+    operationNotice.className = `operation-notice ${state}`;
+    operationNotice.textContent = message;
+    if (timeoutMs > 0) {
+      operationNoticeTimer = setTimeout(() => {
+        operationNotice.hidden = true;
+        operationNoticeTimer = null;
+      }, timeoutMs);
+    }
+  }
 
   function scheduleGroupTestPoll(delay = 350) {
     if (groupTestPollTimer !== null || activeGroupTests.size === 0) return;
@@ -416,6 +435,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnRefresh.addEventListener('click', () => {
     loadDashboard();
+  });
+
+  btnRefreshProviders.addEventListener('click', async () => {
+    if (btnRefreshProviders.disabled) return;
+    const targetInstance = activeInstance;
+    btnRefreshProviders.disabled = true;
+    btnRefreshProviders.classList.add('testing');
+    showOperationNotice('正在刷新远程策略与规则资源…', 'pending');
+    try {
+      const result = await SpikeApiClient.refreshProviders(targetInstance);
+      const revision = result.reload?.revision;
+      const suffix = revision ? ` · revision ${revision}` : '';
+      showOperationNotice(`外部资源刷新完成${suffix}`, 'success', 5000);
+      if (activeInstance?.id === targetInstance?.id) {
+        await loadDashboard();
+      }
+    } catch (err) {
+      showOperationNotice(`外部资源刷新失败: ${err.message}`, 'error', 8000);
+    } finally {
+      btnRefreshProviders.disabled = false;
+      btnRefreshProviders.classList.remove('testing');
+    }
   });
 
   btnOptions.addEventListener('click', () => {
