@@ -9,17 +9,31 @@ import {
 
 const PROVIDER_REFRESH_RECONCILE_AFTER_SECONDS = 240;
 const providerRefreshOperations = new Map();
+const GROUP_TEST_POLL_INTERVAL_MS = 700;
+const GROUP_TEST_ALARM_PREFIX = 'group-test-reconcile:';
+const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
+const groupTestPollTimers = new Map();
 
 chrome.runtime.onInstalled.addListener(async () => {
   await StorageManager.init();
   await updateProxySettings();
   await reconcilePersistedProviderRefreshTasks();
+  await reconcilePersistedGroupTestTasks();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   await updateProxySettings();
   await reconcilePersistedProviderRefreshTasks();
+  await reconcilePersistedGroupTestTasks();
 });
+
+if (chrome.alarms?.onAlarm) {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (!alarm.name.startsWith(GROUP_TEST_ALARM_PREFIX)) return;
+    const instanceId = alarm.name.slice(GROUP_TEST_ALARM_PREFIX.length);
+    void refreshGroupTestState(instanceId, { broadcast: true });
+  });
+}
 
 // Listen for message from popup or options page
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -55,7 +69,147 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true;
   }
+  if (message.type === 'START_GROUP_TEST') {
+    startGroupTestTask(message.instanceId, message.groupName, message.memberName).then((result) => {
+      sendResponse({ ok: true, ...result });
+    }).catch(err => {
+      sendResponse({ ok: false, error: safeGroupTestError(err) });
+    });
+    return true;
+  }
+  if (message.type === 'GET_GROUP_TEST_STATE') {
+    refreshGroupTestState(message.instanceId).then((tasks) => {
+      sendResponse({ ok: true, tasks });
+    }).catch(err => {
+      sendResponse({ ok: false, error: safeGroupTestError(err) });
+    });
+    return true;
+  }
 });
+
+async function findInstance(instanceId) {
+  const instances = await StorageManager.getInstances();
+  const instance = instances.find(candidate => candidate.id === instanceId);
+  if (!instance) throw new Error('Spike instance not found');
+  return instance;
+}
+
+async function startGroupTestTask(instanceId, groupName, memberName) {
+  if (!groupName) throw new Error('Policy group is required');
+  const instance = await findInstance(instanceId);
+  const result = await SpikeApiClient.startGroupTest(instance, groupName, memberName || undefined);
+  if (result.mode !== 'async') return result;
+
+  const tasks = mergeGroupTestTasks(
+    await StorageManager.getGroupTestTasks(instanceId),
+    [result.task]
+  );
+  await StorageManager.setGroupTestTasks(instanceId, tasks);
+  broadcastGroupTestState(instanceId, tasks);
+  scheduleGroupTestPoll(instanceId);
+  return result;
+}
+
+async function refreshGroupTestState(instanceId, { broadcast = false } = {}) {
+  const instance = await findInstance(instanceId);
+  let tasks;
+  try {
+    const response = await SpikeApiClient.getGroupTestTasks(instance, 100);
+    tasks = Array.isArray(response?.tasks)
+      ? response.tasks.slice().sort((left, right) => left.id - right.id)
+      : [];
+  } catch (error) {
+    if (error?.status !== 404) throw error;
+    // Legacy Core has only the synchronous endpoint. Keep any already stored
+    // snapshots so switching instances or reopening the popup stays harmless.
+    tasks = await StorageManager.getGroupTestTasks(instanceId);
+  }
+
+  const activeTasks = tasks.filter(task => !terminalGroupTestStatuses.has(task.status));
+  const previous = await StorageManager.getGroupTestTasks(instanceId);
+  if (JSON.stringify(previous) !== JSON.stringify(activeTasks)) {
+    await StorageManager.setGroupTestTasks(instanceId, activeTasks);
+    broadcast = true;
+  }
+  if (broadcast) broadcastGroupTestState(instanceId, tasks);
+
+  if (activeTasks.length > 0) {
+    scheduleGroupTestPoll(instanceId);
+  } else {
+    stopGroupTestPoll(instanceId);
+  }
+  return tasks;
+}
+
+function mergeGroupTestTasks(current, incoming) {
+  const byId = new Map();
+  for (const task of [...(current || []), ...(incoming || [])]) {
+    if (task && Number.isFinite(Number(task.id))) byId.set(Number(task.id), task);
+  }
+  return Array.from(byId.values())
+    .sort((left, right) => Number(left.id) - Number(right.id))
+    .slice(-100);
+}
+
+function scheduleGroupTestPoll(instanceId) {
+  if (!instanceId || groupTestPollTimers.has(instanceId)) return;
+  const timer = setTimeout(() => {
+    groupTestPollTimers.delete(instanceId);
+    void refreshGroupTestState(instanceId, { broadcast: true }).catch(error => {
+      console.warn(`Unable to poll group tests: ${safeGroupTestError(error)}`);
+      scheduleGroupTestPoll(instanceId);
+    });
+  }, GROUP_TEST_POLL_INTERVAL_MS);
+  groupTestPollTimers.set(instanceId, timer);
+  scheduleGroupTestAlarm(instanceId);
+}
+
+function stopGroupTestPoll(instanceId) {
+  const timer = groupTestPollTimers.get(instanceId);
+  if (timer !== undefined) clearTimeout(timer);
+  groupTestPollTimers.delete(instanceId);
+  if (chrome.alarms?.clear) void chrome.alarms.clear(`${GROUP_TEST_ALARM_PREFIX}${instanceId}`);
+}
+
+function scheduleGroupTestAlarm(instanceId) {
+  if (!chrome.alarms?.create) return;
+  chrome.alarms.create(`${GROUP_TEST_ALARM_PREFIX}${instanceId}`, {
+    delayInMinutes: 0.5
+  });
+}
+
+function broadcastGroupTestState(instanceId, tasks) {
+  if (!chrome.runtime.sendMessage) return;
+  try {
+    const sent = chrome.runtime.sendMessage({
+      type: 'GROUP_TEST_STATE_CHANGED',
+      instanceId,
+      tasks
+    });
+    if (sent?.catch) void sent.catch(() => {});
+  } catch {
+    // No extension page is currently open. State is already persisted.
+  }
+}
+
+async function reconcilePersistedGroupTestTasks() {
+  const taskSets = await StorageManager.getGroupTestTaskSets();
+  await Promise.all(Object.entries(taskSets).map(async ([instanceId, tasks]) => {
+    if (!Array.isArray(tasks) || !tasks.some(task => !terminalGroupTestStatuses.has(task.status))) {
+      return;
+    }
+    try {
+      await refreshGroupTestState(instanceId, { broadcast: true });
+    } catch (error) {
+      console.warn(`Unable to restore group tests: ${safeGroupTestError(error)}`);
+      scheduleGroupTestPoll(instanceId);
+    }
+  }));
+}
+
+function safeGroupTestError(error) {
+  return String(error?.message || error || 'Unknown group test error').slice(0, 500);
+}
 
 async function startProviderRefreshTask(instanceId, providerId, providerIds = []) {
   const instances = await StorageManager.getInstances();
@@ -458,7 +612,9 @@ async function getProxyControlState() {
 }
 
 export {
+  refreshGroupTestState,
   getProviderRefreshTask,
   safeProviderRefreshError,
+  startGroupTestTask,
   startProviderRefreshTask
 };

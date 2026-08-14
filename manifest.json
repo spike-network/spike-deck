@@ -23,6 +23,7 @@
     "type": "module"
   },
   "permissions": [
+    "alarms",
     "storage",
     "proxy"
   ],

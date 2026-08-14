@@ -274,7 +274,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   let groupExpandMode = await StorageManager.getGroupExpandMode();
   let groupExpandStates = await StorageManager.getGroupExpandStates();
   const activeGroupTests = new Map();
-  let groupTestPollTimer = null;
   let providersPanelNoticeTimer = null;
   /** @type {Array<{id: string, type: string, source: string, source_kind: string, group?: string, status: string, last_updated_unix?: number, update_interval_seconds: number}>} */
   let currentProviders = [];
@@ -672,31 +671,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function scheduleGroupTestPoll(delay = 350) {
-    if (groupTestPollTimer !== null || activeGroupTests.size === 0) return;
-    groupTestPollTimer = setTimeout(() => {
-      groupTestPollTimer = null;
-      void pollGroupTests();
-    }, delay);
-  }
-
-  async function pollGroupTests() {
-    const taskIds = Array.from(activeGroupTests.keys());
-    await Promise.all(taskIds.map(async (taskId) => {
-      try {
-        const task = await SpikeApiClient.getGroupTestTask(activeInstance, taskId);
-        handleGroupTestTask(task);
-      } catch (err) {
-        if (err.status === 404) {
-          finishGroupTestTask(taskId);
-        } else {
-          console.warn(`Unable to poll group test ${taskId}: ${err.message}`);
-        }
-      }
-    }));
-    scheduleGroupTestPoll(700);
-  }
-
   function handleGroupTestTask(task) {
     const metadata = activeGroupTests.get(task.id) || {
       groupName: task.group,
@@ -718,8 +692,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (terminalGroupTestStatuses.has(task.status)) {
       finishGroupTestTask(task.id);
       void refreshProbeSnapshots();
-    } else {
-      activeGroupTests.set(task.id, metadata);
     }
   }
 
@@ -752,42 +724,71 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function restoreRecentGroupTests() {
     try {
-      const response = await SpikeApiClient.getGroupTestTasks(activeInstance, 100);
-      const tasks = Array.isArray(response.tasks)
-        ? response.tasks.slice().sort((left, right) => left.id - right.id)
-        : [];
-      for (const task of tasks) {
-        const recordedAt = task.completed_at_unix_ms
-          || task.started_at_unix_ms
-          || task.created_at_unix_ms
-          || Date.now();
-        recordProbeResults(task.results, recordedAt);
-        if (!terminalGroupTestStatuses.has(task.status)) {
-          activeGroupTests.set(task.id, {
-            groupName: task.group,
-            targetMember: task.member || null,
-            completedMembers: new Set(
-              (task.results || []).map((result) => result.member)
-            )
-          });
-        }
-      }
-      updateAllLatencyBadgesDOM();
-      scheduleGroupTestPoll();
-    } catch (err) {
-      if (err.status !== 404) {
-        console.warn(`Unable to restore group tests: ${err.message}`);
-      }
+      const response = await chrome.runtime.sendMessage({
+        type: 'GET_GROUP_TEST_STATE',
+        instanceId: activeInstance.id
+      });
+      if (!response?.ok) throw new Error(response?.error || 'Unable to restore group tests');
+      applyGroupTestState(response.tasks);
+    } catch (error) {
+      console.warn(`Unable to restore group tests: ${error.message}`);
     }
+  }
+
+  function applyGroupTestState(tasks) {
+    const previousActiveIds = new Set(activeGroupTests.keys());
+    activeGroupTests.clear();
+    let taskSettled = false;
+
+    const ordered = Array.isArray(tasks)
+      ? tasks.slice().sort((left, right) => left.id - right.id)
+      : [];
+    for (const task of ordered) {
+      const recordedAt = task.completed_at_unix_ms
+        || task.started_at_unix_ms
+        || task.created_at_unix_ms
+        || Date.now();
+      recordProbeResults(task.results, recordedAt);
+      if (terminalGroupTestStatuses.has(task.status)) {
+        if (previousActiveIds.has(task.id)) taskSettled = true;
+        continue;
+      }
+      activeGroupTests.set(task.id, {
+        groupName: task.group,
+        targetMember: task.member || null,
+        completedMembers: new Set(
+          (task.results || []).map((result) => result.member)
+        )
+      });
+    }
+    syncGroupTestButtons();
+    updateAllLatencyBadgesDOM();
+    if (taskSettled) void refreshProbeSnapshots();
+  }
+
+  function syncGroupTestButtons() {
+    groupsContainer.querySelectorAll('.btn-test-group').forEach((button) => {
+      const testing = Array.from(activeGroupTests.values())
+        .some(task => task.groupName === button.dataset.group);
+      button.classList.toggle('testing', testing);
+    });
   }
 
   function resetGroupTestTracking() {
     activeGroupTests.clear();
-    if (groupTestPollTimer !== null) {
-      clearTimeout(groupTestPollTimer);
-      groupTestPollTimer = null;
-    }
+    syncGroupTestButtons();
+    updateAllLatencyBadgesDOM();
   }
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (
+      message.type !== 'GROUP_TEST_STATE_CHANGED'
+      || message.instanceId !== activeInstance?.id
+    ) {
+      return;
+    }
+    applyGroupTestState(message.tasks);
+  });
 
   btnToggleHidden.addEventListener('click', async () => {
     showHiddenGroups = !showHiddenGroups;
@@ -1393,11 +1394,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let asyncTaskStarted = false;
     try {
-      const result = await SpikeApiClient.startGroupTest(
-        activeInstance,
+      const result = await chrome.runtime.sendMessage({
+        type: 'START_GROUP_TEST',
+        instanceId: activeInstance.id,
         groupName,
-        targetMember
-      );
+        memberName: targetMember
+      });
+      if (!result?.ok) throw new Error(result?.error || 'Unable to start group test');
       if (result.mode === 'async') {
         asyncTaskStarted = true;
         activeGroupTests.set(result.task.id, {
@@ -1406,7 +1409,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           completedMembers: new Set()
         });
         handleGroupTestTask(result.task);
-        scheduleGroupTestPoll();
       } else {
         recordProbeResults(result.results);
         updateAllLatencyBadgesDOM();

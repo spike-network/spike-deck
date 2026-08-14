@@ -20,6 +20,7 @@
    - **全组一键测速**：点击顶部⚡“测速”按钮，批量获取各组节点的 RTT 延迟。
    - **单组/单节点测速**：随时刷新单个策略组的节点状态。
    - 绿 / 黄 / 红 动态延迟徽章标识，超时或异常自动标注。
+   - 测速任务由后台 Service Worker 跟踪并持久化；关闭 Popup 不会中断 Core 中的任务，重新打开后会恢复进度和结果。
 
 4. **浏览器代理托管模式 (Chrome Proxy Host)**
    - 可选开关：一键把 Chrome 浏览器的代理托管至当前 Spike 实例。
@@ -72,10 +73,10 @@
 ```text
 extension/
 ├── manifest.json         # Manifest V3 配置文件
-├── background.js          # Service Worker (后台逻辑与 Chrome Proxy 控制)
+├── background.js          # Service Worker（测速/资源任务与 Chrome Proxy 控制）
 ├── popup.html             # Surge 风格弹出面板页面
 ├── popup.css              # Surge 极简暗黑样式表
-├── popup.js               # Popup 交互与 Spike API 接口调度
+├── popup.js               # Popup 展示与用户交互
 ├── options.html           # 实例管理与设置页面
 ├── options.css            # 设置页面样式表
 ├── options.js             # 实例 CRUD 与测试连接逻辑
