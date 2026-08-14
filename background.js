@@ -95,7 +95,8 @@ async function startProviderRefreshTask(instanceId, providerId, providerIds = []
     const accepted = {
       ...task,
       coreTaskId: coreTask.id,
-      startedAtUnix: Math.floor(Number(coreTask.started_at_unix_ms || Date.now()) / 1000)
+      startedAtUnix: Math.floor(Number(coreTask.started_at_unix_ms || Date.now()) / 1000),
+      providerResults: normalizeProviderRefreshResults(coreTask.provider_results)
     };
     await StorageManager.setProviderRefreshTask(instanceId, accepted);
     return accepted;
@@ -182,17 +183,34 @@ async function persistProviderRefreshTask(instanceId, task) {
   let next = task;
   if (task && task.status !== 'running' && !task.outcomeRecorded) {
     const failures = await StorageManager.getProviderRefreshFailures(instanceId);
-    const requestedProviderIds = Array.isArray(task.requestedProviderIds)
-      ? task.requestedProviderIds
-      : (task.providerId ? [task.providerId] : []);
-    for (const providerId of requestedProviderIds) {
-      if (task.status === 'failed') {
-        failures[providerId] = {
+    const providerResults = Array.isArray(task.providerResults)
+      ? task.providerResults
+      : [];
+    if (providerResults.length > 0) {
+      for (const result of providerResults) {
+        if (result.status === 'failed') {
+          failures[result.providerId] = {
+            failedAtUnix: task.finishedAtUnix || Math.floor(Date.now() / 1000),
+            error: safeProviderRefreshError(result.error || task.error || '外部资源更新失败')
+          };
+        } else if (result.status === 'succeeded') {
+          delete failures[result.providerId];
+        }
+      }
+    } else {
+      const requestedProviderIds = Array.isArray(task.requestedProviderIds)
+        ? task.requestedProviderIds
+        : (task.providerId ? [task.providerId] : []);
+      if (task.status === 'succeeded') {
+        for (const providerId of requestedProviderIds) delete failures[providerId];
+      } else if (task.status === 'failed' && task.providerId) {
+        // Older Core versions cannot identify the failed member of an
+        // aggregate refresh. Only persist a failure when the request targeted
+        // one source; the task-level error still reports aggregate failures.
+        failures[task.providerId] = {
           failedAtUnix: task.finishedAtUnix || Math.floor(Date.now() / 1000),
           error: safeProviderRefreshError(task.error || '外部资源更新失败')
         };
-      } else if (task.status === 'succeeded') {
-        delete failures[providerId];
       }
     }
     await StorageManager.setProviderRefreshFailures(instanceId, failures);
@@ -205,13 +223,17 @@ async function persistProviderRefreshTask(instanceId, task) {
 async function reconcileCoreProviderRefreshTask(instance, task) {
   try {
     const coreTask = await SpikeApiClient.getProviderRefreshTask(instance, task.coreTaskId);
-    if (coreTask.status === 'running') return task;
+    const providerResults = normalizeProviderRefreshResults(coreTask.provider_results);
+    if (coreTask.status === 'running') {
+      return providerResults.length > 0 ? { ...task, providerResults } : task;
+    }
     if (coreTask.status === 'failed') {
       return {
         ...task,
         status: 'failed',
         finishedAtUnix: Math.floor(Number(coreTask.completed_at_unix_ms || Date.now()) / 1000),
-        error: safeProviderRefreshError(coreTask.error || '外部资源更新失败')
+        error: safeProviderRefreshError(coreTask.error || '外部资源更新失败'),
+        providerResults
       };
     }
     const inventory = await SpikeApiClient.getProviders(instance).catch(() => null);
@@ -228,7 +250,8 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
       missing: providers.length
         ? providers.filter(provider => provider.status === 'missing').length
         : null,
-      error: null
+      error: null,
+      providerResults
     };
   } catch (error) {
     if (error?.status === 404) {
@@ -241,6 +264,25 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
     }
     return task;
   }
+}
+
+function normalizeProviderRefreshResults(results) {
+  if (!Array.isArray(results)) return [];
+  const validStatuses = new Set(['pending', 'succeeded', 'failed', 'skipped']);
+  return results.flatMap((result) => {
+    const providerId = typeof result?.provider_id === 'string'
+      ? result.provider_id
+      : '';
+    const status = typeof result?.status === 'string' ? result.status : '';
+    if (!providerId || !validStatuses.has(status)) return [];
+    return [{
+      providerId,
+      status,
+      error: status === 'failed'
+        ? safeProviderRefreshError(result.error || '外部资源更新失败')
+        : null
+    }];
+  });
 }
 
 async function reconcileProviderRefreshTask(instance, task, requestError = null) {
