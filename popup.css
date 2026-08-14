@@ -739,14 +739,15 @@ input:checked + .slider::before {
   justify-content: center;
   padding: 2px 4px;
   border-radius: 3px;
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.06);
+  color: rgba(252, 165, 165, 0.58);
   flex-shrink: 0;
   line-height: 0;
 }
 
 .hidden-kind-badge .eye-off-icon {
   display: block;
+  opacity: 0.8;
 }
 
 .override-kind-badge {
