@@ -14,6 +14,7 @@
    - 极简精致的暗黑视觉设计（Surge / iOS / macOS 风格）。
    - 实时展示配置文件 (Profile) 概览与策略组 (Policy Groups) 列表。
    - 点击策略组中的任意节点即可**实时完成选路切换**（调用 `PUT /groups/{name}/select`）。
+   - 对已固定（override/pin）的 `url-test` / `fallback` / `smart` 组，可一键**恢复自动选择**（`DELETE /groups/{name}/select`）。
 
 3. **延迟测试 (Speedtest / Ping)**
    - **全组一键测速**：点击顶部⚡“测速”按钮，批量获取各组节点的 RTT 延迟。
