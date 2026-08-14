@@ -40,7 +40,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === 'START_PROVIDER_REFRESH') {
-    startProviderRefreshTask(message.instanceId, message.providerId).then((task) => {
+    startProviderRefreshTask(message.instanceId, message.providerId, message.providerIds).then((task) => {
       sendResponse({ ok: true, task });
     }).catch(err => {
       sendResponse({ ok: false, error: safeProviderRefreshError(err) });
@@ -48,8 +48,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === 'GET_PROVIDER_REFRESH_TASK') {
-    getProviderRefreshTask(message.instanceId).then((task) => {
-      sendResponse({ ok: true, task });
+    getProviderRefreshState(message.instanceId).then(({ task, failures }) => {
+      sendResponse({ ok: true, task, failures });
     }).catch(err => {
       sendResponse({ ok: false, error: safeProviderRefreshError(err) });
     });
@@ -57,7 +57,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 });
 
-async function startProviderRefreshTask(instanceId, providerId) {
+async function startProviderRefreshTask(instanceId, providerId, providerIds = []) {
   const instances = await StorageManager.getInstances();
   const instance = instances.find(candidate => candidate.id === instanceId);
   if (!instance) throw new Error('Spike instance not found');
@@ -65,11 +65,17 @@ async function startProviderRefreshTask(instanceId, providerId) {
   const existing = await getProviderRefreshTask(instanceId);
   if (existing?.status === 'running') return existing;
 
+  const requestedProviderIds = await resolveRequestedProviderIds(
+    instance,
+    providerId,
+    providerIds
+  );
   const task = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: globalThis.crypto?.randomUUID?.() || `provider-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     instanceId,
     providerId: providerId || null,
+    requestedProviderIds,
     status: 'running',
     startedAtUnix: Math.floor(Date.now() / 1000),
     finishedAtUnix: null,
@@ -97,7 +103,12 @@ async function startProviderRefreshTask(instanceId, providerId) {
     // Older Core versions do not expose asynchronous refresh tasks. Retain a
     // bounded compatibility path; current Core-owned tasks are the reliable path.
     if (error?.status !== 404) {
-      await StorageManager.setProviderRefreshTask(instanceId, null);
+      await persistProviderRefreshTask(instanceId, {
+        ...task,
+        status: 'failed',
+        finishedAtUnix: Math.floor(Date.now() / 1000),
+        error: safeProviderRefreshError(error)
+      });
       throw error;
     }
     const operation = executeProviderRefreshTask(instance, task);
@@ -111,6 +122,18 @@ async function startProviderRefreshTask(instanceId, providerId) {
     });
     return task;
   }
+}
+
+async function resolveRequestedProviderIds(instance, providerId, providerIds) {
+  if (providerId) return [providerId];
+  const supplied = Array.isArray(providerIds)
+    ? providerIds.filter(id => typeof id === 'string' && id.length > 0)
+    : [];
+  if (supplied.length > 0) return [...new Set(supplied)];
+
+  const inventory = await SpikeApiClient.getProviders(instance).catch(() => null);
+  const providers = Array.isArray(inventory?.providers) ? inventory.providers : [];
+  return [...new Set(providers.map(provider => provider?.id).filter(Boolean))];
 }
 
 async function executeProviderRefreshTask(instance, task) {
@@ -127,27 +150,56 @@ async function executeProviderRefreshTask(instance, task) {
       missing: providers.filter(provider => provider.status === 'missing').length,
       error: null
     };
-    await StorageManager.setProviderRefreshTask(instance.id, completed);
+    await persistProviderRefreshTask(instance.id, completed);
   } catch (error) {
     const reconciled = await reconcileProviderRefreshTask(instance, task, error);
-    await StorageManager.setProviderRefreshTask(instance.id, reconciled);
+    await persistProviderRefreshTask(instance.id, reconciled);
   }
+}
+
+async function getProviderRefreshState(instanceId) {
+  const task = await getProviderRefreshTask(instanceId);
+  const failures = await StorageManager.getProviderRefreshFailures(instanceId);
+  return { task, failures };
 }
 
 async function getProviderRefreshTask(instanceId) {
   if (!instanceId) return null;
   const task = await StorageManager.getProviderRefreshTask(instanceId);
-  if (!task || task.status !== 'running' || providerRefreshOperations.has(instanceId)) {
-    return task;
-  }
+  if (!task) return null;
+  if (task.status !== 'running') return persistProviderRefreshTask(instanceId, task);
+  if (providerRefreshOperations.has(instanceId)) return task;
   const instances = await StorageManager.getInstances();
   const instance = instances.find(candidate => candidate.id === instanceId);
   if (!instance) return task;
   const reconciled = task.coreTaskId
     ? await reconcileCoreProviderRefreshTask(instance, task)
     : await reconcileProviderRefreshTask(instance, task);
-  await StorageManager.setProviderRefreshTask(instanceId, reconciled);
-  return reconciled;
+  return persistProviderRefreshTask(instanceId, reconciled);
+}
+
+async function persistProviderRefreshTask(instanceId, task) {
+  let next = task;
+  if (task && task.status !== 'running' && !task.outcomeRecorded) {
+    const failures = await StorageManager.getProviderRefreshFailures(instanceId);
+    const requestedProviderIds = Array.isArray(task.requestedProviderIds)
+      ? task.requestedProviderIds
+      : (task.providerId ? [task.providerId] : []);
+    for (const providerId of requestedProviderIds) {
+      if (task.status === 'failed') {
+        failures[providerId] = {
+          failedAtUnix: task.finishedAtUnix || Math.floor(Date.now() / 1000),
+          error: safeProviderRefreshError(task.error || '外部资源更新失败')
+        };
+      } else if (task.status === 'succeeded') {
+        delete failures[providerId];
+      }
+    }
+    await StorageManager.setProviderRefreshFailures(instanceId, failures);
+    next = { ...task, outcomeRecorded: true };
+  }
+  await StorageManager.setProviderRefreshTask(instanceId, next);
+  return next;
 }
 
 async function reconcileCoreProviderRefreshTask(instance, task) {
@@ -264,7 +316,7 @@ async function reconcilePersistedProviderRefreshTasks() {
     const reconciled = task.coreTaskId
       ? await reconcileCoreProviderRefreshTask(instance, task)
       : await reconcileProviderRefreshTask(instance, task);
-    await StorageManager.setProviderRefreshTask(instance.id, reconciled);
+    await persistProviderRefreshTask(instance.id, reconciled);
   }));
 }
 

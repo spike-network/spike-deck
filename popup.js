@@ -282,6 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   /** Busy key: '*' for all, or a provider id. */
   let providersBusyKey = '';
   let providerRefreshTask = null;
+  let providerRefreshFailures = {};
   let providerRefreshPollTimer = null;
   let handledProviderTaskState = '';
   updateHiddenToggleUI();
@@ -322,6 +323,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (status === 'ready') return '就绪';
     if (status === 'missing') return '缺失';
     if (status === 'refreshing') return '更新中';
+    if (status === 'update_failed') return '更新失败';
     if (status === 'unknown') return '待确认';
     return status || '未知';
   }
@@ -419,7 +421,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function loadProvidersList(showLoading = true) {
     const targetInstance = activeInstance;
-    const wasRefreshing = providersRefreshing;
     if (showLoading) {
       providersList.replaceChildren(
         el('div', { className: 'providers-empty' },
@@ -437,8 +438,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderProvidersList();
       if (providersRefreshing) {
         scheduleProviderRefreshPoll();
-      } else if (wasRefreshing && providerRefreshTask?.status !== 'running' && isProvidersPanelOpen()) {
-        showProvidersPanelNotice('后台外部资源更新已结束，当前状态已重新读取。', 'success');
       }
     } catch (err) {
       if (activeInstance?.id !== targetInstance?.id) return;
@@ -454,14 +453,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnProvidersRefreshAll.disabled = true;
       }
     }
-  }
-
-  function providerRefreshPendingMessage(task) {
-    if (task?.providerId) {
-      const target = currentProviders.find(provider => provider.id === task.providerId);
-      return `正在更新${target ? `“${providerDisplayName(target)}”` : '所选资源'}；完成前继续使用当前配置。可关闭此面板。`;
-    }
-    return '正在更新全部外部资源；完成前继续使用当前配置。可关闭此面板。';
   }
 
   function scheduleProviderRefreshPoll(delay = 750) {
@@ -494,6 +485,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const previousStatus = providerRefreshTask?.status;
     providerRefreshTask = response.task || null;
+    providerRefreshFailures = response.failures && typeof response.failures === 'object'
+      ? response.failures
+      : {};
     const running = providerRefreshTask?.status === 'running';
     providersBusyKey = running
       ? (providerRefreshTask.providerId || '*')
@@ -501,9 +495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnRefreshProviders.classList.toggle('testing', running || providersRefreshing);
 
     if (running) {
-      if (isProvidersPanelOpen()) {
-        showProvidersPanelNotice(providerRefreshPendingMessage(providerRefreshTask), 'pending');
-      }
+      clearProvidersPanelNotice();
       renderProvidersList();
       scheduleProviderRefreshPoll();
       return;
@@ -531,11 +523,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           'error'
         );
       }
-    } else if (!providerRefreshTask && providersRefreshing && isProvidersPanelOpen()) {
-      showProvidersPanelNotice(
-        'Core 正在后台更新外部资源；完成前继续使用当前配置。',
-        'pending'
-      );
+    } else if (!providerRefreshTask && providersRefreshing) {
+      clearProvidersPanelNotice();
     }
     renderProvidersList();
   }
@@ -545,7 +534,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       return 'refreshing';
     }
     if (providersRefreshing && provider.status === 'refreshing') {
-      return 'unknown';
+      return 'refreshing';
+    }
+    if (providerRefreshFailures[provider.id]) {
+      return 'update_failed';
     }
     return provider.status || 'unknown';
   }
@@ -576,6 +568,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const statusClass = `provider-status status-${displayStatus}`;
       const typeLabel = providerTypeLabel(provider.type);
       const statusLabel = providerStatusLabel(displayStatus);
+      const refreshFailure = providerRefreshFailures[provider.id];
       const safeSource = safeProviderSource(provider);
       const sourceTitle = [
         safeSource,
@@ -607,7 +600,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         el('div', { className: 'provider-row-main' },
           el('div', { className: 'provider-row-top' },
             el('span', { className: 'provider-type' }, typeLabel),
-            el('span', { className: statusClass }, statusLabel),
+            el('span', {
+              className: statusClass,
+              title: refreshFailure?.error || ''
+            }, statusLabel),
             updateBtn
           ),
           el('div', {
@@ -642,14 +638,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     providersBusyKey = providerId || '*';
     btnRefreshProviders.classList.add('testing');
-    showProvidersPanelNotice(providerRefreshPendingMessage(providerRefreshTask), 'pending');
+    clearProvidersPanelNotice();
     renderProvidersList();
 
     try {
       const response = await chrome.runtime.sendMessage({
         type: 'START_PROVIDER_REFRESH',
         instanceId: targetInstance.id,
-        providerId: providerId || null
+        providerId: providerId || null,
+        providerIds: providerId ? [providerId] : currentProviders.map(provider => provider.id)
       });
       if (activeInstance?.id !== targetInstance?.id) return;
       if (!response?.ok || !response.task) {
@@ -658,7 +655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       providerRefreshTask = response.task;
       providersBusyKey = providerRefreshTask.providerId || '*';
       handledProviderTaskState = '';
-      showProvidersPanelNotice(providerRefreshPendingMessage(providerRefreshTask), 'pending');
+      clearProvidersPanelNotice();
       renderProvidersList();
       scheduleProviderRefreshPoll(250);
     } catch (err) {
@@ -671,6 +668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'error'
       );
       renderProvidersList();
+      await syncProviderRefreshTask({ announce: true });
     }
   }
 
@@ -907,6 +905,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeInstance = await StorageManager.getActiveInstance();
     providersBusyKey = '';
     providerRefreshTask = null;
+    providerRefreshFailures = {};
     handledProviderTaskState = '';
     if (providerRefreshPollTimer !== null) {
       clearTimeout(providerRefreshPollTimer);

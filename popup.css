@@ -313,11 +313,6 @@ body {
   display: none;
 }
 
-.providers-panel-notice.pending {
-  border-color: rgba(245, 158, 11, 0.35);
-  color: var(--status-testing);
-}
-
 .providers-panel-notice.success {
   border-color: rgba(16, 185, 129, 0.35);
   color: var(--status-online);
@@ -399,7 +394,8 @@ body {
   background: rgba(16, 185, 129, 0.12);
 }
 
-.provider-status.status-missing {
+.provider-status.status-missing,
+.provider-status.status-update_failed {
   color: var(--status-offline);
   background: rgba(239, 68, 68, 0.12);
 }
