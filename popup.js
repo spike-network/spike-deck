@@ -252,6 +252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const proxyListeners = document.getElementById('proxy-listeners');
   const proxyControlState = document.getElementById('proxy-control-state');
   const groupsContainer = document.getElementById('groups-container');
+  const appContainer = document.querySelector('.container');
 
   const btnTestAll = document.getElementById('btn-test-all');
   const btnRefreshProviders = document.getElementById('btn-refresh-providers');
@@ -280,6 +281,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let providersRefreshing = false;
   /** Busy key: '*' for all, or a provider id. */
   let providersBusyKey = '';
+  let providerRefreshTask = null;
+  let providerRefreshPollTimer = null;
+  let handledProviderTaskState = '';
   updateHiddenToggleUI();
 
   function showProvidersPanelNotice(message, state, timeoutMs = 0) {
@@ -309,8 +313,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function providerTypeLabel(type) {
-    if (type === 'policy-group') return 'POLICY-GROUP';
-    if (type === 'ruleset') return 'RULESET';
+    if (type === 'policy-group') return 'POLICY-PATH';
+    if (type === 'ruleset') return 'RULE-SET';
     return String(type || 'UNKNOWN').toUpperCase();
   }
 
@@ -318,7 +322,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (status === 'ready') return '就绪';
     if (status === 'missing') return '缺失';
     if (status === 'refreshing') return '更新中';
+    if (status === 'unknown') return '待确认';
     return status || '未知';
+  }
+
+  function safeProviderSource(provider) {
+    const source = String(provider?.source || '');
+    if (provider?.source_kind !== 'remote') return source;
+    try {
+      const url = new URL(source);
+      const path = url.pathname === '/' ? '' : url.pathname;
+      return `${url.host}${path}${url.search ? '?…' : ''}`;
+    } catch {
+      return source.replace(/\?.*$/, '?…');
+    }
+  }
+
+  function providerDisplayName(provider) {
+    return provider?.group || safeProviderSource(provider) || provider?.id || '未命名资源';
   }
 
   function formatProviderInterval(seconds) {
@@ -351,35 +372,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${days} 天前`;
   }
 
-  function stampRefreshedProviders(list, providerId, startedUnix) {
-    return (list || []).map((provider) => {
-      if (providerId && provider.id !== providerId) return provider;
-      const last = provider.last_updated_unix || 0;
-      return {
-        ...provider,
-        status: provider.status === 'missing' ? 'ready' : provider.status,
-        last_updated_unix: Math.max(last, startedUnix)
-      };
-    });
-  }
-
-  function summarizeProviderRefreshResult(result, providerId) {
-    const providers = Array.isArray(result?.providers) ? result.providers : currentProviders;
-    const revision = result?.reload?.revision;
-    const revisionSuffix = revision ? ` · rev ${revision}` : '';
-    if (providerId) {
-      const target = providers.find((p) => p.id === providerId);
-      const label = target
-        ? (target.group || target.source || providerId)
-        : providerId;
-      return `已更新: ${label}${revisionSuffix}`;
+  function summarizeProviderRefreshTask(task) {
+    const parts = [];
+    if (task.providerId) {
+      const target = currentProviders.find(provider => provider.id === task.providerId);
+      parts.push(`已更新：${target ? providerDisplayName(target) : '所选资源'}`);
+    } else {
+      parts.push('全部外部资源更新完成');
     }
-    const total = providers.length;
-    const ready = providers.filter((p) => p.status === 'ready').length;
-    const missing = providers.filter((p) => p.status === 'missing').length;
-    const parts = [`全部更新完成 · ${ready}/${total} 就绪`];
-    if (missing > 0) parts.push(`${missing} 缺失`);
-    if (revision) parts.push(`rev ${revision}`);
+    if (Number.isFinite(task.ready) && Number.isFinite(task.total)) {
+      parts.push(`${task.ready}/${task.total} 就绪`);
+    }
+    if (Number(task.missing) > 0) parts.push(`${task.missing} 缺失`);
+    if (task.revision) parts.push(`rev ${task.revision}`);
     return parts.join(' · ');
   }
 
@@ -387,8 +392,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     providersPanel.hidden = !open;
     btnRefreshProviders.setAttribute('aria-expanded', open ? 'true' : 'false');
     btnRefreshProviders.classList.toggle('active', open);
+    btnRefresh.title = open ? '刷新外部资源状态' : '刷新列表';
+    appContainer?.classList.toggle('providers-view', open);
     if (!open) {
       clearProvidersPanelNotice();
+      if (providerRefreshTask && providerRefreshTask.status !== 'running') {
+        void StorageManager.setProviderRefreshTask(activeInstance.id, null);
+        providerRefreshTask = null;
+        handledProviderTaskState = '';
+      }
     }
   }
 
@@ -398,46 +410,157 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function openProvidersPanel() {
     setProvidersPanelOpen(true);
-    await loadProvidersList();
+    await Promise.all([
+      loadProvidersList(),
+      syncProviderRefreshTask({ announce: true })
+    ]);
+    renderProvidersList();
   }
 
-  async function loadProvidersList() {
+  async function loadProvidersList(showLoading = true) {
     const targetInstance = activeInstance;
-    providersList.replaceChildren(
-      el('div', { className: 'providers-empty' },
-        el('span', { className: 'mini-spinner' }),
-        el('span', {}, '正在加载外部资源…')
-      )
-    );
-    providersPanelCount.textContent = '';
+    const wasRefreshing = providersRefreshing;
+    if (showLoading) {
+      providersList.replaceChildren(
+        el('div', { className: 'providers-empty' },
+          el('span', { className: 'mini-spinner' }),
+          el('span', {}, '正在加载外部资源…')
+        )
+      );
+      providersPanelCount.textContent = '';
+    }
     try {
       const data = await SpikeApiClient.getProviders(targetInstance);
       if (activeInstance?.id !== targetInstance?.id) return;
       currentProviders = Array.isArray(data.providers) ? data.providers : [];
       providersRefreshing = data.refreshing === true;
       renderProvidersList();
+      if (providersRefreshing) {
+        scheduleProviderRefreshPoll();
+      } else if (wasRefreshing && providerRefreshTask?.status !== 'running' && isProvidersPanelOpen()) {
+        showProvidersPanelNotice('后台外部资源更新已结束，当前状态已重新读取。', 'success');
+      }
     } catch (err) {
       if (activeInstance?.id !== targetInstance?.id) return;
-      currentProviders = [];
-      providersRefreshing = false;
-      providersPanelCount.textContent = '';
-      providersList.replaceChildren(
-        el('div', { className: 'providers-empty error' },
-          `加载失败: ${err.message || '未知错误'}`
-        )
-      );
-      btnProvidersRefreshAll.disabled = true;
+      if (showLoading || currentProviders.length === 0) {
+        currentProviders = [];
+        providersRefreshing = false;
+        providersPanelCount.textContent = '';
+        providersList.replaceChildren(
+          el('div', { className: 'providers-empty error' },
+            `加载失败: ${err.message || '未知错误'}`
+          )
+        );
+        btnProvidersRefreshAll.disabled = true;
+      }
     }
+  }
+
+  function providerRefreshPendingMessage(task) {
+    if (task?.providerId) {
+      const target = currentProviders.find(provider => provider.id === task.providerId);
+      return `正在更新${target ? `“${providerDisplayName(target)}”` : '所选资源'}；完成前继续使用当前配置。可关闭此面板。`;
+    }
+    return '正在更新全部外部资源；完成前继续使用当前配置。可关闭此面板。';
+  }
+
+  function scheduleProviderRefreshPoll(delay = 750) {
+    if (providerRefreshPollTimer !== null) return;
+    providerRefreshPollTimer = setTimeout(async () => {
+      providerRefreshPollTimer = null;
+      await syncProviderRefreshTask({ announce: true });
+      if (providerRefreshTask?.status !== 'running' && providersRefreshing) {
+        await loadProvidersList(false);
+      }
+      if (providerRefreshTask?.status === 'running' || providersRefreshing) {
+        scheduleProviderRefreshPoll(1000);
+      }
+    }, delay);
+  }
+
+  async function syncProviderRefreshTask({ announce = false } = {}) {
+    const targetInstance = activeInstance;
+    let response;
+    try {
+      response = await chrome.runtime.sendMessage({
+        type: 'GET_PROVIDER_REFRESH_TASK',
+        instanceId: targetInstance.id
+      });
+    } catch (error) {
+      console.warn(`Unable to restore provider refresh task: ${error.message}`);
+      return;
+    }
+    if (activeInstance?.id !== targetInstance?.id || !response?.ok) return;
+
+    const previousStatus = providerRefreshTask?.status;
+    providerRefreshTask = response.task || null;
+    const running = providerRefreshTask?.status === 'running';
+    providersBusyKey = running
+      ? (providerRefreshTask.providerId || '*')
+      : '';
+    btnRefreshProviders.classList.toggle('testing', running || providersRefreshing);
+
+    if (running) {
+      if (isProvidersPanelOpen()) {
+        showProvidersPanelNotice(providerRefreshPendingMessage(providerRefreshTask), 'pending');
+      }
+      renderProvidersList();
+      scheduleProviderRefreshPoll();
+      return;
+    }
+
+    const stateKey = providerRefreshTask
+      ? `${providerRefreshTask.id}:${providerRefreshTask.status}`
+      : '';
+    const newlySettled = stateKey && stateKey !== handledProviderTaskState;
+    if (newlySettled && (announce || previousStatus === 'running')) {
+      await loadProvidersList(false);
+      if (providerRefreshTask.status === 'succeeded') {
+        if (isProvidersPanelOpen()) {
+          handledProviderTaskState = stateKey;
+          showProvidersPanelNotice(
+            summarizeProviderRefreshTask(providerRefreshTask),
+            'success'
+          );
+        }
+        void loadDashboard();
+      } else if (providerRefreshTask.status === 'failed' && isProvidersPanelOpen()) {
+        handledProviderTaskState = stateKey;
+        showProvidersPanelNotice(
+          `更新失败：${providerRefreshTask.error || '未知错误'}；当前运行配置未改变。`,
+          'error'
+        );
+      }
+    } else if (!providerRefreshTask && providersRefreshing && isProvidersPanelOpen()) {
+      showProvidersPanelNotice(
+        'Core 正在后台更新外部资源；完成前继续使用当前配置。',
+        'pending'
+      );
+    }
+    renderProvidersList();
+  }
+
+  function resolveProviderDisplayStatus(provider) {
+    if (providersBusyKey === '*' || providersBusyKey === provider.id) {
+      return 'refreshing';
+    }
+    if (providersRefreshing && provider.status === 'refreshing') {
+      return 'unknown';
+    }
+    return provider.status || 'unknown';
   }
 
   function renderProvidersList() {
     const count = currentProviders.length;
     providersPanelCount.textContent = count > 0 ? `${count} 项` : '';
-    const busyAll = providersBusyKey === '*' || providersRefreshing;
+    const busyAll = providersBusyKey === '*';
+    const anyLocalBusy = Boolean(providersBusyKey);
+    const headerBusy = anyLocalBusy || providersRefreshing;
 
-    btnProvidersRefreshAll.disabled = count === 0 || busyAll || Boolean(providersBusyKey);
-    btnProvidersRefreshAll.textContent = busyAll ? '更新中…' : '全部更新';
-    btnProvidersRefreshAll.classList.toggle('testing', busyAll);
+    btnProvidersRefreshAll.disabled = count === 0 || anyLocalBusy || providersRefreshing;
+    btnProvidersRefreshAll.textContent = headerBusy ? '更新中…' : '全部更新';
+    btnProvidersRefreshAll.classList.toggle('testing', headerBusy);
+    btnRefreshProviders.classList.toggle('testing', headerBusy);
 
     if (count === 0) {
       providersList.replaceChildren(
@@ -448,14 +571,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     providersList.replaceChildren();
     currentProviders.forEach((provider) => {
-      const rowBusy = providersBusyKey === provider.id || busyAll;
-      const statusClass = `provider-status status-${provider.status || 'unknown'}`;
+      const rowUpdating = providersBusyKey === '*' || providersBusyKey === provider.id;
+      const displayStatus = resolveProviderDisplayStatus(provider);
+      const statusClass = `provider-status status-${displayStatus}`;
       const typeLabel = providerTypeLabel(provider.type);
-      const statusLabel = rowBusy && providersBusyKey === provider.id
-        ? '更新中'
-        : providerStatusLabel(provider.status);
+      const statusLabel = providerStatusLabel(displayStatus);
+      const safeSource = safeProviderSource(provider);
       const sourceTitle = [
-        provider.source,
+        safeSource,
         provider.group ? `组: ${provider.group}` : null,
         `来源: ${provider.source_kind || 'unknown'}`,
         `间隔: ${formatProviderInterval(provider.update_interval_seconds)}`,
@@ -465,21 +588,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       const updateBtn = el('button', {
         type: 'button',
         className: 'btn-provider-row-update',
-        disabled: rowBusy || Boolean(providersBusyKey),
-        title: '强制刷新此资源',
+        disabled: anyLocalBusy || providersRefreshing,
+        title: provider.source_kind === 'local' ? '重新读取此本地资源' : '强制下载并应用此资源',
         onClick: (e) => {
           e.stopPropagation();
           void runProviderRefresh(provider.id);
         }
-      }, rowBusy && providersBusyKey === provider.id ? '…' : '更新');
+      }, rowUpdating ? '…' : (provider.source_kind === 'local' ? '重读' : '更新'));
 
       const metaParts = [];
-      if (provider.group) metaParts.push(provider.group);
       metaParts.push(provider.source_kind === 'remote' ? '远程' : (provider.source_kind === 'local' ? '本地' : (provider.source_kind || '未知')));
       metaParts.push(formatProviderInterval(provider.update_interval_seconds));
 
       const row = el('div', {
-        className: `provider-row ${rowBusy ? 'busy' : ''}`,
+        className: `provider-row ${rowUpdating ? 'busy' : ''}`,
         dataset: { providerId: provider.id }
       },
         el('div', { className: 'provider-row-main' },
@@ -491,7 +613,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           el('div', {
             className: 'provider-source',
             title: sourceTitle
-          }, provider.source || provider.id),
+          }, providerDisplayName(provider)),
+          provider.group && safeSource
+            ? el('div', { className: 'provider-origin', title: safeSource }, safeSource)
+            : null,
           el('div', { className: 'provider-row-meta' },
             el('span', {
               className: 'provider-updated',
@@ -507,78 +632,45 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function runProviderRefresh(providerId) {
-    if (providersBusyKey) return;
+    if (providersBusyKey || providersRefreshing) return;
     const targetInstance = activeInstance;
-    const busyKey = providerId || '*';
-    const startedUnix = Math.floor(Date.now() / 1000);
-    providersBusyKey = busyKey;
+    providerRefreshTask = {
+      id: 'starting',
+      instanceId: targetInstance.id,
+      providerId: providerId || null,
+      status: 'running'
+    };
+    providersBusyKey = providerId || '*';
     btnRefreshProviders.classList.add('testing');
+    showProvidersPanelNotice(providerRefreshPendingMessage(providerRefreshTask), 'pending');
     renderProvidersList();
-    showProvidersPanelNotice(
-      providerId ? '正在更新所选外部资源…' : '正在更新全部外部资源…',
-      'pending'
-    );
 
     try {
-      const result = await SpikeApiClient.refreshProviders(targetInstance, providerId);
+      const response = await chrome.runtime.sendMessage({
+        type: 'START_PROVIDER_REFRESH',
+        instanceId: targetInstance.id,
+        providerId: providerId || null
+      });
       if (activeInstance?.id !== targetInstance?.id) return;
-
-      if (Array.isArray(result.providers) && result.providers.length > 0) {
-        currentProviders = stampRefreshedProviders(result.providers, providerId, startedUnix);
-      } else {
-        currentProviders = stampRefreshedProviders(currentProviders, providerId, startedUnix);
+      if (!response?.ok || !response.task) {
+        throw new Error(response?.error || '无法启动外部资源更新');
       }
-      providersRefreshing = result.provider_refresh?.refreshing === true;
-
-      // Revalidate from GET so the list matches server inventory.
-      try {
-        const data = await SpikeApiClient.getProviders(targetInstance);
-        if (activeInstance?.id === targetInstance?.id) {
-          currentProviders = stampRefreshedProviders(
-            Array.isArray(data.providers) ? data.providers : currentProviders,
-            providerId,
-            startedUnix
-          );
-          providersRefreshing = data.refreshing === true;
-        }
-      } catch {
-        // Keep stamped snapshot from the refresh response.
-      }
-
-      showProvidersPanelNotice(
-        summarizeProviderRefreshResult(result, providerId),
-        'success',
-        8000
-      );
-      if (activeInstance?.id === targetInstance?.id) {
-        await loadDashboard();
-      }
+      providerRefreshTask = response.task;
+      providersBusyKey = providerRefreshTask.providerId || '*';
+      handledProviderTaskState = '';
+      showProvidersPanelNotice(providerRefreshPendingMessage(providerRefreshTask), 'pending');
+      renderProvidersList();
+      scheduleProviderRefreshPoll(250);
     } catch (err) {
       if (activeInstance?.id !== targetInstance?.id) return;
+      providerRefreshTask = null;
+      providersBusyKey = '';
+      btnRefreshProviders.classList.remove('testing');
       showProvidersPanelNotice(
-        `更新失败: ${err.message || '未知错误'}`,
-        'error',
-        10000
+        `无法启动更新：${err.message || '未知错误'}；当前运行配置未改变。`,
+        'error'
       );
-      // Reload inventory so statuses stay accurate after a failed attempt.
-      try {
-        const data = await SpikeApiClient.getProviders(targetInstance);
-        if (activeInstance?.id === targetInstance?.id) {
-          currentProviders = Array.isArray(data.providers) ? data.providers : currentProviders;
-          providersRefreshing = data.refreshing === true;
-        }
-      } catch {
-        // Keep previous list.
-      }
-    } finally {
-      if (activeInstance?.id === targetInstance?.id) {
-        providersBusyKey = '';
-        btnRefreshProviders.classList.remove('testing');
-        renderProvidersList();
-      } else {
-        providersBusyKey = '';
-        btnRefreshProviders.classList.remove('testing');
-      }
+      renderProvidersList();
     }
   }
 
@@ -814,23 +906,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     resetGroupTestTracking();
     activeInstance = await StorageManager.getActiveInstance();
     providersBusyKey = '';
+    providerRefreshTask = null;
+    handledProviderTaskState = '';
+    if (providerRefreshPollTimer !== null) {
+      clearTimeout(providerRefreshPollTimer);
+      providerRefreshPollTimer = null;
+    }
     currentProviders = [];
     providersRefreshing = false;
     btnRefreshProviders.classList.remove('testing');
     chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
     if (isProvidersPanelOpen()) {
       clearProvidersPanelNotice();
-      await loadProvidersList();
+      await Promise.all([
+        loadProvidersList(),
+        syncProviderRefreshTask({ announce: true })
+      ]);
+    } else {
+      void syncProviderRefreshTask();
     }
     loadDashboard();
   });
 
   btnRefresh.addEventListener('click', () => {
-    loadDashboard();
+    if (isProvidersPanelOpen()) {
+      void Promise.all([
+        loadProvidersList(),
+        syncProviderRefreshTask({ announce: true })
+      ]);
+    } else {
+      loadDashboard();
+    }
   });
 
   btnRefreshProviders.addEventListener('click', async () => {
-    if (providersBusyKey) return;
     if (isProvidersPanelOpen()) {
       setProvidersPanelOpen(false);
       return;
@@ -839,7 +948,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnProvidersClose.addEventListener('click', () => {
-    if (providersBusyKey) return;
     setProvidersPanelOpen(false);
   });
 
@@ -1441,5 +1549,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Initial load
+  void syncProviderRefreshTask();
   loadDashboard();
 });

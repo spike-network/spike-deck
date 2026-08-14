@@ -197,6 +197,33 @@ body {
   padding: 8px 9px;
 }
 
+.container.providers-view .header {
+  order: 0;
+}
+
+.container.providers-view .control-bar {
+  order: 1;
+}
+
+.container.providers-view .providers-panel {
+  order: 2;
+}
+
+.container.providers-view .info-card,
+.container.providers-view .main-content,
+.container.providers-view .footer {
+  display: none;
+}
+
+.container.providers-view #btn-test-all {
+  display: none;
+}
+
+.container.providers-view .providers-list {
+  max-height: none;
+  overflow: visible;
+}
+
 .providers-panel[hidden] {
   display: none;
 }
@@ -406,7 +433,19 @@ body {
   font-size: 11px;
   color: var(--text-main);
   line-height: 1.3;
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.provider-origin {
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   user-select: text;
 }
 
