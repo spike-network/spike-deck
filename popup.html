@@ -28,16 +28,19 @@
           </svg>
           <span class="btn-label">测速</span>
         </button>
-        <button id="btn-refresh-providers" class="icon-btn provider-refresh-btn" title="刷新外部资源" aria-label="刷新外部资源">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
-            <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"></path>
-            <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"></path>
+        <button id="btn-refresh-providers" class="icon-btn provider-refresh-btn" title="外部资源" aria-label="外部资源" aria-expanded="false" aria-controls="providers-panel">
+          <!-- Cloud + download: remote policy/ruleset sources (not a circular refresh) -->
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+            <path d="M12 12v9"></path>
+            <path d="m8 17 4 4 4-4"></path>
           </svg>
         </button>
         <button id="btn-refresh" class="icon-btn" title="刷新列表">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
-            <path d="M23 4v6h-6"></path>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          <!-- Circular arrow: reload the on-screen groups list -->
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+            <polyline points="21 3 21 9 15 9"></polyline>
           </svg>
         </button>
         <button id="btn-options" class="icon-btn" title="管理实例与设置">
@@ -49,7 +52,27 @@
       </div>
     </header>
 
-    <div id="operation-notice" class="operation-notice" role="status" aria-live="polite" hidden></div>
+    <!-- External Providers Panel -->
+    <section id="providers-panel" class="providers-panel" hidden aria-labelledby="providers-panel-title">
+      <div class="providers-panel-header">
+        <div class="providers-panel-title-group">
+          <span id="providers-panel-title" class="providers-panel-title">外部资源</span>
+          <span id="providers-panel-count" class="providers-panel-count"></span>
+        </div>
+        <div class="providers-panel-actions">
+          <button type="button" id="btn-providers-refresh-all" class="btn-provider-action primary" title="强制刷新全部外部资源">
+            全部更新
+          </button>
+          <button type="button" id="btn-providers-close" class="btn-provider-action" title="关闭">
+            关闭
+          </button>
+        </div>
+      </div>
+      <div id="providers-panel-notice" class="providers-panel-notice" role="status" aria-live="polite" hidden></div>
+      <div id="providers-list" class="providers-list">
+        <div class="providers-empty">点击加载外部资源…</div>
+      </div>
+    </section>
 
     <!-- Instance Selector & Proxy Bar -->
     <div class="control-bar">

@@ -139,6 +139,34 @@ function createFlashIcon(size = 13) {
   return flashIcon;
 }
 
+/** Closed-eye icon for hidden policy groups (compact badge, not the word "hidden"). */
+function createEyeOffIcon(size = 11) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('class', 'eye-off-icon');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const paths = [
+    'M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94',
+    'M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19',
+    'M14.12 14.12a3 3 0 1 1-4.24-4.24',
+    'M1 1l22 22'
+  ];
+  for (const d of paths) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+  }
+  return svg;
+}
+
 /** Whether a probe result exists (success or failure), vs never tested. */
 function hasLatencyResult(latInfo) {
   if (!latInfo) return false;
@@ -167,7 +195,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnRefreshProviders = document.getElementById('btn-refresh-providers');
   const btnRefresh = document.getElementById('btn-refresh');
   const btnOptions = document.getElementById('btn-options');
-  const operationNotice = document.getElementById('operation-notice');
+  const providersPanel = document.getElementById('providers-panel');
+  const providersPanelCount = document.getElementById('providers-panel-count');
+  const providersPanelNotice = document.getElementById('providers-panel-notice');
+  const providersList = document.getElementById('providers-list');
+  const btnProvidersRefreshAll = document.getElementById('btn-providers-refresh-all');
+  const btnProvidersClose = document.getElementById('btn-providers-close');
   const toggleProxy = document.getElementById('toggle-chrome-proxy');
   const proxyToggleWrapper = document.getElementById('proxy-toggle-wrapper');
   const btnToggleHidden = document.getElementById('btn-toggle-hidden');
@@ -179,22 +212,311 @@ document.addEventListener('DOMContentLoaded', async () => {
   let groupExpandStates = await StorageManager.getGroupExpandStates();
   const activeGroupTests = new Map();
   let groupTestPollTimer = null;
-  let operationNoticeTimer = null;
+  let providersPanelNoticeTimer = null;
+  /** @type {Array<{id: string, type: string, source: string, source_kind: string, group?: string, status: string, last_updated_unix?: number, update_interval_seconds: number}>} */
+  let currentProviders = [];
+  let providersRefreshing = false;
+  /** Busy key: '*' for all, or a provider id. */
+  let providersBusyKey = '';
   updateHiddenToggleUI();
 
-  function showOperationNotice(message, state, timeoutMs = 0) {
-    if (operationNoticeTimer !== null) {
-      clearTimeout(operationNoticeTimer);
-      operationNoticeTimer = null;
+  function showProvidersPanelNotice(message, state, timeoutMs = 0) {
+    if (providersPanelNoticeTimer !== null) {
+      clearTimeout(providersPanelNoticeTimer);
+      providersPanelNoticeTimer = null;
     }
-    operationNotice.hidden = false;
-    operationNotice.className = `operation-notice ${state}`;
-    operationNotice.textContent = message;
+    providersPanelNotice.hidden = false;
+    providersPanelNotice.className = `providers-panel-notice ${state}`;
+    providersPanelNotice.textContent = message;
     if (timeoutMs > 0) {
-      operationNoticeTimer = setTimeout(() => {
-        operationNotice.hidden = true;
-        operationNoticeTimer = null;
+      providersPanelNoticeTimer = setTimeout(() => {
+        providersPanelNotice.hidden = true;
+        providersPanelNoticeTimer = null;
       }, timeoutMs);
+    }
+  }
+
+  function clearProvidersPanelNotice() {
+    if (providersPanelNoticeTimer !== null) {
+      clearTimeout(providersPanelNoticeTimer);
+      providersPanelNoticeTimer = null;
+    }
+    providersPanelNotice.hidden = true;
+    providersPanelNotice.textContent = '';
+    providersPanelNotice.className = 'providers-panel-notice';
+  }
+
+  function providerTypeLabel(type) {
+    if (type === 'policy-group') return 'POLICY-GROUP';
+    if (type === 'ruleset') return 'RULESET';
+    return String(type || 'UNKNOWN').toUpperCase();
+  }
+
+  function providerStatusLabel(status) {
+    if (status === 'ready') return '就绪';
+    if (status === 'missing') return '缺失';
+    if (status === 'refreshing') return '更新中';
+    return status || '未知';
+  }
+
+  function formatProviderInterval(seconds) {
+    const value = Number(seconds) || 0;
+    if (value <= 0) return '手动';
+    if (value < 60) return `${value}s`;
+    if (value < 3600) return `${Math.round(value / 60)}m`;
+    if (value < 86400) return `${Math.round(value / 3600)}h`;
+    return `${Math.round(value / 86400)}d`;
+  }
+
+  function formatProviderAbsoluteTime(unixSeconds) {
+    if (!unixSeconds) return '从未';
+    return new Date(unixSeconds * 1000).toLocaleString();
+  }
+
+  function formatProviderRelativeTime(unixSeconds) {
+    if (!unixSeconds) return '—';
+    const delta = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
+    if (delta < 60) return '刚刚';
+    if (delta < 3600) {
+      const minutes = Math.floor(delta / 60);
+      return `${minutes} 分钟前`;
+    }
+    if (delta < 86400) {
+      const hours = Math.floor(delta / 3600);
+      return `${hours} 小时前`;
+    }
+    const days = Math.floor(delta / 86400);
+    return `${days} 天前`;
+  }
+
+  function stampRefreshedProviders(list, providerId, startedUnix) {
+    return (list || []).map((provider) => {
+      if (providerId && provider.id !== providerId) return provider;
+      const last = provider.last_updated_unix || 0;
+      return {
+        ...provider,
+        status: provider.status === 'missing' ? 'ready' : provider.status,
+        last_updated_unix: Math.max(last, startedUnix)
+      };
+    });
+  }
+
+  function summarizeProviderRefreshResult(result, providerId) {
+    const providers = Array.isArray(result?.providers) ? result.providers : currentProviders;
+    const revision = result?.reload?.revision;
+    const revisionSuffix = revision ? ` · rev ${revision}` : '';
+    if (providerId) {
+      const target = providers.find((p) => p.id === providerId);
+      const label = target
+        ? (target.group || target.source || providerId)
+        : providerId;
+      return `已更新: ${label}${revisionSuffix}`;
+    }
+    const total = providers.length;
+    const ready = providers.filter((p) => p.status === 'ready').length;
+    const missing = providers.filter((p) => p.status === 'missing').length;
+    const parts = [`全部更新完成 · ${ready}/${total} 就绪`];
+    if (missing > 0) parts.push(`${missing} 缺失`);
+    if (revision) parts.push(`rev ${revision}`);
+    return parts.join(' · ');
+  }
+
+  function setProvidersPanelOpen(open) {
+    providersPanel.hidden = !open;
+    btnRefreshProviders.setAttribute('aria-expanded', open ? 'true' : 'false');
+    btnRefreshProviders.classList.toggle('active', open);
+    if (!open) {
+      clearProvidersPanelNotice();
+    }
+  }
+
+  function isProvidersPanelOpen() {
+    return !providersPanel.hidden;
+  }
+
+  async function openProvidersPanel() {
+    setProvidersPanelOpen(true);
+    await loadProvidersList();
+  }
+
+  async function loadProvidersList() {
+    const targetInstance = activeInstance;
+    providersList.replaceChildren(
+      el('div', { className: 'providers-empty' },
+        el('span', { className: 'mini-spinner' }),
+        el('span', {}, '正在加载外部资源…')
+      )
+    );
+    providersPanelCount.textContent = '';
+    try {
+      const data = await SpikeApiClient.getProviders(targetInstance);
+      if (activeInstance?.id !== targetInstance?.id) return;
+      currentProviders = Array.isArray(data.providers) ? data.providers : [];
+      providersRefreshing = data.refreshing === true;
+      renderProvidersList();
+    } catch (err) {
+      if (activeInstance?.id !== targetInstance?.id) return;
+      currentProviders = [];
+      providersRefreshing = false;
+      providersPanelCount.textContent = '';
+      providersList.replaceChildren(
+        el('div', { className: 'providers-empty error' },
+          `加载失败: ${err.message || '未知错误'}`
+        )
+      );
+      btnProvidersRefreshAll.disabled = true;
+    }
+  }
+
+  function renderProvidersList() {
+    const count = currentProviders.length;
+    providersPanelCount.textContent = count > 0 ? `${count} 项` : '';
+    const busyAll = providersBusyKey === '*' || providersRefreshing;
+
+    btnProvidersRefreshAll.disabled = count === 0 || busyAll || Boolean(providersBusyKey);
+    btnProvidersRefreshAll.textContent = busyAll ? '更新中…' : '全部更新';
+    btnProvidersRefreshAll.classList.toggle('testing', busyAll);
+
+    if (count === 0) {
+      providersList.replaceChildren(
+        el('div', { className: 'providers-empty' }, '未配置外部资源（policy-path / RULE-SET / DOMAIN-SET）')
+      );
+      return;
+    }
+
+    providersList.replaceChildren();
+    currentProviders.forEach((provider) => {
+      const rowBusy = providersBusyKey === provider.id || busyAll;
+      const statusClass = `provider-status status-${provider.status || 'unknown'}`;
+      const typeLabel = providerTypeLabel(provider.type);
+      const statusLabel = rowBusy && providersBusyKey === provider.id
+        ? '更新中'
+        : providerStatusLabel(provider.status);
+      const sourceTitle = [
+        provider.source,
+        provider.group ? `组: ${provider.group}` : null,
+        `来源: ${provider.source_kind || 'unknown'}`,
+        `间隔: ${formatProviderInterval(provider.update_interval_seconds)}`,
+        `更新: ${formatProviderAbsoluteTime(provider.last_updated_unix)}`
+      ].filter(Boolean).join('\n');
+
+      const updateBtn = el('button', {
+        type: 'button',
+        className: 'btn-provider-row-update',
+        disabled: rowBusy || Boolean(providersBusyKey),
+        title: '强制刷新此资源',
+        onClick: (e) => {
+          e.stopPropagation();
+          void runProviderRefresh(provider.id);
+        }
+      }, rowBusy && providersBusyKey === provider.id ? '…' : '更新');
+
+      const metaParts = [];
+      if (provider.group) metaParts.push(provider.group);
+      metaParts.push(provider.source_kind === 'remote' ? '远程' : (provider.source_kind === 'local' ? '本地' : (provider.source_kind || '未知')));
+      metaParts.push(formatProviderInterval(provider.update_interval_seconds));
+
+      const row = el('div', {
+        className: `provider-row ${rowBusy ? 'busy' : ''}`,
+        dataset: { providerId: provider.id }
+      },
+        el('div', { className: 'provider-row-main' },
+          el('div', { className: 'provider-row-top' },
+            el('span', { className: 'provider-type' }, typeLabel),
+            el('span', { className: statusClass }, statusLabel),
+            updateBtn
+          ),
+          el('div', {
+            className: 'provider-source',
+            title: sourceTitle
+          }, provider.source || provider.id),
+          el('div', { className: 'provider-row-meta' },
+            el('span', {
+              className: 'provider-updated',
+              title: formatProviderAbsoluteTime(provider.last_updated_unix)
+            }, formatProviderRelativeTime(provider.last_updated_unix)),
+            el('span', { className: 'provider-meta-sep' }, '·'),
+            el('span', { className: 'provider-meta-extra' }, metaParts.join(' · '))
+          )
+        )
+      );
+      providersList.appendChild(row);
+    });
+  }
+
+  async function runProviderRefresh(providerId) {
+    if (providersBusyKey) return;
+    const targetInstance = activeInstance;
+    const busyKey = providerId || '*';
+    const startedUnix = Math.floor(Date.now() / 1000);
+    providersBusyKey = busyKey;
+    btnRefreshProviders.classList.add('testing');
+    renderProvidersList();
+    showProvidersPanelNotice(
+      providerId ? '正在更新所选外部资源…' : '正在更新全部外部资源…',
+      'pending'
+    );
+
+    try {
+      const result = await SpikeApiClient.refreshProviders(targetInstance, providerId);
+      if (activeInstance?.id !== targetInstance?.id) return;
+
+      if (Array.isArray(result.providers) && result.providers.length > 0) {
+        currentProviders = stampRefreshedProviders(result.providers, providerId, startedUnix);
+      } else {
+        currentProviders = stampRefreshedProviders(currentProviders, providerId, startedUnix);
+      }
+      providersRefreshing = result.provider_refresh?.refreshing === true;
+
+      // Revalidate from GET so the list matches server inventory.
+      try {
+        const data = await SpikeApiClient.getProviders(targetInstance);
+        if (activeInstance?.id === targetInstance?.id) {
+          currentProviders = stampRefreshedProviders(
+            Array.isArray(data.providers) ? data.providers : currentProviders,
+            providerId,
+            startedUnix
+          );
+          providersRefreshing = data.refreshing === true;
+        }
+      } catch {
+        // Keep stamped snapshot from the refresh response.
+      }
+
+      showProvidersPanelNotice(
+        summarizeProviderRefreshResult(result, providerId),
+        'success',
+        8000
+      );
+      if (activeInstance?.id === targetInstance?.id) {
+        await loadDashboard();
+      }
+    } catch (err) {
+      if (activeInstance?.id !== targetInstance?.id) return;
+      showProvidersPanelNotice(
+        `更新失败: ${err.message || '未知错误'}`,
+        'error',
+        10000
+      );
+      // Reload inventory so statuses stay accurate after a failed attempt.
+      try {
+        const data = await SpikeApiClient.getProviders(targetInstance);
+        if (activeInstance?.id === targetInstance?.id) {
+          currentProviders = Array.isArray(data.providers) ? data.providers : currentProviders;
+          providersRefreshing = data.refreshing === true;
+        }
+      } catch {
+        // Keep previous list.
+      }
+    } finally {
+      if (activeInstance?.id === targetInstance?.id) {
+        providersBusyKey = '';
+        btnRefreshProviders.classList.remove('testing');
+        renderProvidersList();
+      } else {
+        providersBusyKey = '';
+        btnRefreshProviders.classList.remove('testing');
+      }
     }
   }
 
@@ -429,7 +751,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     await StorageManager.setActiveInstanceId(selectedId);
     resetGroupTestTracking();
     activeInstance = await StorageManager.getActiveInstance();
+    providersBusyKey = '';
+    currentProviders = [];
+    providersRefreshing = false;
+    btnRefreshProviders.classList.remove('testing');
     chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
+    if (isProvidersPanelOpen()) {
+      clearProvidersPanelNotice();
+      await loadProvidersList();
+    }
     loadDashboard();
   });
 
@@ -438,25 +768,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnRefreshProviders.addEventListener('click', async () => {
-    if (btnRefreshProviders.disabled) return;
-    const targetInstance = activeInstance;
-    btnRefreshProviders.disabled = true;
-    btnRefreshProviders.classList.add('testing');
-    showOperationNotice('正在刷新远程策略与规则资源…', 'pending');
-    try {
-      const result = await SpikeApiClient.refreshProviders(targetInstance);
-      const revision = result.reload?.revision;
-      const suffix = revision ? ` · revision ${revision}` : '';
-      showOperationNotice(`外部资源刷新完成${suffix}`, 'success', 5000);
-      if (activeInstance?.id === targetInstance?.id) {
-        await loadDashboard();
-      }
-    } catch (err) {
-      showOperationNotice(`外部资源刷新失败: ${err.message}`, 'error', 8000);
-    } finally {
-      btnRefreshProviders.disabled = false;
-      btnRefreshProviders.classList.remove('testing');
+    if (providersBusyKey) return;
+    if (isProvidersPanelOpen()) {
+      setProvidersPanelOpen(false);
+      return;
     }
+    await openProvidersPanel();
+  });
+
+  btnProvidersClose.addEventListener('click', () => {
+    if (providersBusyKey) return;
+    setProvidersPanelOpen(false);
+  });
+
+  btnProvidersRefreshAll.addEventListener('click', async () => {
+    await runProviderRefresh();
   });
 
   btnOptions.addEventListener('click', () => {
@@ -696,7 +1022,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       }, currentSelected);
 
       const hiddenBadge = group.hidden
-        ? el('span', { className: 'hidden-kind-badge' }, 'hidden')
+        ? el('span', {
+            className: 'hidden-kind-badge',
+            title: '隐藏组',
+            'aria-label': '隐藏组'
+          }, createEyeOffIcon(11))
         : null;
 
       const headerEl = el('div', { className: 'group-header' },
