@@ -601,6 +601,25 @@ input:checked + .slider::before {
   gap: 4px;
 }
 
+.traffic-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.traffic-down {
+  color: #34d399;
+}
+
+.traffic-up {
+  color: #38bdf8;
+}
+
 .badge {
   font-size: 10px;
   padding: 2px 6px;

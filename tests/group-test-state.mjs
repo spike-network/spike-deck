@@ -16,7 +16,8 @@ const alarms = new Map();
 globalThis.chrome = {
   action: {
     setBadgeBackgroundColor() {},
-    setBadgeText() {}
+    setBadgeText() {},
+    setTitle() {}
   },
   alarms: {
     create(name, options) {
@@ -40,6 +41,7 @@ globalThis.chrome = {
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
     onStartup: { addListener() {} },
+    onConnect: { addListener() {} },
     async sendMessage(message) {
       broadcasts.push(message);
     }

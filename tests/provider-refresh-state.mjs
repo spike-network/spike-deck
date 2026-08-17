@@ -14,7 +14,13 @@ const storage = {
 globalThis.chrome = {
   action: {
     setBadgeBackgroundColor() {},
-    setBadgeText() {}
+    setBadgeText() {},
+    setTitle() {}
+  },
+  alarms: {
+    create() {},
+    async clear() { return true; },
+    onAlarm: { addListener() {} }
   },
   proxy: {
     settings: {
@@ -28,7 +34,8 @@ globalThis.chrome = {
   runtime: {
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
-    onStartup: { addListener() {} }
+    onStartup: { addListener() {} },
+    onConnect: { addListener() {} }
   },
   storage: {
     local: {

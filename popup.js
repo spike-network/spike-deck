@@ -4,6 +4,7 @@ import {
   proxyListenerSummary,
   proxyListenersFromStatus
 } from './lib/proxy-listeners.js';
+import { formatRate } from './lib/format-rate.js';
 
 // Global latency cache for leaf nodes by member name
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
@@ -249,6 +250,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const badgeGroups = document.getElementById('badge-groups');
   const badgeNodes = document.getElementById('badge-nodes');
   const badgeRules = document.getElementById('badge-rules');
+  const trafficDown = document.getElementById('traffic-down');
+  const trafficUp = document.getElementById('traffic-up');
   const proxyListeners = document.getElementById('proxy-listeners');
   const proxyControlState = document.getElementById('proxy-control-state');
   const groupsContainer = document.getElementById('groups-container');
@@ -267,6 +270,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleProxy = document.getElementById('toggle-chrome-proxy');
   const proxyToggleWrapper = document.getElementById('proxy-toggle-wrapper');
   const btnToggleHidden = document.getElementById('btn-toggle-hidden');
+  const trafficPort = chrome.runtime.connect({ name: 'traffic-watch' });
+  let trafficTimer = null;
   const btnExpandAll = document.getElementById('btn-expand-all');
   const btnCollapseAll = document.getElementById('btn-collapse-all');
 
@@ -989,6 +994,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       badgeNodes.textContent = `节点: ${status.leaves || 0}`;
       badgeRules.textContent = `规则: ${status.rules || 0}`;
       renderProxyListeners(status);
+      void refreshTraffic();
 
       currentGroupsData = groupsData.groups || [];
 
@@ -1003,6 +1009,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       badgeGroups.textContent = '组: -';
       badgeNodes.textContent = '节点: -';
       badgeRules.textContent = '规则: -';
+      renderTraffic(null);
+      publishTrafficSample(null, err.message || 'unreachable');
       proxyListeners.replaceChildren(el('span', { className: 'proxy-listener-empty' }, '-'));
 
       const retryBtn = el('button', { id: 'btn-retry', className: 'icon-btn', style: { marginTop: '6px' } }, '重试连接');
@@ -1014,6 +1022,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         retryBtn
       );
       groupsContainer.replaceChildren(errorNode);
+    }
+  }
+
+  function renderTraffic(traffic) {
+    if (!traffic) {
+      trafficDown.textContent = '↓ —';
+      trafficUp.textContent = '↑ —';
+      return;
+    }
+    trafficDown.textContent = `↓ ${formatRate(traffic.download_bytes_per_second)}`;
+    trafficUp.textContent = `↑ ${formatRate(traffic.upload_bytes_per_second)}`;
+  }
+
+  function publishTrafficSample(traffic, error) {
+    const payload = { type: 'TRAFFIC_SAMPLE', traffic: traffic || null, error: error || null };
+    try {
+      trafficPort.postMessage(payload);
+    } catch {
+      chrome.runtime.sendMessage(payload);
+    }
+  }
+
+  async function refreshTraffic() {
+    const targetInstance = activeInstance;
+    try {
+      const metrics = await SpikeApiClient.getMetrics(targetInstance);
+      if (activeInstance?.id !== targetInstance?.id) return;
+      renderTraffic(metrics?.traffic);
+      publishTrafficSample(metrics?.traffic);
+    } catch (error) {
+      if (activeInstance?.id !== targetInstance?.id) return;
+      renderTraffic(null);
+      publishTrafficSample(null, error.message || 'unreachable');
     }
   }
 
@@ -1552,4 +1593,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initial load
   void syncProviderRefreshTask();
   loadDashboard();
+  void refreshTraffic();
+  trafficTimer = setInterval(() => {
+    void refreshTraffic();
+  }, 1000);
+  window.addEventListener('unload', () => {
+    if (trafficTimer !== null) clearInterval(trafficTimer);
+    try {
+      trafficPort.disconnect();
+    } catch {
+      // Popup teardown.
+    }
+  });
 });

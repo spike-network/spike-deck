@@ -4,6 +4,7 @@ import {
   preferredProxyEndpoint,
   proxyListenersFromStatus
 } from './lib/proxy-listeners.js';
+import { formatBadgeRate, trafficTitle } from './lib/format-rate.js';
 
 // Background Service Worker for SpikeDeck
 
@@ -11,27 +12,53 @@ const PROVIDER_REFRESH_RECONCILE_AFTER_SECONDS = 240;
 const providerRefreshOperations = new Map();
 const GROUP_TEST_POLL_INTERVAL_MS = 700;
 const GROUP_TEST_ALARM_PREFIX = 'group-test-reconcile:';
+const TRAFFIC_RATE_ALARM = 'traffic-rate';
 const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
 const groupTestPollTimers = new Map();
+let trafficWatchPorts = 0;
 
 chrome.runtime.onInstalled.addListener(async () => {
   await StorageManager.init();
   await updateProxySettings();
   await reconcilePersistedProviderRefreshTasks();
   await reconcilePersistedGroupTestTasks();
+  await ensureTrafficRateAlarm();
+  await refreshTrafficBadgeFromActiveInstance();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   await updateProxySettings();
   await reconcilePersistedProviderRefreshTasks();
   await reconcilePersistedGroupTestTasks();
+  await ensureTrafficRateAlarm();
+  await refreshTrafficBadgeFromActiveInstance();
 });
 
 if (chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === TRAFFIC_RATE_ALARM) {
+      if (trafficWatchPorts > 0) return;
+      void refreshTrafficBadgeFromActiveInstance();
+      return;
+    }
     if (!alarm.name.startsWith(GROUP_TEST_ALARM_PREFIX)) return;
     const instanceId = alarm.name.slice(GROUP_TEST_ALARM_PREFIX.length);
     void refreshGroupTestState(instanceId, { broadcast: true });
+  });
+}
+
+if (chrome.runtime?.onConnect?.addListener) {
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== 'traffic-watch') return;
+    trafficWatchPorts += 1;
+    port.onMessage.addListener((message) => {
+      if (message?.type === 'TRAFFIC_SAMPLE') {
+        applyTrafficBadge(message.traffic, message.error);
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      trafficWatchPorts = Math.max(0, trafficWatchPorts - 1);
+    });
   });
 }
 
@@ -84,6 +111,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({ ok: false, error: safeGroupTestError(err) });
     });
     return true;
+  }
+  if (message.type === 'TRAFFIC_SAMPLE') {
+    applyTrafficBadge(message.traffic, message.error);
+    sendResponse({ ok: true });
+    return false;
   }
 });
 
@@ -597,6 +629,72 @@ async function updateProxySettings() {
     }
     throw err;
   }
+}
+
+async function ensureTrafficRateAlarm() {
+  if (!chrome.alarms?.create) return;
+  chrome.alarms.create(TRAFFIC_RATE_ALARM, { periodInMinutes: 0.5 });
+}
+
+async function refreshTrafficBadgeFromActiveInstance() {
+  try {
+    const instance = await StorageManager.getActiveInstance();
+    if (!instance) {
+      applyTrafficBadge(null, 'no instance');
+      return;
+    }
+    const metrics = await SpikeApiClient.getMetrics(instance);
+    applyTrafficBadge(metrics?.traffic);
+  } catch (error) {
+    applyTrafficBadge(null, error?.message || 'unreachable');
+  }
+}
+
+function applyTrafficBadge(traffic, error) {
+  const titleApi = chrome.action?.setTitle?.bind(chrome.action);
+  const setTitle = (title) => {
+    if (titleApi) titleApi({ title });
+  };
+  if (error || !traffic) {
+    setTitle(error ? `SpikeDeck · ${error}` : 'SpikeDeck');
+    void restoreProxyBadgeIfNeeded(Boolean(error));
+    return;
+  }
+  const down = Number(traffic.download_bytes_per_second) || 0;
+  const up = Number(traffic.upload_bytes_per_second) || 0;
+  void StorageManager.isProxyModeEnabled()
+    .then((proxyOn) => {
+      setTitle(`${trafficTitle(traffic)}${proxyOn ? ' · proxy on' : ''}`);
+      if (down > 0 || up > 0) {
+        chrome.action.setBadgeBackgroundColor({ color: '#0f766e' });
+        chrome.action.setBadgeText({ text: formatBadgeRate(down) });
+        return;
+      }
+      if (proxyOn) {
+        chrome.action.setBadgeBackgroundColor({ color: '#6366F1' });
+        chrome.action.setBadgeText({ text: 'ON' });
+        return;
+      }
+      chrome.action.setBadgeText({ text: '' });
+    })
+    .catch(() => {
+      setTitle(trafficTitle(traffic));
+      chrome.action.setBadgeText({ text: down > 0 || up > 0 ? formatBadgeRate(down) : '' });
+    });
+}
+
+async function restoreProxyBadgeIfNeeded(keepErrorTitle) {
+  try {
+    if (await StorageManager.isProxyModeEnabled()) {
+      chrome.action.setBadgeBackgroundColor({ color: '#6366F1' });
+      chrome.action.setBadgeText({ text: 'ON' });
+      if (!keepErrorTitle) chrome.action.setTitle?.({ title: 'SpikeDeck · proxy on' });
+      return;
+    }
+  } catch {
+    // Fall through and clear.
+  }
+  chrome.action.setBadgeText({ text: '' });
 }
 
 async function releaseProxyControl() {
