@@ -4,7 +4,7 @@ import {
   proxyListenerSummary,
   proxyListenersFromStatus
 } from './lib/proxy-listeners.js';
-import { formatRate } from './lib/format-rate.js';
+import { formatByteCount, formatRate } from './lib/format-rate.js';
 
 // Global latency cache for leaf nodes by member name
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
@@ -252,6 +252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const badgeRules = document.getElementById('badge-rules');
   const trafficDown = document.getElementById('traffic-down');
   const trafficUp = document.getElementById('traffic-up');
+  const trafficTotal = document.getElementById('traffic-total');
   const proxyListeners = document.getElementById('proxy-listeners');
   const proxyControlState = document.getElementById('proxy-control-state');
   const groupsContainer = document.getElementById('groups-container');
@@ -1029,10 +1030,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!traffic) {
       trafficDown.textContent = '↓ —';
       trafficUp.textContent = '↑ —';
+      trafficTotal.textContent = '';
       return;
     }
     trafficDown.textContent = `↓ ${formatRate(traffic.download_bytes_per_second)}`;
     trafficUp.textContent = `↑ ${formatRate(traffic.upload_bytes_per_second)}`;
+    trafficTotal.textContent = `${formatByteCount(traffic.download_bytes_total)} / ${formatByteCount(traffic.upload_bytes_total)}`;
   }
 
   function publishTrafficSample(traffic, error) {

@@ -620,6 +620,12 @@ input:checked + .slider::before {
   color: #38bdf8;
 }
 
+.traffic-total {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
 .badge {
   font-size: 10px;
   padding: 2px 6px;
