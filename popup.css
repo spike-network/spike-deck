@@ -564,6 +564,86 @@ input:checked + .slider::before {
   background-color: #fff;
 }
 
+.outbound-mode-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.outbound-mode-card.busy {
+  opacity: 0.72;
+}
+
+.outbound-mode-card.unavailable {
+  color: var(--text-dim);
+}
+
+.outbound-mode-head,
+.outbound-mode-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.outbound-mode-head {
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.outbound-mode-head small {
+  color: var(--accent-cyan);
+  font-weight: 500;
+}
+
+.outbound-mode-controls {
+  flex-wrap: wrap;
+}
+
+.btn-outbound-mode {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-outbound-mode:hover:not(:disabled),
+.btn-outbound-mode.active {
+  color: #fff;
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-outbound-mode:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.outbound-policy-select {
+  flex: 1 1 160px;
+  min-width: 0;
+  background: var(--card-bg);
+  color: var(--text-main);
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 11px;
+  outline: none;
+}
+
+.outbound-policy-select:focus {
+  border-color: var(--primary-color);
+}
+
 /* Info Card */
 .info-card {
   background: var(--panel-bg);

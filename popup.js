@@ -257,6 +257,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const proxyControlState = document.getElementById('proxy-control-state');
   const groupsContainer = document.getElementById('groups-container');
   const appContainer = document.querySelector('.container');
+  const outboundModeCard = document.getElementById('outbound-mode-card');
+  const outboundModeState = document.getElementById('outbound-mode-state');
+  const outboundPolicySelect = document.getElementById('outbound-policy-select');
+  const outboundModeButtons = Array.from(document.querySelectorAll('.btn-outbound-mode'));
 
   const btnTestAll = document.getElementById('btn-test-all');
   const btnRefreshProviders = document.getElementById('btn-refresh-providers');
@@ -290,6 +294,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let providerRefreshFailures = {};
   let providerRefreshPollTimer = null;
   let handledProviderTaskState = '';
+  let currentOutbound = null;
+  let currentOutboundPolicies = [];
+  let outboundBusy = false;
   updateHiddenToggleUI();
 
   function showProvidersPanelNotice(message, state, timeoutMs = 0) {
@@ -361,6 +368,85 @@ document.addEventListener('DOMContentLoaded', async () => {
   function formatProviderAbsoluteTime(unixSeconds) {
     if (!unixSeconds) return '从未';
     return new Date(unixSeconds * 1000).toLocaleString();
+  }
+
+  function outboundModeLabel(mode) {
+    if (mode === 'direct') return '全部直连';
+    if (mode === 'global') return '全局代理';
+    return '规则模式';
+  }
+
+  function outboundPolicyNames(policies, groups, rememberedPolicy) {
+    const names = new Set();
+    if (rememberedPolicy) names.add(rememberedPolicy);
+    const policyRows = Array.isArray(policies?.policies) ? policies.policies : [];
+    if (policyRows.length > 0) {
+      policyRows.forEach((policy) => {
+        if (policy?.name) names.add(policy.name);
+      });
+      return Array.from(names);
+    }
+    (groups || []).forEach((group) => {
+      if (group?.name) names.add(group.name);
+      (group?.members || []).forEach((member) => names.add(member));
+    });
+    return Array.from(names);
+  }
+
+  function renderOutboundMode(outbound, policies, unavailableMessage = '') {
+    currentOutbound = outbound;
+    currentOutboundPolicies = policies || [];
+    const unavailable = !outbound;
+    outboundModeCard.classList.toggle('unavailable', unavailable);
+    outboundModeCard.classList.toggle('busy', outboundBusy);
+
+    const previousPolicySelection = outboundPolicySelect.value;
+    outboundPolicySelect.replaceChildren();
+    if (currentOutboundPolicies.length > 0) {
+      currentOutboundPolicies.forEach((policy) => {
+        const option = el('option', { value: policy }, policy);
+        outboundPolicySelect.appendChild(option);
+      });
+      const preferred = previousPolicySelection || outbound?.global_policy || currentOutboundPolicies[0];
+      outboundPolicySelect.value = currentOutboundPolicies.includes(preferred)
+        ? preferred
+        : currentOutboundPolicies[0];
+    } else {
+      outboundPolicySelect.appendChild(el('option', { value: '' }, '无可用策略'));
+      outboundPolicySelect.value = '';
+    }
+
+    outboundModeButtons.forEach((button) => {
+      const mode = button.dataset.mode;
+      const active = outbound?.mode === mode;
+      const changesGlobalPolicy = mode === 'global'
+        && active
+        && outboundPolicySelect.value
+        && outboundPolicySelect.value !== outbound?.global_policy;
+      button.classList.toggle('active', active && !changesGlobalPolicy);
+      button.disabled = unavailable
+        || outboundBusy
+        || (active && !changesGlobalPolicy)
+        || (mode === 'global' && !outboundPolicySelect.value);
+    });
+    outboundPolicySelect.disabled = unavailable || outboundBusy || currentOutboundPolicies.length === 0;
+
+    if (unavailable) {
+      outboundModeState.textContent = unavailableMessage || '当前核心不支持';
+      return;
+    }
+    outboundModeState.textContent = outbound.mode === 'global'
+      ? `${outboundModeLabel(outbound.mode)} · ${outbound.global_policy || outboundPolicySelect.value || '未选择'}`
+      : outboundModeLabel(outbound.mode);
+  }
+
+  async function optionalApiRequest(label, run) {
+    try {
+      return await run();
+    } catch (err) {
+      console.warn(`${label} unavailable: ${err.message || err}`);
+      return null;
+    }
   }
 
   function formatProviderRelativeTime(unixSeconds) {
@@ -550,7 +636,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderProvidersList() {
     const count = currentProviders.length;
     providersPanelCount.textContent = count > 0 ? `${count} 项` : '';
-    const busyAll = providersBusyKey === '*';
     const anyLocalBusy = Boolean(providersBusyKey);
     const headerBusy = anyLocalBusy || providersRefreshing;
 
@@ -920,7 +1005,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     currentProviders = [];
     providersRefreshing = false;
+    currentOutbound = null;
+    currentOutboundPolicies = [];
     btnRefreshProviders.classList.remove('testing');
+    renderOutboundMode(null, [], '切换实例中…');
     chrome.runtime.sendMessage({ type: 'UPDATE_PROXY_SETTING' });
     if (isProvidersPanelOpen()) {
       clearProvidersPanelNotice();
@@ -969,9 +1057,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  outboundPolicySelect.addEventListener('change', () => {
+    renderOutboundMode(currentOutbound, currentOutboundPolicies, '核心未暴露 /spike/outbound');
+  });
+
+  outboundModeButtons.forEach((button) => {
+    button.addEventListener('click', async () => {
+      await switchOutboundMode(button.dataset.mode);
+    });
+  });
+
   btnTestAll.addEventListener('click', async () => {
     await runTestAll();
   });
+
+  async function switchOutboundMode(mode) {
+    if (!activeInstance || outboundBusy || !['rule', 'direct', 'global'].includes(mode)) return;
+    const policy = outboundPolicySelect.value || currentOutbound?.global_policy || currentOutboundPolicies[0] || '';
+    if (mode === 'global' && !policy) {
+      outboundModeState.textContent = '请选择全局策略';
+      return;
+    }
+    outboundBusy = true;
+    renderOutboundMode(currentOutbound, currentOutboundPolicies, '核心未暴露 /spike/outbound');
+    let errorMessage = '';
+    try {
+      const outbound = await SpikeApiClient.setOutbound(activeInstance, mode, mode === 'global' ? policy : undefined);
+      renderOutboundMode(outbound, outboundPolicyNames({ policies: currentOutboundPolicies.map((name) => ({ name })) }, currentGroupsData, outbound?.global_policy));
+    } catch (err) {
+      errorMessage = `切换失败: ${err.message || '未知错误'}`;
+    } finally {
+      outboundBusy = false;
+      renderOutboundMode(currentOutbound, currentOutboundPolicies, '核心未暴露 /spike/outbound');
+      if (errorMessage) outboundModeState.textContent = errorMessage;
+    }
+  }
 
   // Main Dashboard Loader
   async function loadDashboard() {
@@ -984,9 +1104,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     groupsContainer.replaceChildren(loadingNode);
 
     try {
-      const [status, groupsData] = await Promise.all([
+      const [status, groupsData, outbound, policies] = await Promise.all([
         SpikeApiClient.getStatus(activeInstance),
-        SpikeApiClient.getGroups(activeInstance)
+        SpikeApiClient.getGroups(activeInstance),
+        optionalApiRequest('outbound mode', () => SpikeApiClient.getOutbound(activeInstance)),
+        optionalApiRequest('policy inventory', () => SpikeApiClient.getPolicies(activeInstance))
       ]);
 
       setStatus('online', '已连接');
@@ -998,6 +1120,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       void refreshTraffic();
 
       currentGroupsData = groupsData.groups || [];
+      renderOutboundMode(
+        outbound,
+        outboundPolicyNames(policies, currentGroupsData, outbound?.global_policy),
+        '核心未暴露 /spike/outbound'
+      );
 
       // Ingest persisted probe results from all group member_info fields
       ingestPersistedMemberInfo(currentGroupsData);
@@ -1013,6 +1140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderTraffic(null);
       publishTrafficSample(null, err.message || 'unreachable');
       proxyListeners.replaceChildren(el('span', { className: 'proxy-listener-empty' }, '-'));
+      renderOutboundMode(null, [], '连接后可用');
 
       const retryBtn = el('button', { id: 'btn-retry', className: 'icon-btn', style: { marginTop: '6px' } }, '重试连接');
       retryBtn.addEventListener('click', () => loadDashboard());

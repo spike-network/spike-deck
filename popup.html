@@ -92,6 +92,21 @@
       </div>
     </div>
 
+    <section class="outbound-mode-card" id="outbound-mode-card" aria-label="Spike 运行模式">
+      <div class="outbound-mode-head">
+        <span>运行模式</span>
+        <small id="outbound-mode-state">检测中…</small>
+      </div>
+      <div class="outbound-mode-controls">
+        <button type="button" class="btn-outbound-mode" data-mode="rule">规则</button>
+        <button type="button" class="btn-outbound-mode" data-mode="direct">直连</button>
+        <button type="button" class="btn-outbound-mode" data-mode="global">全局</button>
+        <select id="outbound-policy-select" class="outbound-policy-select" aria-label="全局代理策略">
+          <option value="">加载策略…</option>
+        </select>
+      </div>
+    </section>
+
     <!-- Status & Info Card -->
     <div class="info-card" id="info-card">
       <div class="info-row">

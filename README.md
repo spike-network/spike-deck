@@ -15,8 +15,9 @@
    - 实时展示配置文件 (Profile) 概览、进程级 ↑↓ 速度与策略组 (Policy Groups) 列表。
    - 工具栏角标显示下行速度（约 4 字符）；完整 ↑↓ 写在图标 title。Popup 打开时每秒刷新；关闭后由后台 alarm 约 30 秒刷新一次（Chrome MV3 限制）。
    - 接管浏览器代理时，空闲角标仍显示 `ON`；有流量时优先显示速度。
-   - 点击策略组中的任意节点即可**实时完成选路切换**（调用 `PUT /groups/{name}/select`）。
-   - 对已固定（override/pin）的 `url-test` / `fallback` / `smart` 组，可一键**恢复自动选择**（`DELETE /groups/{name}/select`）。
+   - 点击策略组中的任意节点即可**实时完成选路切换**（调用 Spike 原生 `PUT /spike/groups/{name}/select`）。
+   - Popup 可切换运行模式：规则模式、全部直连、全局代理（调用 `GET` / `PUT /spike/outbound`，全局模式选择一个策略）。
+   - 对已固定（override/pin）的 `url-test` / `fallback` / `smart` 组，可一键**恢复自动选择**（`DELETE /spike/groups/{name}/select`）。
 
 3. **延迟测试 (Speedtest / Ping)**
    - **全组一键测速**：点击顶部⚡“测速”按钮，批量获取各组节点的 RTT 延迟。
@@ -62,6 +63,7 @@
 ### 3. 日常使用
 
 - **查看实时速度**：打开 Popup 后，Profile 卡片会显示进程级 ↓/↑；关掉面板后工具栏角标仍会按 Chrome 允许的间隔更新。
+- **切换运行模式**：在 Popup 的“运行模式”卡片选择规则、直连或全局；全局模式先选择目标策略。
 - **切换策略组节点**：点击 Chrome 顶栏的 SpikeDeck 图标，展开目标策略组，点击节点名称即可瞬间切换。
 - **全组测速**：点击 Popup 顶栏的 **⚡ 测速** 按钮。
 - **外部资源**：点击 Popup 顶栏的云下载按钮打开资源列表；可「全部更新」或对单条点「更新」，面板会展示每项结果。
