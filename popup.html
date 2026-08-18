@@ -28,6 +28,14 @@
           </svg>
           <span class="btn-label">测速</span>
         </button>
+        <button id="btn-modules" class="icon-btn modules-btn" title="模块" aria-label="模块" aria-expanded="false" aria-controls="modules-panel">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+        </button>
         <button id="btn-refresh-providers" class="icon-btn provider-refresh-btn" title="外部资源" aria-label="外部资源" aria-expanded="false" aria-controls="providers-panel">
           <!-- Cloud + download: remote policy/ruleset sources (not a circular refresh) -->
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -51,6 +59,25 @@
         </button>
       </div>
     </header>
+
+    <section id="modules-panel" class="providers-panel" hidden aria-labelledby="modules-panel-title">
+      <div class="providers-panel-header">
+        <div class="providers-panel-title-group">
+          <span id="modules-panel-title" class="providers-panel-title">模块</span>
+          <span id="modules-panel-count" class="providers-panel-count"></span>
+        </div>
+        <button type="button" id="btn-modules-close" class="btn-provider-action" title="关闭">关闭</button>
+      </div>
+      <div id="modules-panel-notice" class="providers-panel-notice" role="status" aria-live="polite" hidden></div>
+      <form id="module-install-form" class="module-install-form">
+        <input id="module-name-input" type="text" placeholder="名称" required>
+        <input id="module-url-input" type="url" placeholder="https://modules.example.test/a.sgmodule" required>
+        <button type="submit" id="btn-module-install" class="btn-provider-action primary">安装</button>
+      </form>
+      <div id="modules-list" class="providers-list">
+        <div class="providers-empty">点击加载已安装模块…</div>
+      </div>
+    </section>
 
     <!-- External Providers Panel -->
     <section id="providers-panel" class="providers-panel" hidden aria-labelledby="providers-panel-title">
@@ -83,6 +110,14 @@
         </select>
       </div>
 
+      <div class="instance-selector-wrapper profile-selector-wrapper">
+        <label for="profile-select" class="selector-label">Profile:</label>
+        <select id="profile-select" class="instance-select" aria-label="切换 Profile">
+          <option value="">—</option>
+        </select>
+        <button type="button" id="btn-profile-switch" class="btn-section-action">切换</button>
+      </div>
+
       <div class="proxy-toggle-wrapper" id="proxy-toggle-wrapper">
         <label class="switch-label" title="开启后由 SpikeDeck 使用当前实例监听地址接管 Chrome 代理；关闭后释放给其他扩展">
           <input type="checkbox" id="toggle-chrome-proxy">
@@ -107,16 +142,31 @@
       </div>
     </section>
 
+    <section class="outbound-mode-card policy-probe-card" id="policy-probe-card" aria-label="任意策略探测">
+      <div class="outbound-mode-head">
+        <span>策略探测</span>
+        <small id="policy-probe-state">与组测速分开</small>
+      </div>
+      <form id="policy-probe-form" class="policy-probe-form">
+        <input id="policy-probe-url" type="url" value="http://127.0.0.1:9/" required>
+        <select id="policy-probe-select" multiple aria-label="选择策略"></select>
+        <button type="submit" id="btn-policy-probe" class="btn-provider-action primary">探测</button>
+      </form>
+      <div id="policy-probe-results" class="policy-probe-results"></div>
+    </section>
+
     <!-- Status & Info Card -->
     <div class="info-card" id="info-card">
       <div class="info-row">
         <span class="info-label">Profile:</span>
         <span class="info-value" id="profile-name">-</span>
+        <span class="managed-badge" id="managed-badge" hidden>Managed</span>
       </div>
       <div class="info-meta" id="info-meta">
         <span class="badge" id="badge-groups">组: -</span>
         <span class="badge" id="badge-nodes">节点: -</span>
         <span class="badge" id="badge-rules">规则: -</span>
+        <span class="badge" id="badge-dns-delay">DNS: —</span>
       </div>
       <div class="traffic-row" id="traffic-row" aria-label="实时速度">
         <span class="traffic-down" id="traffic-down">↓ —</span>

@@ -474,6 +474,7 @@ body {
 /* Control Bar (Instance Select & Proxy Toggle) */
 .control-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -1175,4 +1176,59 @@ input:checked + .slider::before {
   font-size: 10px;
   color: var(--text-dim);
   border-top: 1px solid var(--card-border);
+}
+
+.profile-selector-wrapper {
+  min-width: 0;
+}
+
+.managed-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+  font-size: 10px;
+}
+
+.module-install-form,
+.policy-probe-form {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.module-install-form input,
+.policy-probe-form input,
+.policy-probe-form select {
+  width: 100%;
+  background: var(--card-bg);
+  color: var(--text-main);
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  padding: 5px 7px;
+  font-size: 11px;
+}
+
+.policy-probe-form select {
+  min-height: 72px;
+}
+
+.policy-probe-results {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.probe-row.ok {
+  color: var(--lat-green);
+}
+
+.probe-row.failed {
+  color: var(--lat-red);
+}
+
+.icon-btn.modules-btn.active {
+  color: var(--accent-cyan);
 }

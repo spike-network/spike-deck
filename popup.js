@@ -262,6 +262,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   const outboundPolicySelect = document.getElementById('outbound-policy-select');
   const outboundModeButtons = Array.from(document.querySelectorAll('.btn-outbound-mode'));
 
+  const managedBadge = document.getElementById('managed-badge');
+  const badgeDnsDelay = document.getElementById('badge-dns-delay');
+  const profileSelect = document.getElementById('profile-select');
+  const btnProfileSwitch = document.getElementById('btn-profile-switch');
+  const btnModules = document.getElementById('btn-modules');
+  const modulesPanel = document.getElementById('modules-panel');
+  const modulesPanelCount = document.getElementById('modules-panel-count');
+  const modulesPanelNotice = document.getElementById('modules-panel-notice');
+  const modulesList = document.getElementById('modules-list');
+  const moduleInstallForm = document.getElementById('module-install-form');
+  const moduleNameInput = document.getElementById('module-name-input');
+  const moduleUrlInput = document.getElementById('module-url-input');
+  const btnModulesClose = document.getElementById('btn-modules-close');
+  const policyProbeForm = document.getElementById('policy-probe-form');
+  const policyProbeUrl = document.getElementById('policy-probe-url');
+  const policyProbeSelect = document.getElementById('policy-probe-select');
+  const policyProbeState = document.getElementById('policy-probe-state');
+  const policyProbeResults = document.getElementById('policy-probe-results');
   const btnTestAll = document.getElementById('btn-test-all');
   const btnRefreshProviders = document.getElementById('btn-refresh-providers');
   const btnRefresh = document.getElementById('btn-refresh');
@@ -297,6 +315,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentOutbound = null;
   let currentOutboundPolicies = [];
   let outboundBusy = false;
+  let currentProfileStem = '';
+  let currentModules = [];
+  let moduleBusy = false;
   updateHiddenToggleUI();
 
   function showProvidersPanelNotice(message, state, timeoutMs = 0) {
@@ -1049,6 +1070,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     await runProviderRefresh();
   });
 
+  btnModules.addEventListener('click', async () => {
+    if (!modulesPanel.hidden) {
+      modulesPanel.hidden = true;
+      btnModules.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    providersPanel.hidden = true;
+    modulesPanel.hidden = false;
+    btnModules.setAttribute('aria-expanded', 'true');
+    await loadModulesList();
+  });
+
+  btnModulesClose.addEventListener('click', () => {
+    modulesPanel.hidden = true;
+    btnModules.setAttribute('aria-expanded', 'false');
+  });
+
+  moduleInstallForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await runModuleUpdate({
+      name: moduleNameInput.value.trim(),
+      url: moduleUrlInput.value.trim()
+    });
+  });
+
+  btnProfileSwitch.addEventListener('click', () => {
+    void switchActiveProfile();
+  });
+
+  policyProbeForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const names = Array.from(policyProbeSelect.selectedOptions).map((option) => option.value);
+    await runPolicyProbe(names, policyProbeUrl.value.trim());
+  });
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.instanceId !== activeInstance?.id) return;
+    if (message.type === 'MODULE_UPDATE_CHANGED') {
+      applyModuleTask(message.task);
+    }
+    if (message.type === 'POLICY_TEST_CHANGED') {
+      applyPolicyTestTask(message.task);
+    }
+  });
+
   btnOptions.addEventListener('click', () => {
     if (chrome.runtime.openOptionsPage) {
       chrome.runtime.openOptionsPage();
@@ -1113,11 +1179,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       setStatus('online', '已连接');
       profileName.textContent = status.profile || 'Default';
+      currentProfileStem = SpikeApiClient.profileStem(status.profile || '');
       badgeGroups.textContent = `组: ${status.groups || groupsData.groups?.length || 0}`;
       badgeNodes.textContent = `节点: ${status.leaves || 0}`;
       badgeRules.textContent = `规则: ${status.rules || 0}`;
       renderProxyListeners(status);
       void refreshTraffic();
+      void refreshProfileControls(status);
+      void refreshDnsDelay();
+      renderPolicyProbeOptions(policies);
 
       currentGroupsData = groupsData.groups || [];
       renderOutboundMode(
@@ -1134,9 +1204,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       setStatus('offline', '未连接');
       profileName.textContent = '-';
+      managedBadge.hidden = true;
       badgeGroups.textContent = '组: -';
       badgeNodes.textContent = '节点: -';
       badgeRules.textContent = '规则: -';
+      badgeDnsDelay.textContent = 'DNS: —';
+      profileSelect.replaceChildren(el('option', { value: '' }, '—'));
       renderTraffic(null);
       publishTrafficSample(null, err.message || 'unreachable');
       proxyListeners.replaceChildren(el('span', { className: 'proxy-listener-empty' }, '-'));
@@ -1272,6 +1345,207 @@ document.addEventListener('DOMContentLoaded', async () => {
   function setStatus(state, text) {
     statusDot.className = `status-dot ${state}`;
     statusText.textContent = text;
+  }
+
+  async function refreshProfileControls(status) {
+    currentProfileStem = SpikeApiClient.profileStem(status?.profile || '');
+    try {
+      const [list, current] = await Promise.all([
+        SpikeApiClient.getProfiles(activeInstance),
+        SpikeApiClient.getCurrentProfile(activeInstance)
+      ]);
+      const names = Array.isArray(list?.profiles) ? list.profiles : [];
+      profileSelect.replaceChildren(
+        ...(names.length ? names : [currentProfileStem || '']).map((name) =>
+          el('option', { value: name }, name)
+        )
+      );
+      profileSelect.value = names.includes(currentProfileStem)
+        ? currentProfileStem
+        : (names[0] || '');
+      const managed = SpikeApiClient.parseManagedProfile(current?.profile || '');
+      if (managed) {
+        const parts = ['Managed'];
+        if (managed.intervalSeconds) parts.push(`${managed.intervalSeconds}s`);
+        if (managed.strict === true) parts.push('strict');
+        managedBadge.textContent = parts.join(' · ');
+        managedBadge.hidden = false;
+      } else {
+        managedBadge.hidden = true;
+      }
+    } catch {
+      profileSelect.replaceChildren(el('option', { value: currentProfileStem }, currentProfileStem || '—'));
+      managedBadge.hidden = true;
+    }
+  }
+
+  async function switchActiveProfile() {
+    const name = profileSelect.value;
+    if (!name || name === currentProfileStem) return;
+    btnProfileSwitch.disabled = true;
+    try {
+      const checked = await SpikeApiClient.checkProfile(activeInstance, name);
+      if (checked?.error) throw new Error(checked.error);
+      const switched = await SpikeApiClient.switchProfile(activeInstance, name);
+      if (switched?.error) throw new Error(switched.error);
+      await loadDashboard();
+    } catch (error) {
+      profileName.title = error.message || '切换失败';
+    } finally {
+      btnProfileSwitch.disabled = false;
+    }
+  }
+
+  async function refreshDnsDelay() {
+    try {
+      const result = await SpikeApiClient.measureDnsDelay(activeInstance);
+      if (result?.error) {
+        badgeDnsDelay.textContent = 'DNS: err';
+        badgeDnsDelay.title = result.error;
+        return;
+      }
+      badgeDnsDelay.textContent = `DNS: ${result?.delay ?? '—'} ms`;
+      badgeDnsDelay.title = '';
+    } catch (error) {
+      badgeDnsDelay.textContent = 'DNS: —';
+      badgeDnsDelay.title = error.message || '';
+    }
+  }
+
+  function renderPolicyProbeOptions(policies) {
+    const names = (policies?.policies || []).map((policy) => policy.name).filter(Boolean);
+    policyProbeSelect.replaceChildren(
+      ...names.map((name) => el('option', { value: name }, name))
+    );
+  }
+
+  async function runPolicyProbe(names, url) {
+    if (!names.length) {
+      policyProbeState.textContent = '请选择策略';
+      return;
+    }
+    policyProbeState.textContent = '探测中…';
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'START_POLICY_TEST',
+        instanceId: activeInstance.id,
+        policyNames: names,
+        url
+      });
+      if (!response?.ok) throw new Error(response?.error || '无法启动探测');
+      applyPolicyTestTask(response.task);
+    } catch (error) {
+      policyProbeState.textContent = error.message || '探测失败';
+    }
+  }
+
+  function applyPolicyTestTask(task) {
+    if (!task) return;
+    if (task.status === 'running') {
+      policyProbeState.textContent = '探测中…';
+      return;
+    }
+    if (task.error) {
+      policyProbeState.textContent = task.error;
+    } else {
+      policyProbeState.textContent = task.status === 'completed' ? '完成' : task.status;
+    }
+    const rows = task.result?.results || [];
+    policyProbeResults.replaceChildren(
+      ...rows.map((row) =>
+        el('div', { className: row.ok ? 'probe-row ok' : 'probe-row failed' },
+          `${row.policy}: ${row.ok ? `${row.latency_ms ?? '—'} ms` : (row.error || 'failed')}`
+        )
+      )
+    );
+  }
+
+  async function loadModulesList() {
+    modulesList.replaceChildren(el('div', { className: 'providers-empty' }, '正在加载模块…'));
+    try {
+      const data = await SpikeApiClient.getModules(activeInstance);
+      currentModules = Array.isArray(data.modules) ? data.modules : [];
+      modulesPanelCount.textContent = `${currentModules.length}`;
+      renderModulesList();
+      if (data.error) showModulesNotice(data.error, 'error');
+    } catch (error) {
+      currentModules = [];
+      modulesList.replaceChildren(
+        el('div', { className: 'providers-empty error' }, error.message || '加载失败')
+      );
+    }
+  }
+
+  function renderModulesList() {
+    if (!currentModules.length) {
+      modulesList.replaceChildren(el('div', { className: 'providers-empty' }, '没有已安装模块'));
+      return;
+    }
+    modulesList.replaceChildren(
+      ...currentModules.map((module) => {
+        const row = el('div', { className: 'provider-row' },
+          el('div', { className: 'provider-source' }, module.name),
+          el('div', { className: 'provider-origin' }, module.url || module.source || ''),
+          el('div', { className: 'provider-row-meta' },
+            el('span', {}, module.enabled ? '已启用' : '已停用')
+          )
+        );
+        const toggle = el('button', { className: 'btn-provider-action', type: 'button' }, module.enabled ? '停用' : '启用');
+        toggle.addEventListener('click', () => {
+          void runModuleUpdate({ [module.name]: !module.enabled });
+        });
+        const uninstall = el('button', { className: 'btn-provider-action', type: 'button' }, '卸载');
+        uninstall.addEventListener('click', () => {
+          void runModuleUpdate({ uninstall: module.name });
+        });
+        row.append(toggle, uninstall);
+        return row;
+      })
+    );
+  }
+
+  function showModulesNotice(message, state) {
+    modulesPanelNotice.hidden = false;
+    modulesPanelNotice.className = `providers-panel-notice ${state || ''}`;
+    modulesPanelNotice.textContent = message;
+  }
+
+  async function runModuleUpdate(body) {
+    if (moduleBusy) return;
+    moduleBusy = true;
+    showModulesNotice('正在更新模块…', '');
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'START_MODULE_UPDATE',
+        instanceId: activeInstance.id,
+        body
+      });
+      if (!response?.ok) throw new Error(response?.error || '模块更新失败');
+      applyModuleTask(response.task);
+    } catch (error) {
+      showModulesNotice(error.message || '模块更新失败', 'error');
+    } finally {
+      moduleBusy = false;
+    }
+  }
+
+  function applyModuleTask(task) {
+    if (!task) return;
+    if (task.status === 'running') {
+      showModulesNotice('正在更新模块…', '');
+      return;
+    }
+    if (task.error) {
+      showModulesNotice(task.error, 'error');
+    } else {
+      showModulesNotice('模块已更新', '');
+    }
+    if (task.result?.modules) {
+      currentModules = task.result.modules;
+      renderModulesList();
+    } else {
+      void loadModulesList();
+    }
   }
 
   /**

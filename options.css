@@ -25,6 +25,20 @@
   padding: 0;
 }
 
+.profile-export-text {
+  margin: 8px 0 12px;
+  padding: 10px;
+  max-height: 280px;
+  overflow: auto;
+  background: #0b0d16;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 body {
   background-color: var(--bg-color);
   color: var(--text-main);

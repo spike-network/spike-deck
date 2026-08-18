@@ -43,6 +43,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   prefControlProxyCheckbox.checked = currentProxyMode;
   void refreshProxyPreferenceState();
 
+  const profileExportText = document.getElementById('profile-export-text');
+  const btnLoadProfileExport = document.getElementById('btn-load-profile-export');
+  const btnCopyProfileExport = document.getElementById('btn-copy-profile-export');
+
+  btnLoadProfileExport.addEventListener('click', async () => {
+    const active = await StorageManager.getActiveInstance();
+    profileExportText.textContent = '正在加载…';
+    try {
+      const current = await SpikeApiClient.getCurrentProfile(active);
+      profileExportText.textContent = current.profile || current.error || '空';
+    } catch (error) {
+      profileExportText.textContent = error.message || '加载失败';
+    }
+  });
+
+  btnCopyProfileExport.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(profileExportText.textContent || '');
+    } catch {
+      profileExportText.title = '无法写入剪贴板';
+    }
+  });
+
   prefExpandModeSelect.addEventListener('change', async (e) => {
     await StorageManager.setGroupExpandMode(e.target.value);
   });

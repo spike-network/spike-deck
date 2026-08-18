@@ -37,6 +37,16 @@ await SpikeApiClient.getStatus(instance);
 await SpikeApiClient.getGroups(instance);
 await SpikeApiClient.selectGroupMember(instance, 'Proxy / Auto', 'Direct');
 await SpikeApiClient.clearGroupSelection(instance, 'Proxy / Auto');
+await SpikeApiClient.getProfiles(instance);
+await SpikeApiClient.getCurrentProfile(instance);
+await SpikeApiClient.checkProfile(instance, 'alt');
+await SpikeApiClient.switchProfile(instance, 'alt');
+await SpikeApiClient.getModules(instance);
+await SpikeApiClient.updateModules(instance, { Ads: true });
+await SpikeApiClient.getScripts(instance);
+await SpikeApiClient.getDnsCache(instance);
+await SpikeApiClient.measureDnsDelay(instance);
+await SpikeApiClient.testPolicies(instance, ['DIRECT'], 'http://127.0.0.1:9/');
 
 assert.deepEqual(
   requests.map((request) => request.url),
@@ -44,8 +54,37 @@ assert.deepEqual(
     'http://127.0.0.1:9090/spike/status',
     'http://127.0.0.1:9090/spike/groups',
     'http://127.0.0.1:9090/spike/groups/Proxy%20%2F%20Auto/select',
-    'http://127.0.0.1:9090/spike/groups/Proxy%20%2F%20Auto/select'
+    'http://127.0.0.1:9090/spike/groups/Proxy%20%2F%20Auto/select',
+    'http://127.0.0.1:9090/spike/profiles',
+    'http://127.0.0.1:9090/spike/profiles/current',
+    'http://127.0.0.1:9090/spike/profiles/check',
+    'http://127.0.0.1:9090/spike/profiles/switch',
+    'http://127.0.0.1:9090/spike/modules',
+    'http://127.0.0.1:9090/spike/modules',
+    'http://127.0.0.1:9090/spike/scripts',
+    'http://127.0.0.1:9090/spike/dns/cache',
+    'http://127.0.0.1:9090/spike/dns/delay',
+    'http://127.0.0.1:9090/spike/policies/test'
   ]
+);
+assert.equal(requests[6].options.method, 'POST');
+assert.equal(requests[7].options.method, 'POST');
+assert.equal(requests[9].options.method, 'POST');
+assert.equal(requests[12].options.method, 'POST');
+assert.equal(requests[13].options.method, 'POST');
+assert.deepEqual(JSON.parse(requests[13].options.body), {
+  policy_names: ['DIRECT'],
+  url: 'http://127.0.0.1:9/'
+});
+assert.equal(
+  SpikeApiClient.profileStem('/tmp/alt.conf'),
+  'alt'
+);
+assert.deepEqual(
+  SpikeApiClient.parseManagedProfile(
+    '#!MANAGED-CONFIG https://example.test/a.conf interval=3600 strict=true\n[General]\n'
+  ),
+  { managed: true, intervalSeconds: 3600, strict: true }
 );
 assert.equal(requests[2].options.method, 'PUT');
 assert.equal(requests[3].options.method, 'DELETE');
