@@ -27,7 +27,7 @@
 
 4. **浏览器代理托管模式 (Chrome Proxy Host)**
    - 可选开关：一键把 Chrome 浏览器的代理托管至当前 Spike 实例。
-   - 端口不再手工配置：开启时从 Control API `GET /status` 的 `listeners` 字段自动选择（优先 `mixed` / `http`，其次 `socks`）。
+   - 端口不再手工配置：开启时从 Control API `GET /spike/status` 的 `listeners` 字段自动选择（优先 `mixed` / `http`，其次 `socks`）。
    - Popup 展示发现的 Mixed / HTTP / SOCKS5 可达地址。
    - 关闭托管时清除 SpikeDeck 写入的代理设置并释放控制权，不影响 SwitchyOmega 等其他代理扩展。
 
@@ -57,7 +57,7 @@
    - **实例名称**：如 `Local Spike`
    - **Control API Base URL**：默认 `http://127.0.0.1:9090`
    - **Control Secret**：若在 Spike 配置中启用了控制面密码（`http-api`），填入该 Secret；未设置可留空。
-   - **代理端口**：无需填写。开启浏览器代理时会读取 `/status.listeners`（mixed / HTTP / SOCKS）。
+   - **代理端口**：无需填写。开启浏览器代理时会读取 `/spike/status` 的 `listeners`（mixed / HTTP / SOCKS）。
 3. 点击 **⚡ 测试连接** 验证配置（成功时会展示发现的 listeners），无误后点击 **保存实例**。
 
 ### 3. 日常使用

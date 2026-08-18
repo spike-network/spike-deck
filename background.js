@@ -581,7 +581,7 @@ async function updateProxySettings() {
     const status = await SpikeApiClient.getStatus(activeInstance);
     const endpoint = preferredProxyEndpoint(proxyListenersFromStatus(status, activeInstance));
     if (!endpoint) {
-      throw new Error('Spike /status did not expose a usable HTTP or SOCKS listener');
+      throw new Error('Spike /spike/status did not expose a usable HTTP or SOCKS listener');
     }
 
     const proxyConfig = {
