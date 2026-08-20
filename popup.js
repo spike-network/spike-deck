@@ -275,11 +275,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const moduleNameInput = document.getElementById('module-name-input');
   const moduleUrlInput = document.getElementById('module-url-input');
   const btnModulesClose = document.getElementById('btn-modules-close');
-  const policyProbeForm = document.getElementById('policy-probe-form');
-  const policyProbeUrl = document.getElementById('policy-probe-url');
-  const policyProbeSelect = document.getElementById('policy-probe-select');
-  const policyProbeState = document.getElementById('policy-probe-state');
-  const policyProbeResults = document.getElementById('policy-probe-results');
   const btnTestAll = document.getElementById('btn-test-all');
   const btnRefreshProviders = document.getElementById('btn-refresh-providers');
   const btnRefresh = document.getElementById('btn-refresh');
@@ -1099,19 +1094,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     void switchActiveProfile();
   });
 
-  policyProbeForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const names = Array.from(policyProbeSelect.selectedOptions).map((option) => option.value);
-    await runPolicyProbe(names, policyProbeUrl.value.trim());
-  });
-
   chrome.runtime.onMessage.addListener((message) => {
     if (message.instanceId !== activeInstance?.id) return;
     if (message.type === 'MODULE_UPDATE_CHANGED') {
       applyModuleTask(message.task);
-    }
-    if (message.type === 'POLICY_TEST_CHANGED') {
-      applyPolicyTestTask(message.task);
     }
   });
 
@@ -1187,7 +1173,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       void refreshTraffic();
       void refreshProfileControls(status);
       void refreshDnsDelay();
-      renderPolicyProbeOptions(policies);
 
       currentGroupsData = groupsData.groups || [];
       renderOutboundMode(
@@ -1410,54 +1395,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       badgeDnsDelay.textContent = 'DNS: —';
       badgeDnsDelay.title = error.message || '';
     }
-  }
-
-  function renderPolicyProbeOptions(policies) {
-    const names = (policies?.policies || []).map((policy) => policy.name).filter(Boolean);
-    policyProbeSelect.replaceChildren(
-      ...names.map((name) => el('option', { value: name }, name))
-    );
-  }
-
-  async function runPolicyProbe(names, url) {
-    if (!names.length) {
-      policyProbeState.textContent = '请选择策略';
-      return;
-    }
-    policyProbeState.textContent = '探测中…';
-    try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'START_POLICY_TEST',
-        instanceId: activeInstance.id,
-        policyNames: names,
-        url
-      });
-      if (!response?.ok) throw new Error(response?.error || '无法启动探测');
-      applyPolicyTestTask(response.task);
-    } catch (error) {
-      policyProbeState.textContent = error.message || '探测失败';
-    }
-  }
-
-  function applyPolicyTestTask(task) {
-    if (!task) return;
-    if (task.status === 'running') {
-      policyProbeState.textContent = '探测中…';
-      return;
-    }
-    if (task.error) {
-      policyProbeState.textContent = task.error;
-    } else {
-      policyProbeState.textContent = task.status === 'completed' ? '完成' : task.status;
-    }
-    const rows = task.result?.results || [];
-    policyProbeResults.replaceChildren(
-      ...rows.map((row) =>
-        el('div', { className: row.ok ? 'probe-row ok' : 'probe-row failed' },
-          `${row.policy}: ${row.ok ? `${row.latency_ms ?? '—'} ms` : (row.error || 'failed')}`
-        )
-      )
-    );
   }
 
   async function loadModulesList() {

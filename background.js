@@ -11,7 +11,6 @@ import { formatBadgeRate, trafficTitle } from './lib/format-rate.js';
 const PROVIDER_REFRESH_RECONCILE_AFTER_SECONDS = 240;
 const providerRefreshOperations = new Map();
 const moduleOperations = new Map();
-const policyTestOperations = new Map();
 const GROUP_TEST_POLL_INTERVAL_MS = 700;
 const GROUP_TEST_ALARM_PREFIX = 'group-test-reconcile:';
 const TRAFFIC_RATE_ALARM = 'traffic-rate';
@@ -126,18 +125,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ ok: true, task: moduleOperations.get(message.instanceId) || null });
     return false;
   }
-  if (message.type === 'START_POLICY_TEST') {
-    startPolicyTest(message.instanceId, message.policyNames, message.url).then((task) => {
-      sendResponse({ ok: true, task });
-    }).catch(err => {
-      sendResponse({ ok: false, error: err.message || String(err) });
-    });
-    return true;
-  }
-  if (message.type === 'GET_POLICY_TEST') {
-    sendResponse({ ok: true, task: policyTestOperations.get(message.instanceId) || null });
-    return false;
-  }
   if (message.type === 'TRAFFIC_SAMPLE') {
     applyTrafficBadge(message.traffic, message.error);
     sendResponse({ ok: true });
@@ -160,36 +147,6 @@ async function startModuleUpdate(instanceId, body) {
     const next = { ...task, status: 'failed', error: error.message || String(error) };
     moduleOperations.set(instanceId, next);
     broadcastRuntimeTask('MODULE_UPDATE_CHANGED', instanceId, next);
-    throw error;
-  }
-}
-
-async function startPolicyTest(instanceId, policyNames, url) {
-  if (!Array.isArray(policyNames) || policyNames.length === 0) {
-    throw new Error('policy_names is required');
-  }
-  if (!url) throw new Error('url is required');
-  const instance = await findInstance(instanceId);
-  const task = {
-    instanceId,
-    status: 'running',
-    policyNames,
-    url,
-    error: null,
-    result: null
-  };
-  policyTestOperations.set(instanceId, task);
-  broadcastRuntimeTask('POLICY_TEST_CHANGED', instanceId, task);
-  try {
-    const result = await SpikeApiClient.testPolicies(instance, policyNames, url);
-    const next = { ...task, status: 'completed', result, error: result?.error || null };
-    policyTestOperations.set(instanceId, next);
-    broadcastRuntimeTask('POLICY_TEST_CHANGED', instanceId, next);
-    return next;
-  } catch (error) {
-    const next = { ...task, status: 'failed', error: error.message || String(error) };
-    policyTestOperations.set(instanceId, next);
-    broadcastRuntimeTask('POLICY_TEST_CHANGED', instanceId, next);
     throw error;
   }
 }

@@ -46,7 +46,6 @@ await SpikeApiClient.updateModules(instance, { Ads: true });
 await SpikeApiClient.getScripts(instance);
 await SpikeApiClient.getDnsCache(instance);
 await SpikeApiClient.measureDnsDelay(instance);
-await SpikeApiClient.testPolicies(instance, ['DIRECT'], 'http://127.0.0.1:9/');
 
 assert.deepEqual(
   requests.map((request) => request.url),
@@ -63,19 +62,13 @@ assert.deepEqual(
     'http://127.0.0.1:9090/spike/modules',
     'http://127.0.0.1:9090/spike/scripts',
     'http://127.0.0.1:9090/spike/dns/cache',
-    'http://127.0.0.1:9090/spike/dns/delay',
-    'http://127.0.0.1:9090/spike/policies/test'
+    'http://127.0.0.1:9090/spike/dns/delay'
   ]
 );
 assert.equal(requests[6].options.method, 'POST');
 assert.equal(requests[7].options.method, 'POST');
 assert.equal(requests[9].options.method, 'POST');
 assert.equal(requests[12].options.method, 'POST');
-assert.equal(requests[13].options.method, 'POST');
-assert.deepEqual(JSON.parse(requests[13].options.body), {
-  policy_names: ['DIRECT'],
-  url: 'http://127.0.0.1:9/'
-});
 assert.equal(
   SpikeApiClient.profileStem('/tmp/alt.conf'),
   'alt'
