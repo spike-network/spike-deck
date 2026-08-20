@@ -659,22 +659,28 @@ input:checked + .slider::before {
 
 .info-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: 12px;
+  width: 100%;
+  min-width: 0;
 }
 
 .info-label {
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .info-value {
   font-weight: 600;
   color: var(--accent-cyan);
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: normal;
+  user-select: text;
+  cursor: text;
 }
 
 .info-meta {

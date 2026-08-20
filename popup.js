@@ -1165,6 +1165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       setStatus('online', '已连接');
       profileName.textContent = status.profile || 'Default';
+      profileName.title = status.profile || '';
       currentProfileStem = SpikeApiClient.profileStem(status.profile || '');
       badgeGroups.textContent = `组: ${status.groups || groupsData.groups?.length || 0}`;
       badgeNodes.textContent = `节点: ${status.leaves || 0}`;
@@ -1189,6 +1190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       setStatus('offline', '未连接');
       profileName.textContent = '-';
+      profileName.title = '';
       managedBadge.hidden = true;
       badgeGroups.textContent = '组: -';
       badgeNodes.textContent = '节点: -';
