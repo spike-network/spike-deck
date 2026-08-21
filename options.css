@@ -19,6 +19,10 @@
   --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
 }
 
+:root {
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -257,6 +261,47 @@ input[type="text"], input[type="url"], input[type="password"], .select-input {
   height: 16px;
   accent-color: var(--primary-color);
   cursor: pointer;
+}
+
+.secret-field {
+  display: flex;
+  gap: 6px;
+}
+
+.secret-field input {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-secret-toggle {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 0 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secret-toggle:hover {
+  color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 1px;
+}
+
+.instance-card:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }
 
 .right-column {

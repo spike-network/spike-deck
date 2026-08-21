@@ -15,7 +15,8 @@
    - 实时展示配置文件 (Profile) 概览、进程级 ↑↓ 速度与策略组 (Policy Groups) 列表。
    - 工具栏角标显示下行速度（约 4 字符）；完整 ↑↓ 写在图标 title。Popup 打开时每秒刷新；关闭后由后台 alarm 约 30 秒刷新一次（Chrome MV3 限制）。
    - 接管浏览器代理时，空闲角标仍显示 `ON`；有流量时优先显示速度。
-   - 点击策略组中的任意节点即可**实时完成选路切换**（调用 Spike 原生 `PUT /spike/groups/{name}/select`）。
+    - 点击策略组中的任意节点即可**实时完成选路切换**（调用 Spike 原生 `PUT /spike/groups/{name}/select`）。
+    - 支持关键字实时筛选策略组与节点，自动展开并只显示匹配项。
    - Popup 可切换运行模式：规则模式、全部直连、全局代理（调用 `GET` / `PUT /spike/outbound`，全局模式选择一个策略）。
    - 对已固定（override/pin）的 `url-test` / `fallback` / `smart` 组，可一键**恢复自动选择**（`DELETE /spike/groups/{name}/select`）。
 

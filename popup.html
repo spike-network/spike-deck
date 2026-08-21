@@ -14,7 +14,7 @@
         <img src="icons/icon48.png" alt="SpikeDeck" class="logo">
         <div class="title-group">
           <span class="title">SpikeDeck</span>
-          <div class="status-indicator" id="status-indicator">
+          <div class="status-indicator" id="status-indicator" role="status" aria-live="polite">
             <span class="status-dot offline" id="status-dot"></span>
             <span class="status-text" id="status-text">未连接</span>
           </div>
@@ -198,6 +198,11 @@
         </div>
       </div>
       
+      <div class="filter-bar" id="filter-bar">
+        <input type="text" id="group-filter" class="filter-input" placeholder="筛选策略组 / 节点" autocomplete="off" spellcheck="false" aria-label="筛选策略组或节点">
+        <button type="button" id="btn-filter-clear" class="filter-clear" title="清除筛选" aria-label="清除筛选">&times;</button>
+      </div>
+
       <div id="groups-container" class="groups-container">
         <!-- Skeleton loading or dynamic groups -->
         <div class="loading-placeholder">
@@ -206,11 +211,6 @@
         </div>
       </div>
     </main>
-
-    <!-- Global Footer -->
-    <footer class="footer">
-      <span class="footer-tip">💡 点击策略组节点可实时切路</span>
-    </footer>
   </div>
 
   <script type="module" src="popup.js"></script>

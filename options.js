@@ -61,9 +61,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnCopyProfileExport.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(profileExportText.textContent || '');
+      const original = btnCopyProfileExport.textContent;
+      btnCopyProfileExport.textContent = '已复制';
+      setTimeout(() => {
+        btnCopyProfileExport.textContent = original;
+      }, 1500);
     } catch {
       profileExportText.title = '无法写入剪贴板';
     }
+  });
+
+  const btnToggleSecret = document.getElementById('btn-toggle-secret');
+  btnToggleSecret.addEventListener('click', () => {
+    const hidden = instSecretInput.type === 'password';
+    instSecretInput.type = hidden ? 'text' : 'password';
+    btnToggleSecret.textContent = hidden ? '隐藏' : '显示';
   });
 
   prefExpandModeSelect.addEventListener('change', async (e) => {
@@ -156,10 +168,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.className = `instance-card ${isEditing ? 'active' : ''}`;
       card.appendChild(infoDiv);
       card.appendChild(actionGroup);
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('role', 'button');
 
-      card.addEventListener('click', () => {
+      const openCard = () => {
         isCreating = false;
         selectInstanceForEdit(inst.id);
+      };
+
+      card.addEventListener('click', openCard);
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openCard();
+        }
       });
 
       instancesContainer.appendChild(card);

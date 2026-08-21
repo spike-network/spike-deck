@@ -54,7 +54,10 @@
 
             <div class="form-group">
               <label for="inst-secret">Control Secret (密码/密钥)</label>
-              <input type="password" id="inst-secret" placeholder="未设置控制密码可留空">
+              <div class="secret-field">
+                <input type="password" id="inst-secret" placeholder="未设置控制密码可留空" autocomplete="new-password">
+                <button type="button" id="btn-toggle-secret" class="btn-secret-toggle" title="显示或隐藏 Secret">显示</button>
+              </div>
             </div>
 
             <div class="form-group">

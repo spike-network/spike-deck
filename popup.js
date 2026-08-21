@@ -124,6 +124,31 @@ function el(tag, attributes = {}, ...children) {
   return element;
 }
 
+const toastHost = document.body.appendChild(
+  el('div', { className: 'toast-host', role: 'status', 'aria-live': 'polite' })
+);
+
+function showToast(message, kind = '', timeoutMs = 2600) {
+  const toast = el('div', { className: `toast ${kind}`.trim() }, message);
+  toastHost.appendChild(toast);
+  while (toastHost.children.length > 3) {
+    toastHost.firstChild.remove();
+  }
+  setTimeout(() => {
+    toast.classList.add('hide');
+    setTimeout(() => toast.remove(), 220);
+  }, timeoutMs);
+}
+
+function attachKeyboardActivate(element, handler) {
+  element.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handler(event);
+    }
+  });
+}
+
 /** Lightning bolt icon used by group test button and empty-node probe affordance. */
 function createFlashIcon(size = 13) {
   const flashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -292,6 +317,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let trafficTimer = null;
   const btnExpandAll = document.getElementById('btn-expand-all');
   const btnCollapseAll = document.getElementById('btn-collapse-all');
+  const filterBar = document.getElementById('filter-bar');
+  const groupFilterInput = document.getElementById('group-filter');
+  const btnFilterClear = document.getElementById('btn-filter-clear');
 
   let showHiddenGroups = await StorageManager.getShowHiddenGroups();
   let groupExpandMode = await StorageManager.getGroupExpandMode();
@@ -313,6 +341,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentProfileStem = '';
   let currentModules = [];
   let moduleBusy = false;
+  const runtimeExpansion = new Map();
+  let groupFilterText = '';
+  let filterRenderTimer = null;
+  let dashboardLoading = false;
+  let offlineRetryTimer = null;
+  const selectingGroups = new Set();
   updateHiddenToggleUI();
 
   function showProvidersPanelNotice(message, state, timeoutMs = 0) {
@@ -502,7 +536,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnRefreshProviders.setAttribute('aria-expanded', open ? 'true' : 'false');
     btnRefreshProviders.classList.toggle('active', open);
     btnRefresh.title = open ? '刷新外部资源状态' : '刷新列表';
-    appContainer?.classList.toggle('providers-view', open);
+    modulesPanel.hidden = true;
+    btnModules.setAttribute('aria-expanded', 'false');
+    appContainer?.classList.toggle('dock-view', open);
     if (!open) {
       clearProvidersPanelNotice();
       if (providerRefreshTask && providerRefreshTask.status !== 'running') {
@@ -912,6 +948,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     void setAllGroupsExpanded(false);
   });
 
+  groupFilterInput.addEventListener('input', () => {
+    groupFilterText = groupFilterInput.value.trim().toLowerCase();
+    filterBar.classList.toggle('has-value', groupFilterText.length > 0);
+    if (filterRenderTimer !== null) clearTimeout(filterRenderTimer);
+    filterRenderTimer = setTimeout(() => {
+      filterRenderTimer = null;
+      renderGroups(currentGroupsData);
+    }, 120);
+  });
+
+  btnFilterClear.addEventListener('click', () => {
+    groupFilterInput.value = '';
+    groupFilterText = '';
+    filterBar.classList.remove('has-value');
+    renderGroups(currentGroupsData);
+    groupFilterInput.focus();
+  });
+
+  groupFilterInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && groupFilterInput.value) {
+      event.stopPropagation();
+      btnFilterClear.click();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (!providersPanel.hidden) {
+      setProvidersPanelOpen(false);
+    } else if (!modulesPanel.hidden) {
+      setModulesPanelOpen(false);
+    }
+  });
+
   function updateHiddenToggleUI() {
     if (showHiddenGroups) {
       btnToggleHidden.classList.add('active');
@@ -933,6 +1003,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.classList.toggle('expanded', expanded);
       if (card.dataset.group) {
         nextStates[card.dataset.group] = expanded;
+        runtimeExpansion.set(card.dataset.group, expanded);
       }
     });
 
@@ -944,6 +1015,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function persistGroupExpandState(groupName, expanded) {
     if (!groupName) return;
+    runtimeExpansion.set(groupName, Boolean(expanded));
     groupExpandStates = { ...groupExpandStates, [groupName]: Boolean(expanded) };
     if (groupExpandMode === 'remember') {
       await StorageManager.setGroupExpandState(groupName, expanded);
@@ -951,6 +1023,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function resolveInitialExpand(group, idx) {
+    if (runtimeExpansion.has(group.name)) {
+      return Boolean(runtimeExpansion.get(group.name));
+    }
     if (groupExpandMode === 'expand-all') return true;
     if (groupExpandMode === 'collapse-all') return false;
     if (groupExpandMode === 'remember') {
@@ -1010,6 +1085,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const selectedId = e.target.value;
     await StorageManager.setActiveInstanceId(selectedId);
     resetGroupTestTracking();
+    leafProbeResults.clear();
+    runtimeExpansion.clear();
+    selectingGroups.clear();
+    groupFilterText = '';
+    groupFilterInput.value = '';
+    filterBar.classList.remove('has-value');
+    if (offlineRetryTimer !== null) {
+      clearTimeout(offlineRetryTimer);
+      offlineRetryTimer = null;
+    }
     activeInstance = await StorageManager.getActiveInstance();
     providersBusyKey = '';
     providerRefreshTask = null;
@@ -1065,29 +1150,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     await runProviderRefresh();
   });
 
-  btnModules.addEventListener('click', async () => {
-    if (!modulesPanel.hidden) {
-      modulesPanel.hidden = true;
-      btnModules.setAttribute('aria-expanded', 'false');
-      return;
-    }
+  function setModulesPanelOpen(open) {
+    modulesPanel.hidden = !open;
+    btnModules.setAttribute('aria-expanded', open ? 'true' : 'false');
     providersPanel.hidden = true;
-    modulesPanel.hidden = false;
-    btnModules.setAttribute('aria-expanded', 'true');
-    await loadModulesList();
+    btnRefreshProviders.classList.remove('active');
+    btnRefreshProviders.setAttribute('aria-expanded', 'false');
+    appContainer?.classList.toggle('dock-view', open);
+    if (open) void loadModulesList();
+  }
+
+  btnModules.addEventListener('click', () => {
+    setModulesPanelOpen(modulesPanel.hidden);
   });
 
   btnModulesClose.addEventListener('click', () => {
-    modulesPanel.hidden = true;
-    btnModules.setAttribute('aria-expanded', 'false');
+    setModulesPanelOpen(false);
   });
 
   moduleInstallForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    await runModuleUpdate({
+    const succeeded = await runModuleUpdate({
       name: moduleNameInput.value.trim(),
       url: moduleUrlInput.value.trim()
     });
+    if (succeeded) {
+      moduleNameInput.value = '';
+      moduleUrlInput.value = '';
+    }
   });
 
   btnProfileSwitch.addEventListener('click', () => {
@@ -1147,6 +1237,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Main Dashboard Loader
   async function loadDashboard() {
+    if (dashboardLoading) return;
+    dashboardLoading = true;
+    if (offlineRetryTimer !== null) {
+      clearTimeout(offlineRetryTimer);
+      offlineRetryTimer = null;
+    }
+    btnRefresh.classList.add('testing');
     setStatus('testing', '正在连接...');
     
     const loadingNode = el('div', { className: 'loading-placeholder' },
@@ -1211,7 +1308,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         retryBtn
       );
       groupsContainer.replaceChildren(errorNode);
+      scheduleOfflineRetry();
+    } finally {
+      dashboardLoading = false;
+      btnRefresh.classList.remove('testing');
     }
+  }
+
+  function scheduleOfflineRetry(delayMs = 8000) {
+    if (offlineRetryTimer !== null) return;
+    offlineRetryTimer = setTimeout(() => {
+      offlineRetryTimer = null;
+      void loadDashboard();
+    }, delayMs);
   }
 
   function renderTraffic(traffic) {
@@ -1376,8 +1485,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const switched = await SpikeApiClient.switchProfile(activeInstance, name);
       if (switched?.error) throw new Error(switched.error);
       await loadDashboard();
+      showToast(`已切换到 ${name}`, 'success');
     } catch (error) {
-      profileName.title = error.message || '切换失败';
+      showToast(`切换 Profile 失败: ${error.message || '未知错误'}`, 'error');
+      profileSelect.value = currentProfileStem || '';
     } finally {
       btnProfileSwitch.disabled = false;
     }
@@ -1435,7 +1546,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         const uninstall = el('button', { className: 'btn-provider-action', type: 'button' }, '卸载');
         uninstall.addEventListener('click', () => {
-          void runModuleUpdate({ uninstall: module.name });
+          if (uninstall.dataset.armed) {
+            void runModuleUpdate({ uninstall: module.name });
+            return;
+          }
+          uninstall.dataset.armed = 'true';
+          uninstall.textContent = '确认卸载';
+          setTimeout(() => {
+            delete uninstall.dataset.armed;
+            uninstall.textContent = '卸载';
+          }, 2500);
         });
         row.append(toggle, uninstall);
         return row;
@@ -1450,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function runModuleUpdate(body) {
-    if (moduleBusy) return;
+    if (moduleBusy) return false;
     moduleBusy = true;
     showModulesNotice('正在更新模块…', '');
     try {
@@ -1461,8 +1581,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       if (!response?.ok) throw new Error(response?.error || '模块更新失败');
       applyModuleTask(response.task);
+      return true;
     } catch (error) {
       showModulesNotice(error.message || '模块更新失败', 'error');
+      return false;
     } finally {
       moduleBusy = false;
     }
@@ -1535,19 +1657,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Render Policy Groups
   function renderGroups(groups) {
+    const normalizedFilter = groupFilterText.toLowerCase();
     const visibleGroups = (groups || []).filter((g) => showHiddenGroups || !g.hidden);
+    const filteredGroups = normalizedFilter
+      ? visibleGroups.filter((g) =>
+          g.name.toLowerCase().includes(normalizedFilter)
+          || (g.members || []).some((member) => member.toLowerCase().includes(normalizedFilter)))
+      : visibleGroups;
 
-    if (visibleGroups.length === 0) {
+    if (filteredGroups.length === 0) {
       groupsContainer.replaceChildren(
-        el('div', { className: 'empty-state' }, '暂无策略组')
+        el('div', { className: 'empty-state' },
+          normalizedFilter ? '没有匹配的策略组或节点' : '暂无策略组')
       );
       return;
     }
 
     groupsContainer.replaceChildren();
 
-    visibleGroups.forEach((group, idx) => {
-      const isExpand = resolveInitialExpand(group, idx);
+    filteredGroups.forEach((group, idx) => {
+      const isExpand = normalizedFilter ? true : resolveInitialExpand(group, idx);
 
       const isOverridden = Boolean(group.override_member);
       const currentSelected = group.override_member || group.selected || (group.members && group.members[0]) || '-';
@@ -1637,7 +1766,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       }
 
+      const groupNameMatches = group.name.toLowerCase().includes(normalizedFilter);
+
       (group.members || []).forEach((member) => {
+        if (normalizedFilter && !groupNameMatches && !member.toLowerCase().includes(normalizedFilter)) return;
         const isSelected = member === currentSelected;
         const isPinnedMember = isOverridden && member === group.override_member;
         const memberInfo = memberInfoMap.get(member);
@@ -1668,21 +1800,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         applyLatencyBadge(latencyBadge, latencyInfo, { member });
 
         // On automatic groups, re-clicking the pinned member clears the override.
+        const activateMember = async () => {
+          if (isPinnedMember) {
+            await resumeAutomaticSelection(group.name);
+            return;
+          }
+          await selectMember(group.name, member);
+        };
+
         const memberItem = el('div', {
           className: `member-item ${isSelected ? 'selected' : ''}${isPinnedMember ? ' pinned' : ''}`,
           dataset: { group: group.name, member: member },
           title: isPinnedMember ? '再次点击可恢复自动选择' : undefined,
-          onClick: async () => {
-            if (isPinnedMember) {
-              await resumeAutomaticSelection(group.name);
-              return;
-            }
-            await selectMember(group.name, member);
-          }
+          tabindex: '0',
+          role: 'button',
+          onClick: activateMember
         },
           el('div', { className: 'member-left' }, checkMark, memberNameEl, typeTag),
           el('div', { className: 'member-right' }, latencyBadge)
         );
+        attachKeyboardActivate(memberItem, activateMember);
 
         membersContainer.appendChild(memberItem);
       });
@@ -1692,11 +1829,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         dataset: { group: group.name }
       }, headerEl, membersContainer);
 
+      headerEl.setAttribute('tabindex', '0');
+      headerEl.setAttribute('role', 'button');
+      headerEl.setAttribute('aria-expanded', String(isExpand));
+
+      const toggleExpand = () => {
+        groupCard.classList.toggle('expanded');
+        const nowExpanded = groupCard.classList.contains('expanded');
+        headerEl.setAttribute('aria-expanded', String(nowExpanded));
+        void persistGroupExpandState(group.name, nowExpanded);
+      };
+
       headerEl.addEventListener('click', (e) => {
         if (e.target.closest('.btn-test-group, .btn-resume-auto')) return;
-        groupCard.classList.toggle('expanded');
-        void persistGroupExpandState(group.name, groupCard.classList.contains('expanded'));
+        toggleExpand();
       });
+
+      attachKeyboardActivate(headerEl, toggleExpand);
 
       groupsContainer.appendChild(groupCard);
     });
@@ -1711,8 +1860,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateAllLatencyBadgesDOM();
   }
 
-  // Select Member Action
+  function paintSelection(groupCard, memberName) {
+    if (!groupCard) return;
+    groupCard.querySelectorAll('.member-item').forEach((item) => {
+      const isTarget = item.dataset.member === memberName;
+      item.classList.toggle('selected', isTarget);
+      const check = item.querySelector('.check-mark');
+      if (check) check.textContent = isTarget ? '✓' : '';
+    });
+    if (!memberName) return;
+    const selectedSummary = groupCard.querySelector('.current-selected');
+    if (selectedSummary) selectedSummary.textContent = memberName;
+  }
+
   async function selectMember(groupName, memberName) {
+    if (selectingGroups.has(groupName)) return;
+    selectingGroups.add(groupName);
+
+    const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
+    paintSelection(groupCard, memberName);
+
     try {
       await SpikeApiClient.selectGroupMember(activeInstance, groupName, memberName);
 
@@ -1727,24 +1894,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         await refreshGroupsSelectionState();
       } catch {
-        // Fall back to optimistic local paint if re-fetch fails.
-        const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
-        if (groupCard) {
-          const selectedSummary = groupCard.querySelector('.current-selected');
-          if (selectedSummary) selectedSummary.textContent = memberName;
-
-          const memberItems = groupCard.querySelectorAll('.member-item');
-          memberItems.forEach((item) => {
-            const isTarget = item.dataset.member === memberName;
-            item.classList.toggle('selected', isTarget);
-            const check = item.querySelector('.check-mark');
-            if (check) check.textContent = isTarget ? '✓' : '';
-          });
-        }
         updateAllLatencyBadgesDOM();
       }
     } catch (err) {
-      alert(`切换节点失败: ${err.message}`);
+      showToast(`切换节点失败: ${err.message || err}`, 'error');
+      try {
+        await refreshGroupsSelectionState();
+      } catch {
+        const group = currentGroupsData.find((g) => g.name === groupName);
+        paintSelection(groupCard, group?.override_member || group?.selected || null);
+      }
+    } finally {
+      selectingGroups.delete(groupName);
     }
   }
 
@@ -1765,13 +1926,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn(`Cleared override but failed to refresh groups: ${err.message}`);
       }
     } catch (err) {
-      alert(`恢复自动选择失败: ${err.message}`);
+      showToast(`恢复自动选择失败: ${err.message || err}`, 'error');
     }
   }
 
   // Latency Testing with visual feedback
   async function runTestGroup(groupName, targetMember = null) {
     const testBtn = document.querySelector(`.btn-test-group[data-group="${CSS.escape(groupName)}"]`);
+    if (!targetMember && testBtn?.classList.contains('testing')) return;
     if (testBtn) testBtn.classList.add('testing');
 
     // Update target badges to "Testing..." spinner status immediately
@@ -1831,7 +1993,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnTestAll.disabled = true;
     btnTestAll.classList.add('testing');
     const labelSpan = btnTestAll.querySelector('.btn-label');
-    if (labelSpan) labelSpan.textContent = '测速中...';
+    if (labelSpan) labelSpan.textContent = '测速…';
 
     // Mark all visible group badges as testing
     const allBadges = document.querySelectorAll('.latency-badge');
@@ -1941,7 +2103,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   trafficTimer = setInterval(() => {
     void refreshTraffic();
   }, 1000);
-  window.addEventListener('unload', () => {
+  window.addEventListener('pagehide', () => {
     if (trafficTimer !== null) clearInterval(trafficTimer);
     try {
       trafficPort.disconnect();
