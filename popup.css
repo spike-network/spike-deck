@@ -137,7 +137,7 @@ body {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .icon-btn {
@@ -183,23 +183,6 @@ body {
   outline-offset: 1px;
 }
 
-.action-btn .btn-label {
-  min-width: 42px;
-  text-align: center;
-}
-
-.action-btn {
-  background: var(--primary-gradient);
-  border: none;
-  font-weight: 600;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
-}
-
-.action-btn:hover {
-  opacity: 0.9;
-}
-
 .provider-refresh-btn.testing svg {
   animation: spin 0.8s linear infinite;
   color: var(--accent-cyan);
@@ -236,10 +219,6 @@ body {
 
 .container.dock-view .info-card,
 .container.dock-view .main-content {
-  display: none;
-}
-
-.container.dock-view #btn-test-all {
   display: none;
 }
 
@@ -1121,7 +1100,7 @@ input:checked + .slider::before {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.btn-test-group.testing svg, .action-btn.testing svg {
+.btn-test-group.testing svg {
   animation: spin 0.8s linear infinite;
   color: var(--accent-cyan);
 }

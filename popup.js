@@ -300,7 +300,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const moduleNameInput = document.getElementById('module-name-input');
   const moduleUrlInput = document.getElementById('module-url-input');
   const btnModulesClose = document.getElementById('btn-modules-close');
-  const btnTestAll = document.getElementById('btn-test-all');
   const btnRefreshProviders = document.getElementById('btn-refresh-providers');
   const btnRefresh = document.getElementById('btn-refresh');
   const btnEmbeddedUi = document.getElementById('btn-embedded-ui');
@@ -1242,10 +1241,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  btnTestAll.addEventListener('click', async () => {
-    await runTestAll();
-  });
-
   async function switchOutboundMode(mode) {
     if (!activeInstance || outboundBusy || !['rule', 'direct', 'global'].includes(mode)) return;
     const policy = outboundPolicySelect.value || currentOutbound?.global_policy || currentOutboundPolicies[0] || '';
@@ -2020,33 +2015,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
       }
     });
-  }
-
-  async function runTestAll() {
-    btnTestAll.disabled = true;
-    btnTestAll.classList.add('testing');
-    const labelSpan = btnTestAll.querySelector('.btn-label');
-    if (labelSpan) labelSpan.textContent = '测速…';
-
-    // Mark all visible group badges as testing
-    const allBadges = document.querySelectorAll('.latency-badge');
-    allBadges.forEach((badge) => {
-      badge.className = 'latency-badge lat-testing';
-      badge.replaceChildren(
-        el('span', { className: 'mini-spinner' })
-      );
-    });
-
-    const groupCards = document.querySelectorAll('.group-card');
-    const groupNames = Array.from(groupCards).map((card) => card.dataset.group);
-
-    for (const gName of groupNames) {
-      await runTestGroup(gName);
-    }
-
-    btnTestAll.disabled = false;
-    btnTestAll.classList.remove('testing');
-    if (labelSpan) labelSpan.textContent = '测速';
   }
 
   /** Update latency badges across all visible groups and members in DOM */
