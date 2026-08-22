@@ -269,6 +269,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activeInstance = await StorageManager.getActiveInstance();
 
   const instanceSelect = document.getElementById('instance-select');
+  const btnQuickInstance = document.getElementById('btn-quick-instance');
+  const btnQuickOutbound = document.getElementById('btn-quick-outbound');
+  const btnQuickProfile = document.getElementById('btn-quick-profile');
+  const quickInstanceValue = document.getElementById('quick-instance-value');
+  const quickOutboundValue = document.getElementById('quick-outbound-value');
+  const quickProfileValue = document.getElementById('quick-profile-value');
+  const quickPanelInstance = document.getElementById('quick-panel-instance');
+  const quickPanelProfile = document.getElementById('quick-panel-profile');
   const statusDot = document.getElementById('status-dot');
   const statusText = document.getElementById('status-text');
   const profileName = document.getElementById('profile-name');
@@ -483,11 +491,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (unavailable) {
       outboundModeState.textContent = unavailableMessage || '当前核心不支持';
+      updateQuickSummaries();
       return;
     }
     outboundModeState.textContent = outbound.mode === 'global'
       ? `${outboundModeLabel(outbound.mode)} · ${outbound.global_policy || outboundPolicySelect.value || '未选择'}`
       : outboundModeLabel(outbound.mode);
+    updateQuickSummaries();
   }
 
   async function optionalApiRequest(label, run) {
@@ -531,7 +541,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     return parts.join(' · ');
   }
 
+  function currentQuickPanel() {
+    if (!quickPanelInstance.hidden) return 'instance';
+    if (!outboundModeCard.hidden) return 'outbound';
+    if (!quickPanelProfile.hidden) return 'profile';
+    return null;
+  }
+
+  function setQuickPanel(name) {
+    const next = name && name !== currentQuickPanel() ? name : null;
+    if (next) {
+      if (isProvidersPanelOpen()) setProvidersPanelOpen(false);
+      if (!modulesPanel.hidden) setModulesPanelOpen(false);
+    }
+    const panels = [
+      ['instance', quickPanelInstance, btnQuickInstance],
+      ['outbound', outboundModeCard, btnQuickOutbound],
+      ['profile', quickPanelProfile, btnQuickProfile]
+    ];
+    panels.forEach(([key, panel, button]) => {
+      const open = key === next;
+      panel.hidden = !open;
+      button.classList.toggle('active', open);
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
+
+  function updateQuickSummaries() {
+    const instanceName = activeInstance?.name || '—';
+    quickInstanceValue.textContent = instanceName;
+    btnQuickInstance.title = `实例：${instanceName}`;
+
+    const outboundShort = currentOutbound
+      ? outboundModeLabel(currentOutbound.mode)
+      : '—';
+    quickOutboundValue.textContent = outboundShort;
+    btnQuickOutbound.title = currentOutbound
+      ? (currentOutbound.mode === 'global'
+        ? `${outboundShort} · ${currentOutbound.global_policy || outboundPolicySelect.value || '未选择'}`
+        : outboundShort)
+      : (outboundModeState.textContent || '运行模式');
+
+    const profileText = currentProfileStem || profileSelect.value || '—';
+    quickProfileValue.textContent = profileText;
+    const fullProfile = profileName.title || profileName.textContent || profileText;
+    btnQuickProfile.title = fullProfile && fullProfile !== '-' ? fullProfile : 'Profile';
+  }
+
   function setProvidersPanelOpen(open) {
+    if (open) setQuickPanel(null);
     providersPanel.hidden = !open;
     btnRefreshProviders.setAttribute('aria-expanded', open ? 'true' : 'false');
     btnRefreshProviders.classList.toggle('active', open);
@@ -975,7 +1033,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
-    if (!providersPanel.hidden) {
+    if (currentQuickPanel()) {
+      setQuickPanel(null);
+    } else if (!providersPanel.hidden) {
       setProvidersPanelOpen(false);
     } else if (!modulesPanel.hidden) {
       setModulesPanelOpen(false);
@@ -1049,6 +1109,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       instanceSelect.appendChild(opt);
     });
+    updateQuickSummaries();
   }
   renderInstanceSelector();
 
@@ -1082,6 +1143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Instance selector change handler
   instanceSelect.addEventListener('change', async (e) => {
+    setQuickPanel(null);
     const selectedId = e.target.value;
     await StorageManager.setActiveInstanceId(selectedId);
     resetGroupTestTracking();
@@ -1151,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function setModulesPanelOpen(open) {
+    if (open) setQuickPanel(null);
     modulesPanel.hidden = !open;
     btnModules.setAttribute('aria-expanded', open ? 'true' : 'false');
     providersPanel.hidden = true;
@@ -1178,6 +1241,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       moduleNameInput.value = '';
       moduleUrlInput.value = '';
     }
+  });
+
+  btnQuickInstance.addEventListener('click', () => setQuickPanel('instance'));
+  btnQuickOutbound.addEventListener('click', () => setQuickPanel('outbound'));
+  btnQuickProfile.addEventListener('click', () => setQuickPanel('profile'));
+  document.querySelectorAll('[data-quick-close]').forEach((button) => {
+    button.addEventListener('click', () => setQuickPanel(null));
   });
 
   btnProfileSwitch.addEventListener('click', () => {
@@ -1321,6 +1391,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       badgeNodes.textContent = '节点: -';
       badgeRules.textContent = '规则: -';
       badgeDnsDelay.textContent = 'DNS: —';
+      currentProfileStem = '';
       profileSelect.replaceChildren(el('option', { value: '' }, '—'));
       renderTraffic(null);
       publishTrafficSample(null, err.message || 'unreachable');
@@ -1487,6 +1558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       profileSelect.value = names.includes(currentProfileStem)
         ? currentProfileStem
         : (names[0] || '');
+      updateQuickSummaries();
       const managed = SpikeApiClient.parseManagedProfile(current?.profile || '');
       if (managed) {
         const parts = ['Managed'];
@@ -1500,6 +1572,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch {
       profileSelect.replaceChildren(el('option', { value: currentProfileStem }, currentProfileStem || '—'));
       managedBadge.hidden = true;
+      updateQuickSummaries();
     }
   }
 
@@ -1513,6 +1586,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const switched = await SpikeApiClient.switchProfile(activeInstance, name);
       if (switched?.error) throw new Error(switched.error);
       await loadDashboard();
+      setQuickPanel(null);
       showToast(`已切换到 ${name}`, 'success');
     } catch (error) {
       showToast(`切换 Profile 失败: ${error.message || '未知错误'}`, 'error');

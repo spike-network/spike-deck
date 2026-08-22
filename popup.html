@@ -102,69 +102,96 @@
       </div>
     </section>
 
-    <!-- Instance Selector & Proxy Bar -->
-    <div class="control-bar">
-      <div class="instance-selector-wrapper">
-        <label for="instance-select" class="selector-label">实例:</label>
-        <select id="instance-select" class="instance-select">
+    <section class="quick-bar" aria-label="实例、运行模式与 Profile">
+      <div class="quick-tabs">
+        <button type="button" class="quick-tab" id="btn-quick-instance" aria-expanded="false" aria-controls="quick-panel-instance">
+          <span class="quick-tab-kicker">实例</span>
+          <span class="quick-tab-value" id="quick-instance-value">—</span>
+        </button>
+        <button type="button" class="quick-tab" id="btn-quick-outbound" aria-expanded="false" aria-controls="outbound-mode-card">
+          <span class="quick-tab-kicker">模式</span>
+          <span class="quick-tab-value" id="quick-outbound-value">—</span>
+        </button>
+        <button type="button" class="quick-tab" id="btn-quick-profile" aria-expanded="false" aria-controls="quick-panel-profile">
+          <span class="quick-tab-kicker">Profile</span>
+          <span class="quick-tab-value" id="quick-profile-value">—</span>
+        </button>
+      </div>
+
+      <div id="quick-panel-instance" class="quick-panel" hidden>
+        <div class="quick-panel-header">
+          <span>切换实例</span>
+          <button type="button" class="btn-provider-action" data-quick-close title="关闭">关闭</button>
+        </div>
+        <label for="instance-select" class="selector-label">实例</label>
+        <select id="instance-select" class="instance-select" aria-label="切换实例">
           <!-- Populated dynamically -->
         </select>
       </div>
 
-      <div class="instance-selector-wrapper profile-selector-wrapper">
-        <label for="profile-select" class="selector-label">Profile:</label>
-        <select id="profile-select" class="instance-select" aria-label="切换 Profile">
-          <option value="">—</option>
-        </select>
-        <button type="button" id="btn-profile-switch" class="btn-section-action">切换</button>
-      </div>
+      <section id="outbound-mode-card" class="quick-panel outbound-mode-card" hidden aria-label="Spike 运行模式">
+        <div class="quick-panel-header">
+          <span>运行模式</span>
+          <small id="outbound-mode-state">检测中…</small>
+          <button type="button" class="btn-provider-action" data-quick-close title="关闭">关闭</button>
+        </div>
+        <div class="outbound-mode-controls">
+          <button type="button" class="btn-outbound-mode" data-mode="rule">规则</button>
+          <button type="button" class="btn-outbound-mode" data-mode="direct">直连</button>
+          <button type="button" class="btn-outbound-mode" data-mode="global">全局</button>
+          <select id="outbound-policy-select" class="outbound-policy-select" aria-label="全局代理策略">
+            <option value="">加载策略…</option>
+          </select>
+        </div>
+      </section>
 
-      <div class="proxy-toggle-wrapper" id="proxy-toggle-wrapper">
-        <label class="switch-label" title="开启后由 SpikeDeck 使用当前实例监听地址接管 Chrome 代理；关闭后释放给其他扩展">
-          <input type="checkbox" id="toggle-chrome-proxy">
-          <span class="slider"></span>
-          <span class="switch-text">接管代理</span>
-        </label>
-      </div>
-    </div>
-
-    <section class="outbound-mode-card" id="outbound-mode-card" aria-label="Spike 运行模式">
-      <div class="outbound-mode-head">
-        <span>运行模式</span>
-        <small id="outbound-mode-state">检测中…</small>
-      </div>
-      <div class="outbound-mode-controls">
-        <button type="button" class="btn-outbound-mode" data-mode="rule">规则</button>
-        <button type="button" class="btn-outbound-mode" data-mode="direct">直连</button>
-        <button type="button" class="btn-outbound-mode" data-mode="global">全局</button>
-        <select id="outbound-policy-select" class="outbound-policy-select" aria-label="全局代理策略">
-          <option value="">加载策略…</option>
-        </select>
+      <div id="quick-panel-profile" class="quick-panel" hidden>
+        <div class="quick-panel-header">
+          <span>切换 Profile</span>
+          <button type="button" class="btn-provider-action" data-quick-close title="关闭">关闭</button>
+        </div>
+        <div class="profile-switch-row">
+          <label for="profile-select" class="selector-label">Profile</label>
+          <select id="profile-select" class="instance-select" aria-label="切换 Profile">
+            <option value="">—</option>
+          </select>
+          <button type="button" id="btn-profile-switch" class="btn-section-action">切换</button>
+        </div>
+        <div class="profile-details">
+          <div class="info-row">
+            <span class="info-label">路径:</span>
+            <span class="info-value" id="profile-name">-</span>
+            <span class="managed-badge" id="managed-badge" hidden>Managed</span>
+          </div>
+          <div class="info-meta" id="info-meta">
+            <span class="badge" id="badge-groups">组: -</span>
+            <span class="badge" id="badge-nodes">节点: -</span>
+            <span class="badge" id="badge-rules">规则: -</span>
+            <span class="badge" id="badge-dns-delay">DNS: —</span>
+          </div>
+          <div class="proxy-listener-section">
+            <span class="info-label">代理监听:</span>
+            <div class="proxy-listeners" id="proxy-listeners">
+              <span class="proxy-listener-empty">-</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Status & Info Card -->
-    <div class="info-card" id="info-card">
-      <div class="info-row">
-        <span class="info-label">Profile:</span>
-        <span class="info-value" id="profile-name">-</span>
-        <span class="managed-badge" id="managed-badge" hidden>Managed</span>
-      </div>
-      <div class="info-meta" id="info-meta">
-        <span class="badge" id="badge-groups">组: -</span>
-        <span class="badge" id="badge-nodes">节点: -</span>
-        <span class="badge" id="badge-rules">规则: -</span>
-        <span class="badge" id="badge-dns-delay">DNS: —</span>
-      </div>
-      <div class="traffic-row" id="traffic-row" aria-label="实时速度">
-        <span class="traffic-down" id="traffic-down">↓ —</span>
-        <span class="traffic-up" id="traffic-up">↑ —</span>
-        <span class="traffic-total" id="traffic-total"></span>
-      </div>
-      <div class="proxy-listener-section">
-        <span class="info-label">代理监听:</span>
-        <div class="proxy-listeners" id="proxy-listeners">
-          <span class="proxy-listener-empty">-</span>
+    <div class="status-bar" id="status-bar">
+      <div class="status-bar-main">
+        <div class="proxy-toggle-wrapper" id="proxy-toggle-wrapper">
+          <label class="switch-label" title="开启后由 SpikeDeck 使用当前实例监听地址接管 Chrome 代理；关闭后释放给其他扩展">
+            <input type="checkbox" id="toggle-chrome-proxy">
+            <span class="slider"></span>
+            <span class="switch-text">接管代理</span>
+          </label>
+        </div>
+        <div class="traffic-row" id="traffic-row" aria-label="实时速度">
+          <span class="traffic-down" id="traffic-down">↓ —</span>
+          <span class="traffic-up" id="traffic-up">↑ —</span>
+          <span class="traffic-total" id="traffic-total"></span>
         </div>
       </div>
       <div class="proxy-control-state" id="proxy-control-state">未接管浏览器代理</div>
