@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>SpikeDeck store screenshot</title>
+  <link rel="stylesheet" href="../popup.css">
+  <link rel="stylesheet" href="shot.css">
+</head>
+<body>
+  <div class="shot">
+    <div class="popup-shell">
+      <div class="container">
+        <header class="header">
+          <div class="brand">
+            <img src="../icons/icon48.png" alt="SpikeDeck" class="logo">
+            <div class="title-group">
+              <span class="title">SpikeDeck</span>
+              <div class="status-indicator">
+                <span class="status-dot online"></span>
+                <span class="status-text">已连接</span>
+              </div>
+            </div>
+          </div>
+          <div class="header-actions">
+            <button class="icon-btn" type="button">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+            <button class="icon-btn provider-refresh-btn" id="btn-providers-shot" type="button">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                <path d="M12 12v9"></path>
+                <path d="m8 17 4 4 4-4"></path>
+              </svg>
+            </button>
+            <button class="icon-btn" type="button">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                <polyline points="21 3 21 9 15 9"></polyline>
+              </svg>
+            </button>
+            <button class="icon-btn" type="button">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </button>
+            <button class="icon-btn" type="button">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="quick-bar">
+          <div class="quick-tabs">
+            <button type="button" class="quick-tab" data-tab="instance">
+              <span class="quick-tab-kicker">实例</span>
+              <span class="quick-tab-value">My Spike</span>
+            </button>
+            <button type="button" class="quick-tab" data-tab="mode">
+              <span class="quick-tab-kicker">模式</span>
+              <span class="quick-tab-value">规则模式</span>
+            </button>
+            <button type="button" class="quick-tab" data-tab="profile">
+              <span class="quick-tab-kicker">Profile</span>
+              <span class="quick-tab-value">surge</span>
+            </button>
+          </div>
+
+          <section class="quick-panel outbound-mode-card" data-only="mode">
+            <div class="quick-panel-header">
+              <span>运行模式</span>
+              <small>规则模式</small>
+              <button type="button" class="btn-provider-action">关闭</button>
+            </div>
+            <div class="outbound-mode-controls">
+              <button type="button" class="btn-outbound-mode active">规则</button>
+              <button type="button" class="btn-outbound-mode">直连</button>
+              <button type="button" class="btn-outbound-mode">全局</button>
+              <select class="outbound-policy-select" aria-label="全局代理策略">
+                <option selected>PROXY</option>
+              </select>
+            </div>
+          </section>
+
+          <div class="quick-panel" data-only="profile">
+            <div class="quick-panel-header">
+              <span>切换 Profile</span>
+              <button type="button" class="btn-provider-action">关闭</button>
+            </div>
+            <div class="profile-switch-row">
+              <label class="selector-label">Profile</label>
+              <select class="instance-select">
+                <option selected>surge</option>
+              </select>
+              <button type="button" class="btn-section-action">切换</button>
+            </div>
+            <div class="profile-details">
+              <div class="info-row">
+                <span class="info-label">路径:</span>
+                <span class="info-value">/home/spike/surge.conf</span>
+              </div>
+              <div class="info-meta">
+                <span class="badge">组: 8</span>
+                <span class="badge">节点: 24</span>
+                <span class="badge">规则: 1862</span>
+                <span class="badge">DNS: 12 ms</span>
+              </div>
+              <div class="proxy-listener-section">
+                <span class="info-label">代理监听:</span>
+                <div class="proxy-listeners">
+                  <span class="proxy-listener">
+                    <span class="proxy-listener-kind">Mixed</span>
+                    <span class="proxy-listener-address">127.0.0.1:7890</span>
+                  </span>
+                  <span class="proxy-listener">
+                    <span class="proxy-listener-kind">HTTP</span>
+                    <span class="proxy-listener-address">127.0.0.1:7891</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="providers-panel" data-only="providers" aria-labelledby="providers-panel-title">
+          <div class="providers-panel-header">
+            <div class="providers-panel-title-group">
+              <span id="providers-panel-title" class="providers-panel-title">外部资源</span>
+              <span class="providers-panel-count">3 项</span>
+            </div>
+            <div class="providers-panel-actions">
+              <button type="button" class="btn-provider-action primary">全部更新</button>
+              <button type="button" class="btn-provider-action">关闭</button>
+            </div>
+          </div>
+          <div class="providers-list">
+            <div class="provider-row">
+              <div class="provider-row-main">
+                <div class="provider-row-top">
+                  <span class="provider-type">POLICY-PATH</span>
+                  <span class="provider-status status-ready">就绪</span>
+                  <button type="button" class="btn-provider-row-update">更新</button>
+                </div>
+                <div class="provider-source">PROXY</div>
+                <div class="provider-origin">providers.example.test/proxy.yaml</div>
+                <div class="provider-row-meta">
+                  <span class="provider-updated">12 分钟前</span>
+                  <span class="provider-meta-sep">·</span>
+                  <span class="provider-meta-extra">远程 · 12h</span>
+                </div>
+              </div>
+            </div>
+            <div class="provider-row">
+              <div class="provider-row-main">
+                <div class="provider-row-top">
+                  <span class="provider-type">RULE-SET</span>
+                  <span class="provider-status status-ready">就绪</span>
+                  <button type="button" class="btn-provider-row-update">更新</button>
+                </div>
+                <div class="provider-source">cn.conf</div>
+                <div class="provider-origin">rules.example.test/cn.conf</div>
+                <div class="provider-row-meta">
+                  <span class="provider-updated">1 小时前</span>
+                  <span class="provider-meta-sep">·</span>
+                  <span class="provider-meta-extra">远程 · 24h</span>
+                </div>
+              </div>
+            </div>
+            <div class="provider-row">
+              <div class="provider-row-main">
+                <div class="provider-row-top">
+                  <span class="provider-type">DOMAIN-SET</span>
+                  <span class="provider-status status-update_failed">更新失败</span>
+                  <button type="button" class="btn-provider-row-update">更新</button>
+                </div>
+                <div class="provider-source">ads.list</div>
+                <div class="provider-origin">rules.example.test/ads.list</div>
+                <div class="provider-row-meta">
+                  <span class="provider-updated">3 天前</span>
+                  <span class="provider-meta-sep">·</span>
+                  <span class="provider-meta-extra">远程 · 24h</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="status-bar" data-hide="providers">
+          <div class="status-bar-main">
+            <div class="proxy-toggle-wrapper">
+              <label class="switch-label">
+                <input type="checkbox" checked>
+                <span class="slider"></span>
+                <span class="switch-text">接管代理</span>
+              </label>
+              <span class="proxy-control-dot owned"></span>
+            </div>
+            <div class="traffic-row">
+              <span class="traffic-down">↓ 1.2 MB/s</span>
+              <span class="traffic-up">↑ 86 KB/s</span>
+              <span class="traffic-total">226.8 MB / 59.1 MB</span>
+            </div>
+          </div>
+        </div>
+
+        <main class="main-content" data-hide="providers,profile">
+          <div class="section-title">
+            <span>策略组</span>
+            <div class="section-actions">
+              <button type="button" class="btn-section-action">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+                  <polyline points="7 13 12 18 17 13"></polyline>
+                  <polyline points="7 6 12 11 17 6"></polyline>
+                </svg>
+              </button>
+              <button type="button" class="btn-section-action">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+                  <polyline points="7 11 12 6 17 11"></polyline>
+                  <polyline points="7 18 12 13 17 18"></polyline>
+                </svg>
+              </button>
+              <button type="button" class="btn-toggle-hidden">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+              <button type="button" class="btn-section-action">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="groups-container">
+            <div class="group-card expanded">
+              <div class="group-header">
+                <div class="group-title-wrapper">
+                  <svg class="expand-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                  <span class="group-name">PROXY</span>
+                  <span class="group-kind-badge">Select</span>
+                </div>
+                <div class="group-summary">
+                  <span class="current-selected">HK-01</span>
+                  <button type="button" class="btn-test-group">
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="group-members">
+                <div class="member-item selected">
+                  <div class="member-left"><span class="check-mark">✓</span><span>HK-01</span><span class="member-type-tag">SS</span></div>
+                  <div class="member-right"><span class="latency-badge lat-fast">28</span></div>
+                </div>
+                <div class="member-item">
+                  <div class="member-left"><span class="check-mark"></span><span>JP-02</span><span class="member-type-tag">Trojan</span></div>
+                  <div class="member-right"><span class="latency-badge lat-fast">41</span></div>
+                </div>
+                <div class="member-item">
+                  <div class="member-left"><span class="check-mark"></span><span>US-West</span><span class="member-type-tag">VMess</span></div>
+                  <div class="member-right"><span class="latency-badge lat-medium">88</span></div>
+                </div>
+                <div class="member-item">
+                  <div class="member-left"><span class="check-mark"></span><span>DIRECT</span><span class="member-type-tag">DIRECT</span></div>
+                  <div class="member-right"><span class="latency-badge lat-fast">12</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="group-card" data-hide="mode">
+              <div class="group-header">
+                <div class="group-title-wrapper">
+                  <svg class="expand-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                  <span class="group-name">AUTO</span>
+                  <span class="group-kind-badge">URL-Test</span>
+                </div>
+                <div class="group-summary">
+                  <span class="current-selected">HK-01</span>
+                  <button type="button" class="btn-test-group">
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+  <script>
+    const view = new URLSearchParams(location.search).get('v') || 'groups';
+    document.querySelectorAll('[data-only]').forEach((el) => {
+      el.hidden = el.getAttribute('data-only') !== view;
+    });
+    document.querySelectorAll('[data-hide]').forEach((el) => {
+      const hides = el.getAttribute('data-hide').split(',');
+      if (hides.includes(view)) el.hidden = true;
+    });
+    document.querySelectorAll('.quick-tab').forEach((el) => {
+      el.classList.toggle('active', el.dataset.tab === view);
+    });
+    const providersBtn = document.getElementById('btn-providers-shot');
+    if (providersBtn) providersBtn.classList.toggle('active', view === 'providers');
+  </script>
+</body>
+</html>

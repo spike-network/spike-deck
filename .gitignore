@@ -4,3 +4,8 @@
 *.log
 node_modules/
 dist/
+store/screenshot-1280x800.png
+store/screenshot-mode.png
+store/screenshot-options.png
+store/screenshot-profile.png
+store/screenshot-providers.png

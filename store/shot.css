@@ -1,0 +1,79 @@
+html, body {
+  width: 1280px !important;
+  height: 800px !important;
+  max-height: none !important;
+  margin: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  background: #12141c !important;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.shot {
+  width: 1280px;
+  height: 800px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #12141c;
+}
+
+.popup-shell {
+  width: 410px;
+  background: #0f111a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.popup-shell .container {
+  max-height: none;
+}
+
+.status-dot.online {
+  background-color: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+/* Keep member list fully painted; inset box-shadow smears when downscaled. */
+.group-card.expanded .group-members {
+  animation: none !important;
+}
+
+.member-item.selected {
+  color: #38bdf8 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-left: 2px solid #38bdf8;
+  padding-left: 26px;
+}
+
+.options-shot {
+  width: 1200px;
+  max-height: 760px;
+  overflow: hidden;
+  background: #0f111a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
+  padding: 20px 24px 16px;
+}
+
+.options-shot .options-container {
+  max-width: none;
+  gap: 16px;
+}
+
+.options-shot .options-main {
+  grid-template-columns: 300px 1fr;
+}
+
+.options-shot .preferences-panel,
+.options-shot .profile-export-panel,
+.options-shot .options-footer {
+  display: none;
+}

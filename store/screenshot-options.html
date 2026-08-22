@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>SpikeDeck options screenshot</title>
+  <link rel="stylesheet" href="../options.css">
+  <link rel="stylesheet" href="shot.css">
+</head>
+<body>
+  <div class="shot">
+    <div class="options-shot">
+      <div class="options-container">
+        <header class="options-header">
+          <div class="brand">
+            <img src="../icons/icon48.png" alt="Logo" class="logo">
+            <div>
+              <h1>SpikeDeck 设置</h1>
+              <p class="subtitle">管理多个 Spike 实例与浏览器代理托管配置</p>
+            </div>
+          </div>
+        </header>
+        <main class="options-main">
+          <section class="panel instance-list-panel">
+            <div class="panel-header">
+              <h2>Spike 实例列表</h2>
+              <button type="button" class="btn btn-primary">+ 添加新实例</button>
+            </div>
+            <div class="instances-container">
+              <div class="instance-card active">
+                <div class="instance-info">
+                  <span class="instance-name">My Spike</span>
+                  <span class="instance-url">http://127.0.0.1:9090</span>
+                </div>
+                <span class="active-badge">当前</span>
+              </div>
+              <div class="instance-card">
+                <div class="instance-info">
+                  <span class="instance-name">Remote Edge</span>
+                  <span class="instance-url">https://spike.example.test</span>
+                </div>
+                <button type="button" class="btn-set-active">设为当前</button>
+              </div>
+            </div>
+          </section>
+          <section class="panel instance-form-panel">
+            <div class="panel-header">
+              <h2>编辑实例</h2>
+            </div>
+            <form class="instance-form">
+              <div class="form-group">
+                <label>实例名称 *</label>
+                <input type="text" value="My Spike" readonly>
+              </div>
+              <div class="form-group">
+                <label>Control API Base URL *</label>
+                <input type="url" value="http://127.0.0.1:9090" readonly>
+                <span class="help-text">Spike 控制面 HTTP 监听地址</span>
+              </div>
+              <div class="form-group">
+                <label>Control Secret (密码/密钥)</label>
+                <div class="secret-field">
+                  <input type="password" value="••••••••" readonly>
+                  <button type="button" class="btn-secret-toggle">显示</button>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-secondary">⚡ 测试连接</button>
+                <div class="right-actions">
+                  <button type="button" class="btn btn-primary">保存实例</button>
+                </div>
+              </div>
+              <div class="test-result" style="color: var(--success-color);">已连接 · Mixed 127.0.0.1:7890</div>
+            </form>
+          </section>
+        </main>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
