@@ -43,7 +43,7 @@ html {
 }
 
 body {
-  width: 380px;
+  width: 410px;
   max-height: var(--popup-max-height, 600px);
   background-color: var(--bg-color);
   color: var(--text-main);
