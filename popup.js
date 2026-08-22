@@ -303,6 +303,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnTestAll = document.getElementById('btn-test-all');
   const btnRefreshProviders = document.getElementById('btn-refresh-providers');
   const btnRefresh = document.getElementById('btn-refresh');
+  const btnEmbeddedUi = document.getElementById('btn-embedded-ui');
   const btnOptions = document.getElementById('btn-options');
   const providersPanel = document.getElementById('providers-panel');
   const providersPanelCount = document.getElementById('providers-panel-count');
@@ -1197,6 +1198,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       window.open(chrome.runtime.getURL('options.html'));
     }
+  });
+
+  async function openEmbeddedUi() {
+    const url = SpikeApiClient.dashboardUrl(activeInstance);
+    if (!url) {
+      showToast('当前实例没有 Control API 地址', 'error');
+      return;
+    }
+    try {
+      const existing = chrome.tabs?.query
+        ? await chrome.tabs.query({ url: `${url}*` })
+        : [];
+      const tab = existing.find((item) => item.id != null);
+      if (tab) {
+        await chrome.tabs.update(tab.id, { active: true });
+        if (tab.windowId != null && chrome.windows?.update) {
+          await chrome.windows.update(tab.windowId, { focused: true });
+        }
+        return;
+      }
+      if (chrome.tabs?.create) {
+        await chrome.tabs.create({ url });
+        return;
+      }
+      window.open(url, '_blank', 'noopener');
+    } catch (err) {
+      showToast(`无法打开 Embedded UI: ${err.message || '未知错误'}`, 'error');
+    }
+  }
+
+  btnEmbeddedUi.addEventListener('click', () => {
+    void openEmbeddedUi();
   });
 
   outboundPolicySelect.addEventListener('change', () => {

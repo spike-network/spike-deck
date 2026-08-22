@@ -2,6 +2,29 @@ import assert from 'node:assert/strict';
 
 const { SpikeApiClient } = await import('../lib/spike-client.js');
 
+assert.equal(
+  SpikeApiClient.dashboardUrl({ baseUrl: 'http://127.0.0.1:9090/' }),
+  'http://127.0.0.1:9090/'
+);
+assert.equal(
+  SpikeApiClient.dashboardUrl({ baseUrl: 'http://127.0.0.1:9090' }),
+  'http://127.0.0.1:9090/'
+);
+assert.equal(
+  SpikeApiClient.dashboardUrl({ baseUrl: 'https://spike.example.test/ctrl' }),
+  'https://spike.example.test/ctrl/'
+);
+assert.equal(
+  SpikeApiClient.dashboardUrl({
+    baseUrl: 'http://user:pass@127.0.0.1:9090/?x=1#frag'
+  }),
+  'http://127.0.0.1:9090/'
+);
+assert.equal(SpikeApiClient.dashboardUrl({ baseUrl: 'ftp://127.0.0.1:9090' }), '');
+assert.equal(SpikeApiClient.dashboardUrl({ baseUrl: '' }), '');
+assert.equal(SpikeApiClient.dashboardUrl({}), '');
+assert.equal(SpikeApiClient.dashboardUrl(null), '');
+
 assert.equal(SpikeApiClient.nativePath('/status'), '/spike/status');
 assert.equal(SpikeApiClient.nativePath('/spike/status'), '/spike/status');
 assert.equal(
