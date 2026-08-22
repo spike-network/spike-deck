@@ -1427,11 +1427,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       trafficDown.textContent = '↓ —';
       trafficUp.textContent = '↑ —';
       trafficTotal.textContent = '';
+      trafficTotal.removeAttribute('title');
       return;
     }
     trafficDown.textContent = `↓ ${formatRate(traffic.download_bytes_per_second)}`;
     trafficUp.textContent = `↑ ${formatRate(traffic.upload_bytes_per_second)}`;
     trafficTotal.textContent = `${formatByteCount(traffic.download_bytes_total)} / ${formatByteCount(traffic.upload_bytes_total)}`;
+    trafficTotal.title = trafficTotal.textContent;
   }
 
   function publishTrafficSample(traffic, error) {

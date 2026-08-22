@@ -493,7 +493,7 @@ body {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   background: var(--panel-bg);
   border: 1px solid var(--card-border);
   border-radius: 6px;
@@ -524,7 +524,7 @@ body {
 .quick-tab-value {
   min-width: 0;
   flex: 1;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
   overflow: hidden;
@@ -618,6 +618,7 @@ body {
 .proxy-toggle-wrapper {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .switch-label {
@@ -736,6 +737,7 @@ input:checked + .slider::before {
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .info-row {
@@ -772,14 +774,23 @@ input:checked + .slider::before {
 
 .traffic-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
   flex: 1;
   justify-content: flex-end;
+  flex-wrap: nowrap;
+  overflow: hidden;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.traffic-down,
+.traffic-up {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .traffic-down {
@@ -791,8 +802,11 @@ input:checked + .slider::before {
 }
 
 .traffic-total {
+  min-width: 0;
   color: var(--text-dim);
-  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge {
