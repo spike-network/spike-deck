@@ -327,6 +327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCollapseAll = document.getElementById('btn-collapse-all');
   const filterBar = document.getElementById('filter-bar');
   const groupFilterInput = document.getElementById('group-filter');
+  const btnFilter = document.getElementById('btn-filter');
   const btnFilterClear = document.getElementById('btn-filter-clear');
 
   let showHiddenGroups = await StorageManager.getShowHiddenGroups();
@@ -1006,9 +1007,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     void setAllGroupsExpanded(false);
   });
 
+  function isFilterBarOpen() {
+    return !filterBar.hidden;
+  }
+
+  function updateFilterButtonUI() {
+    const open = isFilterBarOpen();
+    btnFilter.classList.toggle('active', open || groupFilterText.length > 0);
+    btnFilter.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function setFilterBarOpen(open) {
+    filterBar.hidden = !open;
+    updateFilterButtonUI();
+    if (open) groupFilterInput.focus();
+  }
+
+  btnFilter.addEventListener('click', () => {
+    setFilterBarOpen(!isFilterBarOpen());
+  });
+
   groupFilterInput.addEventListener('input', () => {
     groupFilterText = groupFilterInput.value.trim().toLowerCase();
     filterBar.classList.toggle('has-value', groupFilterText.length > 0);
+    updateFilterButtonUI();
     if (filterRenderTimer !== null) clearTimeout(filterRenderTimer);
     filterRenderTimer = setTimeout(() => {
       filterRenderTimer = null;
@@ -1020,20 +1042,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     groupFilterInput.value = '';
     groupFilterText = '';
     filterBar.classList.remove('has-value');
+    updateFilterButtonUI();
     renderGroups(currentGroupsData);
     groupFilterInput.focus();
   });
 
   groupFilterInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && groupFilterInput.value) {
-      event.stopPropagation();
+    if (event.key !== 'Escape') return;
+    event.stopPropagation();
+    if (groupFilterInput.value) {
       btnFilterClear.click();
+      return;
     }
+    setFilterBarOpen(false);
   });
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
-    if (currentQuickPanel()) {
+    if (isFilterBarOpen()) {
+      setFilterBarOpen(false);
+    } else if (currentQuickPanel()) {
       setQuickPanel(null);
     } else if (!providersPanel.hidden) {
       setProvidersPanelOpen(false);
@@ -1133,8 +1161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       await StorageManager.setProxyModeEnabled(previous);
       toggleProxy.checked = previous;
-      proxyControlState.className = 'proxy-control-state blocked';
-      proxyControlState.textContent = `代理控制失败: ${err.message}`;
+      setProxyControlDot('blocked', `代理控制失败: ${err.message}`);
     } finally {
       toggleProxy.disabled = false;
       proxyToggleWrapper.classList.remove('busy');
@@ -1153,6 +1180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     groupFilterText = '';
     groupFilterInput.value = '';
     filterBar.classList.remove('has-value');
+    setFilterBarOpen(false);
     if (offlineRetryTimer !== null) {
       clearTimeout(offlineRetryTimer);
       offlineRetryTimer = null;
@@ -1482,24 +1510,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!state || !state.ok) throw new Error(state?.error || '无法读取 Chrome 代理状态');
       renderProxyControlState(state, enabled);
     } catch (err) {
-      proxyControlState.className = 'proxy-control-state blocked';
-      proxyControlState.textContent = `代理状态未知: ${err.message}`;
+      setProxyControlDot('blocked', `代理状态未知: ${err.message}`);
     }
+  }
+
+  function setProxyControlDot(kind, message) {
+    proxyControlState.className = kind ? `proxy-control-dot ${kind}` : 'proxy-control-dot';
+    proxyControlState.title = message;
+    proxyControlState.setAttribute('aria-label', message);
   }
 
   function renderProxyControlState(state, enabled) {
     if (enabled && state.controlledBySpikeDeck) {
-      proxyControlState.className = 'proxy-control-state owned';
-      proxyControlState.textContent = 'SpikeDeck 正在接管浏览器代理';
+      setProxyControlDot('owned', 'SpikeDeck 正在接管浏览器代理');
       return;
     }
     if (enabled && state.levelOfControl === 'controlled_by_other_extensions') {
-      proxyControlState.className = 'proxy-control-state blocked';
-      proxyControlState.textContent = '浏览器代理当前由其他扩展控制';
+      setProxyControlDot('blocked', '浏览器代理当前由其他扩展控制');
       return;
     }
-    proxyControlState.className = 'proxy-control-state';
-    proxyControlState.textContent = '未接管；其他代理扩展可控制浏览器';
+    setProxyControlDot('', '未接管；其他代理扩展可控制浏览器');
   }
 
   /** Ingest member_info last_test_* fields into leafProbeResults map */

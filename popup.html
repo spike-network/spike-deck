@@ -187,6 +187,7 @@
             <span class="slider"></span>
             <span class="switch-text">接管代理</span>
           </label>
+          <span class="proxy-control-dot" id="proxy-control-state" role="status" aria-live="polite" title="未接管；其他代理扩展可控制浏览器" aria-label="未接管；其他代理扩展可控制浏览器"></span>
         </div>
         <div class="traffic-row" id="traffic-row" aria-label="实时速度">
           <span class="traffic-down" id="traffic-down">↓ —</span>
@@ -194,39 +195,41 @@
           <span class="traffic-total" id="traffic-total"></span>
         </div>
       </div>
-      <div class="proxy-control-state" id="proxy-control-state">未接管浏览器代理</div>
     </div>
 
     <!-- Policy Groups Section -->
     <main class="main-content">
       <div class="section-title">
-        <span>策略组 (Policy Groups)</span>
+        <span>策略组</span>
         <div class="section-actions">
-          <button id="btn-expand-all" class="btn-section-action" title="全部展开">
-            <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none">
+          <button type="button" id="btn-expand-all" class="btn-section-action" title="全部展开" aria-label="全部展开">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
               <polyline points="7 13 12 18 17 13"></polyline>
               <polyline points="7 6 12 11 17 6"></polyline>
             </svg>
-            <span>全部展开</span>
           </button>
-          <button id="btn-collapse-all" class="btn-section-action" title="全部收起">
-            <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none">
+          <button type="button" id="btn-collapse-all" class="btn-section-action" title="全部收起" aria-label="全部收起">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
               <polyline points="7 11 12 6 17 11"></polyline>
               <polyline points="7 18 12 13 17 18"></polyline>
             </svg>
-            <span>全部收起</span>
           </button>
-          <button id="btn-toggle-hidden" class="btn-toggle-hidden" title="切换是否显示隐藏的策略组">
-            <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none">
+          <button type="button" id="btn-toggle-hidden" class="btn-toggle-hidden" title="显示隐藏的策略组" aria-label="显示隐藏的策略组">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
-            <span id="label-hidden-toggle">显示隐藏组</span>
+          </button>
+          <button type="button" id="btn-filter" class="btn-section-action" title="筛选策略组 / 节点" aria-label="筛选策略组 / 节点" aria-expanded="false" aria-controls="filter-bar">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
           </button>
         </div>
       </div>
-      
-      <div class="filter-bar" id="filter-bar">
+
+      <div class="filter-bar" id="filter-bar" hidden>
         <input type="text" id="group-filter" class="filter-input" placeholder="筛选策略组 / 节点" autocomplete="off" spellcheck="false" aria-label="筛选策略组或节点">
         <button type="button" id="btn-filter-clear" class="filter-clear" title="清除筛选" aria-label="清除筛选">&times;</button>
       </div>
