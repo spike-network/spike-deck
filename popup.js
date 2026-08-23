@@ -1283,6 +1283,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'PROXY_HEALTH_CHANGED') {
+      void refreshProxyControlState();
+      return;
+    }
     if (message.instanceId !== activeInstance?.id) return;
     if (message.type === 'MODULE_UPDATE_CHANGED') {
       applyModuleTask(message.task);
@@ -1521,6 +1525,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderProxyControlState(state, enabled) {
+    if (enabled && state.releasedForUnhealthy) {
+      setProxyControlDot('blocked', 'Spike 不可达，已交回代理控制；恢复后将自动接管');
+      return;
+    }
     if (enabled && state.controlledBySpikeDeck) {
       setProxyControlDot('owned', 'SpikeDeck 正在接管浏览器代理');
       return;

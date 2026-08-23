@@ -10,6 +10,7 @@ PACK_FILES := \
 	manifest.json \
 	background.js \
 	popup.html popup.css popup.js popup-max-height.js \
+	offscreen.html offscreen.js \
 	options.html options.css options.js \
 	lib \
 	icons

@@ -14,13 +14,21 @@ const moduleOperations = new Map();
 const GROUP_TEST_POLL_INTERVAL_MS = 700;
 const GROUP_TEST_ALARM_PREFIX = 'group-test-reconcile:';
 const TRAFFIC_RATE_ALARM = 'traffic-rate';
+const STATUS_PROBE_TIMEOUT_MS = 2500;
+const HEALTH_OFFSCREEN_PATH = 'offscreen.html';
 const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
 const groupTestPollTimers = new Map();
 let trafficWatchPorts = 0;
+let healthReconcileInFlight = false;
 
 chrome.runtime.onInstalled.addListener(async () => {
   await StorageManager.init();
-  await updateProxySettings();
+  try {
+    await updateProxySettings();
+  } catch {
+    // Spike may be down; reconcileProxyWithHealth records a yield.
+  }
+  await reconcileProxyWithHealth();
   await reconcilePersistedProviderRefreshTasks();
   await reconcilePersistedGroupTestTasks();
   await ensureTrafficRateAlarm();
@@ -28,7 +36,12 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  await updateProxySettings();
+  try {
+    await updateProxySettings();
+  } catch {
+    // Spike may be down; reconcileProxyWithHealth records a yield.
+  }
+  await reconcileProxyWithHealth();
   await reconcilePersistedProviderRefreshTasks();
   await reconcilePersistedGroupTestTasks();
   await ensureTrafficRateAlarm();
@@ -38,6 +51,7 @@ chrome.runtime.onStartup.addListener(async () => {
 if (chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === TRAFFIC_RATE_ALARM) {
+      void reconcileProxyWithHealth();
       if (trafficWatchPorts > 0) return;
       void refreshTrafficBadgeFromActiveInstance();
       return;
@@ -55,6 +69,7 @@ if (chrome.runtime?.onConnect?.addListener) {
     port.onMessage.addListener((message) => {
       if (message?.type === 'TRAFFIC_SAMPLE') {
         applyTrafficBadge(message.traffic, message.error);
+        void onTrafficSampleHealth(message);
       }
     });
     port.onDisconnect.addListener(() => {
@@ -127,6 +142,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === 'TRAFFIC_SAMPLE') {
     applyTrafficBadge(message.traffic, message.error);
+    void onTrafficSampleHealth(message);
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (message.type === 'SPIKE_HEALTH_TICK') {
+    void reconcileProxyWithHealth();
     sendResponse({ ok: true });
     return false;
   }
@@ -605,6 +626,8 @@ async function updateProxySettings() {
     if (!isProxyEnabled) {
       // Remove this extension's value instead of replacing it with `system`.
       // That releases Chrome's proxy API for SwitchyOmega and other managers.
+      await StorageManager.setProxyReleasedForUnhealthy(false);
+      await closeHealthOffscreen();
       await releaseProxyControl();
       chrome.action.setBadgeText({ text: '' });
       return { mode: 'released', ...(await getProxyControlState()) };
@@ -641,6 +664,9 @@ async function updateProxySettings() {
       throw new Error('Chrome proxy settings are controlled by another extension or policy');
     }
 
+    await StorageManager.setProxyReleasedForUnhealthy(false);
+    await openHealthOffscreen();
+
     // Display indicator badge on action icon
     chrome.action.setBadgeBackgroundColor({ color: '#6366F1' });
     chrome.action.setBadgeText({ text: 'ON' });
@@ -659,11 +685,134 @@ async function updateProxySettings() {
     // Do not leave Chrome on a stale fixed proxy, and release ownership so a
     // different proxy extension can take over.
     try {
+      if (await StorageManager.isProxyModeEnabled()) {
+        await StorageManager.setProxyReleasedForUnhealthy(true);
+      }
       await releaseProxyControl();
     } catch (resetErr) {
       console.error('Failed to reset Chrome proxy after error:', resetErr);
     }
     throw err;
+  }
+}
+
+async function hasHealthOffscreen() {
+  if (chrome.runtime?.getContexts) {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT']
+    });
+    return contexts.some((context) => String(context.documentUrl || '').endsWith(HEALTH_OFFSCREEN_PATH));
+  }
+  if (chrome.offscreen?.hasDocument) {
+    return chrome.offscreen.hasDocument();
+  }
+  return false;
+}
+
+async function openHealthOffscreen() {
+  if (!chrome.offscreen?.createDocument) return;
+  if (await hasHealthOffscreen()) return;
+  try {
+    const justification = 'Probe Spike every few seconds while proxy takeover is enabled so a dead engine can release Chrome proxy quickly';
+    try {
+      await chrome.offscreen.createDocument({
+        url: HEALTH_OFFSCREEN_PATH,
+        reasons: ['WORKERS'],
+        justification
+      });
+    } catch (workerError) {
+      const message = String(workerError?.message || workerError);
+      if (message.includes('single offscreen') || message.includes('already exists')) return;
+      await chrome.offscreen.createDocument({
+        url: HEALTH_OFFSCREEN_PATH,
+        reasons: ['BLOBS'],
+        justification
+      });
+    }
+  } catch (error) {
+    const message = String(error?.message || error);
+    if (message.includes('single offscreen') || message.includes('already exists')) return;
+    console.warn(`Health offscreen unavailable: ${message}`);
+  }
+}
+
+async function closeHealthOffscreen() {
+  if (!chrome.offscreen?.closeDocument) return;
+  if (!(await hasHealthOffscreen())) return;
+  try {
+    await chrome.offscreen.closeDocument();
+  } catch {
+    // Already closed.
+  }
+}
+
+async function onTrafficSampleHealth(message) {
+  if (!(await StorageManager.isProxyModeEnabled())) return;
+  if (message?.error) {
+    await reconcileProxyWithHealth();
+    return;
+  }
+  if (await StorageManager.isProxyReleasedForUnhealthy()) {
+    await reconcileProxyWithHealth();
+  }
+}
+
+async function probeActiveInstanceHealth() {
+  const instance = await StorageManager.getActiveInstance();
+  if (!instance) return { ok: false, error: 'no instance' };
+  try {
+    await SpikeApiClient.getStatus(instance, { timeoutMs: STATUS_PROBE_TIMEOUT_MS });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'unreachable' };
+  }
+}
+
+async function yieldProxyForUnhealthy() {
+  await StorageManager.setProxyReleasedForUnhealthy(true);
+  await releaseProxyControl();
+  chrome.action.setBadgeBackgroundColor({ color: '#EF4444' });
+  chrome.action.setBadgeText({ text: 'ERR' });
+  chrome.action.setTitle?.({ title: 'SpikeDeck · Spike unreachable, proxy released' });
+  try {
+    await chrome.runtime.sendMessage({
+      type: 'PROXY_HEALTH_CHANGED',
+      releasedForUnhealthy: true
+    });
+  } catch {
+    // No popup/options page listening.
+  }
+}
+
+async function reconcileProxyWithHealth() {
+  if (healthReconcileInFlight) return { action: 'busy', healthy: null };
+  healthReconcileInFlight = true;
+  try {
+    const wantProxy = await StorageManager.isProxyModeEnabled();
+    if (!wantProxy) {
+      await StorageManager.setProxyReleasedForUnhealthy(false);
+      await closeHealthOffscreen();
+      return { action: 'idle', healthy: null };
+    }
+
+    await openHealthOffscreen();
+
+    const health = await probeActiveInstanceHealth();
+    if (!health.ok) {
+      await yieldProxyForUnhealthy();
+      return { action: 'released', healthy: false, error: health.error };
+    }
+
+    const released = await StorageManager.isProxyReleasedForUnhealthy();
+    const control = await getProxyControlState();
+    if (!released && control.controlledBySpikeDeck) {
+      return { action: 'holding', healthy: true };
+    }
+
+    const applied = await updateProxySettings();
+    return { action: 'restored', healthy: true, ...applied };
+  } finally {
+    healthReconcileInFlight = false;
   }
 }
 
@@ -721,6 +870,14 @@ function applyTrafficBadge(traffic, error) {
 
 async function restoreProxyBadgeIfNeeded(keepErrorTitle) {
   try {
+    if (await StorageManager.isProxyReleasedForUnhealthy()) {
+      chrome.action.setBadgeBackgroundColor({ color: '#EF4444' });
+      chrome.action.setBadgeText({ text: 'ERR' });
+      if (!keepErrorTitle) {
+        chrome.action.setTitle?.({ title: 'SpikeDeck · Spike unreachable, proxy released' });
+      }
+      return;
+    }
     if (await StorageManager.isProxyModeEnabled()) {
       chrome.action.setBadgeBackgroundColor({ color: '#6366F1' });
       chrome.action.setBadgeText({ text: 'ON' });
@@ -741,7 +898,8 @@ async function getProxyControlState() {
   const setting = await chrome.proxy.settings.get({ incognito: false });
   return {
     levelOfControl: setting.levelOfControl,
-    controlledBySpikeDeck: setting.levelOfControl === 'controlled_by_this_extension'
+    controlledBySpikeDeck: setting.levelOfControl === 'controlled_by_this_extension',
+    releasedForUnhealthy: await StorageManager.isProxyReleasedForUnhealthy()
   };
 }
 
@@ -750,5 +908,6 @@ export {
   getProviderRefreshTask,
   safeProviderRefreshError,
   startGroupTestTask,
-  startProviderRefreshTask
+  startProviderRefreshTask,
+  reconcileProxyWithHealth
 };

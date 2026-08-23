@@ -25,7 +25,8 @@
   "permissions": [
     "alarms",
     "storage",
-    "proxy"
+    "proxy",
+    "offscreen"
   ],
   "host_permissions": [
     "http://*/*",

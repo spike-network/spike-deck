@@ -353,6 +353,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderProxyPreferenceState(state, enabled) {
+    if (enabled && state.releasedForUnhealthy) {
+      proxyPreferenceState.className = 'proxy-preference-state warning';
+      proxyPreferenceState.textContent = 'Spike 不可达，已交回代理控制；恢复后将自动接管。';
+      return;
+    }
     if (enabled && state.controlledBySpikeDeck) {
       proxyPreferenceState.className = 'proxy-preference-state success';
       proxyPreferenceState.textContent = 'SpikeDeck 正在控制当前浏览器代理。';

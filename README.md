@@ -30,6 +30,7 @@
    - 端口不再手工配置：开启时从 Control API `GET /spike/status` 的 `listeners` 字段自动选择（优先 `mixed` / `http`，其次 `socks`）。
    - Popup 展示发现的 Mixed / HTTP / SOCKS5 可达地址。
    - 关闭托管时清除 SpikeDeck 写入的代理设置并释放控制权，不影响 SwitchyOmega 等其他代理扩展。
+   - 接管开启时约每 3 秒探测当前实例（Popup 打开时随流量刷新约 1 秒一次）。Spike 不可达时交回代理控制，用户开关仍保持开启，实例恢复后自动重新接管。
 
 5. **外部资源管理**
    - Popup 顶栏打开外部资源面板，列出全部 `policy-path`、`RULE-SET` 与 `DOMAIN-SET` 及其状态。
