@@ -124,6 +124,16 @@ h2 {
   gap: 10px;
 }
 
+.instances-empty {
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--text-dim);
+  font-size: 12px;
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .instance-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);

@@ -72,6 +72,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   btnLoadProfileExport.addEventListener("click", async () => {
     const active = await StorageManager.getActiveInstance();
+    if (!active) {
+      profileExportText.textContent = "未配置实例";
+      return;
+    }
     profileExportText.textContent = "正在加载…";
     try {
       const current = await SpikeApiClient.getCurrentProfile(active);
@@ -156,16 +160,37 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function loadData() {
     instances = await StorageManager.getInstances();
     const active = await StorageManager.getActiveInstance();
-    activeInstanceId = active.id;
+    activeInstanceId = active ? active.id : "";
+
+    if (instances.length === 0) {
+      isCreating = true;
+      editingId = null;
+      formTitle.textContent = "添加 Spike 实例";
+      instIdInput.value = "";
+      instNameInput.value = "";
+      instUrlInput.value = "http://127.0.0.1:9090";
+      instSecretInput.value = "";
+      btnDeleteInst.style.display = "none";
+      renderInstancesList();
+      return;
+    }
 
     renderInstancesList();
-    if (!editingId && !isCreating && instances.length > 0) {
+    if (!editingId && !isCreating && active) {
       selectInstanceForEdit(active.id);
     }
   }
 
   function renderInstancesList() {
     instancesContainer.replaceChildren();
+
+    if (instances.length === 0 && !isCreating) {
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "instances-empty";
+      emptyDiv.textContent = "暂无实例，请在右侧添加您的第一个 Spike 实例";
+      instancesContainer.appendChild(emptyDiv);
+      return;
+    }
 
     // Render existing instances
     instances.forEach((inst) => {
@@ -282,7 +307,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     instSecretInput.value = inst.secret || "";
 
     btnDeleteInst.style.display =
-      instances.length > 1 ? "inline-block" : "none";
+      instances.length > 0 ? "inline-block" : "none";
     hideTestResult();
     renderInstancesList();
   }

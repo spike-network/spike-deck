@@ -604,7 +604,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function updateQuickSummaries() {
-    const instanceName = activeInstance?.name || "—";
+    const instanceName = activeInstance?.name || "未配置";
     quickInstanceValue.textContent = instanceName;
     btnQuickInstance.title = `实例：${instanceName}`;
 
@@ -637,7 +637,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     appContainer?.classList.toggle("dock-view", open);
     if (!open) {
       clearProvidersPanelNotice();
-      if (providerRefreshTask && providerRefreshTask.status !== "running") {
+      if (activeInstance && providerRefreshTask && providerRefreshTask.status !== "running") {
         void StorageManager.setProviderRefreshTask(activeInstance.id, null);
         providerRefreshTask = null;
         handledProviderTaskState = "";
@@ -660,6 +660,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function loadProvidersList(showLoading = true) {
     const targetInstance = activeInstance;
+    if (!targetInstance) {
+      currentProviders = [];
+      providersRefreshing = false;
+      providersPanelCount.textContent = "";
+      providersList.replaceChildren(
+        el("div", { className: "providers-empty" }, "未配置 Spike 实例"),
+      );
+      btnProvidersRefreshAll.disabled = true;
+      return;
+    }
     if (showLoading) {
       providersList.replaceChildren(
         el(
@@ -1235,13 +1245,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Populate Instance Selector
   function renderInstanceSelector() {
     instanceSelect.replaceChildren();
-    instances.forEach((inst) => {
-      const opt = el("option", { value: inst.id }, inst.name);
-      if (inst.id === activeInstance.id) {
-        opt.selected = true;
-      }
+    if (instances.length === 0) {
+      const opt = el("option", { value: "" }, "无可用实例");
       instanceSelect.appendChild(opt);
-    });
+    } else {
+      instances.forEach((inst) => {
+        const opt = el("option", { value: inst.id }, inst.name);
+        if (activeInstance && inst.id === activeInstance.id) {
+          opt.selected = true;
+        }
+        instanceSelect.appendChild(opt);
+      });
+    }
     updateQuickSummaries();
   }
   renderInstanceSelector();
@@ -1252,6 +1267,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   void refreshProxyControlState();
 
   toggleProxy.addEventListener("change", async (e) => {
+    if (!activeInstance) {
+      toggleProxy.checked = false;
+      showToast("请先配置并激活 Spike 实例", "error");
+      return;
+    }
     const enabled = e.target.checked;
     const previous = !enabled;
     toggleProxy.disabled = true;
@@ -1418,6 +1438,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   async function openEmbeddedUi() {
+    if (!activeInstance) {
+      showToast("请先配置并激活 Spike 实例", "error");
+      return;
+    }
     const url = SpikeApiClient.dashboardUrl(activeInstance);
     if (!url) {
       showToast("当前实例没有 Control API 地址", "error");
@@ -1519,6 +1543,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       clearTimeout(offlineRetryTimer);
       offlineRetryTimer = null;
     }
+
+    if (!activeInstance) {
+      dashboardLoading = false;
+      btnRefresh.classList.remove("testing");
+      setStatus("offline", "未配置实例");
+      profileName.textContent = "-";
+      profileName.title = "";
+      managedBadge.hidden = true;
+      badgeGroups.textContent = "组: -";
+      badgeNodes.textContent = "节点: -";
+      badgeRules.textContent = "规则: -";
+      badgeDnsDelay.textContent = "DNS: —";
+      currentProfileStem = "";
+      profileSelect.replaceChildren(el("option", { value: "" }, "—"));
+      renderTraffic(null);
+      publishTrafficSample(null, "no instance");
+      proxyListeners.replaceChildren(
+        el("span", { className: "proxy-listener-empty" }, "-"),
+      );
+      renderOutboundMode(null, [], "未配置实例");
+      renderNoInstanceGuidance();
+      return;
+    }
+
     btnRefresh.classList.add("testing");
     setStatus("testing", "正在连接...");
 
@@ -1612,6 +1660,59 @@ document.addEventListener("DOMContentLoaded", async () => {
       dashboardLoading = false;
       btnRefresh.classList.remove("testing");
     }
+  }
+
+  function renderNoInstanceGuidance() {
+    const iconSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    iconSvg.setAttribute("viewBox", "0 0 24 24");
+    iconSvg.setAttribute("width", "26");
+    iconSvg.setAttribute("height", "26");
+    iconSvg.setAttribute("stroke", "currentColor");
+    iconSvg.setAttribute("stroke-width", "2");
+    iconSvg.setAttribute("fill", "none");
+
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", "12");
+    circle.setAttribute("cy", "12");
+    circle.setAttribute("r", "3");
+    iconSvg.appendChild(circle);
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute(
+      "d",
+      "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+    );
+    iconSvg.appendChild(path);
+
+    const iconWrapper = el("div", { className: "onboarding-icon" }, iconSvg);
+
+    const configBtn = el(
+      "button",
+      { type: "button", id: "btn-onboarding-config", className: "btn-onboarding-action" },
+      "前往配置实例",
+    );
+    configBtn.addEventListener("click", () => {
+      if (chrome.runtime.openOptionsPage) {
+        chrome.runtime.openOptionsPage();
+      } else {
+        window.open(chrome.runtime.getURL("options.html"));
+      }
+    });
+
+    const onboardingNode = el(
+      "div",
+      { className: "empty-state onboarding-state" },
+      iconWrapper,
+      el("h3", { className: "onboarding-title" }, "欢迎使用 SpikeDeck"),
+      el(
+        "p",
+        { className: "onboarding-desc" },
+        "首次使用请先添加 Spike 实例（填入控制面 API 地址与密钥），即可开始管理节点与策略组。",
+      ),
+      configBtn,
+    );
+
+    groupsContainer.replaceChildren(onboardingNode);
   }
 
   function scheduleOfflineRetry(delayMs = 8000) {
@@ -1847,6 +1948,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function loadModulesList() {
+    if (!activeInstance) {
+      currentModules = [];
+      modulesPanelCount.textContent = "";
+      modulesList.replaceChildren(
+        el("div", { className: "providers-empty" }, "未配置 Spike 实例"),
+      );
+      return;
+    }
     modulesList.replaceChildren(
       el("div", { className: "providers-empty" }, "正在加载模块…"),
     );

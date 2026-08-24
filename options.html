@@ -1,158 +1,268 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SpikeDeck 设置 - 实例管理</title>
-  <link rel="stylesheet" href="options.css">
-</head>
-<body>
-  <div class="options-container">
-    <header class="options-header">
-      <div class="brand">
-        <img src="icons/icon48.png" alt="Logo" class="logo">
-        <div>
-          <h1>SpikeDeck 设置</h1>
-          <p class="subtitle">管理多个 Spike 实例与浏览器代理托管配置</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SpikeDeck 设置 - 实例管理</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="options-container">
+      <header class="options-header">
+        <div class="brand">
+          <img src="icons/icon48.png" alt="Logo" class="logo" />
+          <div>
+            <h1>SpikeDeck 设置</h1>
+            <p class="subtitle">管理多个 Spike 实例与浏览器代理托管配置</p>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <main class="options-main">
-      <!-- Left Panel: Instance List -->
-      <section class="panel instance-list-panel">
-        <div class="panel-header">
-          <h2>Spike 实例列表</h2>
-          <button id="btn-add-instance" class="btn btn-primary">+ 添加新实例</button>
-        </div>
-
-        <div id="instances-container" class="instances-container">
-          <!-- Populated dynamically -->
-        </div>
-      </section>
-
-      <!-- Right Panel: Edit Form & Preferences -->
-      <div class="right-column">
-        <section class="panel instance-form-panel">
+      <main class="options-main">
+        <!-- Left Panel: Instance List -->
+        <section class="panel instance-list-panel">
           <div class="panel-header">
-            <h2 id="form-title">编辑实例</h2>
+            <h2>Spike 实例列表</h2>
+            <button id="btn-add-instance" class="btn btn-primary">
+              + 添加新实例
+            </button>
           </div>
 
-          <form id="instance-form" class="instance-form">
-            <input type="hidden" id="inst-id">
-
-            <div class="form-group">
-              <label for="inst-name">实例名称 *</label>
-              <input type="text" id="inst-name" placeholder="例如: 本地开发实例 / HK Edge" required>
-            </div>
-
-            <div class="form-group">
-              <label for="inst-url">Control API Base URL *</label>
-              <input type="url" id="inst-url" placeholder="http://127.0.0.1:9090" required>
-              <span class="help-text">Spike 控制面 HTTP 监听地址（默认端口 9090）</span>
-            </div>
-
-            <div class="form-group">
-              <label for="inst-secret">Control Secret (密码/密钥)</label>
-              <div class="secret-field">
-                <input type="password" id="inst-secret" placeholder="未设置控制密码可留空" autocomplete="new-password">
-                <button type="button" id="btn-toggle-secret" class="btn-secret-toggle" title="显示或隐藏 Secret">显示</button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>浏览器代理端口</label>
-              <p class="help-text" style="margin: 0;">
-                开启 Popup 中的「浏览器代理」时，自动从 Spike Control API
-                <code>/spike/status.listeners</code> 读取 mixed / HTTP / SOCKS 监听地址，无需手工填写。
-              </p>
-            </div>
-
-            <div class="form-actions">
-              <button type="button" id="btn-test-conn" class="btn btn-secondary">⚡ 测试连接</button>
-              <div class="right-actions">
-                <button type="button" id="btn-delete-inst" class="btn btn-danger" style="display:none;">删除实例</button>
-                <button type="submit" id="btn-save-inst" class="btn btn-primary">保存实例</button>
-              </div>
-            </div>
-            <div id="test-result" class="test-result"></div>
-          </form>
-        </section>
-
-        <!-- Global Preferences Panel -->
-        <section class="panel preferences-panel" style="margin-top: 16px;">
-          <div class="panel-header">
-            <h2>全局偏好</h2>
-          </div>
-
-          <div class="preference-form">
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="pref-control-proxy">
-                <span>使用 Spike 监听地址接管当前浏览器代理</span>
-              </label>
-              <span class="help-text">
-                开启后自动读取当前实例的 Mixed / HTTP / SOCKS5 地址并写入 Chrome。
-                关闭后 SpikeDeck 会清除自己的代理设置，让 SwitchyOmega 等其他扩展接管。
-              </span>
-              <span class="proxy-preference-state" id="proxy-preference-state"></span>
-            </div>
-
-            <div class="preference-divider"></div>
-
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label for="pref-health-interval">Spike 健康检查频率 (秒)</label>
-                <input type="number" id="pref-health-interval" class="number-input" min="1" max="300" step="1" value="5">
-                <span class="help-text">无论 Chrome 窗口是否在可视区域，均以此频率后台探测 Spike 存活状态（默认 5 秒）。</span>
-              </div>
-              <div class="form-group flex-1">
-                <label for="pref-traffic-interval">实时网速刷新频率 (秒)</label>
-                <input type="number" id="pref-traffic-interval" class="number-input" min="1" max="60" step="1" value="1">
-                <span class="help-text">仅当 Chrome 窗口处于可视/活跃状态时以此频率刷新图标网速；非可视时自动暂停以省电（默认 1 秒）。</span>
-              </div>
-            </div>
-
-            <div class="preference-divider"></div>
-
-            <div class="form-group">
-              <label for="pref-expand-mode">策略组默认展开/收起状态</label>
-              <select id="pref-expand-mode" class="select-input">
-                <option value="smart">智能展开 (仅自动展开前 2 个组与 select 组)</option>
-                <option value="expand-all">默认全部展开 (Expand All)</option>
-                <option value="collapse-all">默认全部收起 (Collapse All)</option>
-                <option value="remember">记忆展开状态 (Remember Collapse State)</option>
-              </select>
-              <span class="help-text">控制在 Popup 中打开策略组面板时，所有组卡片的默认展开状态。选择「记忆展开状态」后，会记住你在 Popup 中手动展开/收起的结果，以及「全部展开 / 全部收起」操作。</span>
-            </div>
-
-            <div class="form-group margin-top-12">
-              <label class="checkbox-label">
-                <input type="checkbox" id="pref-show-hidden">
-                <span>默认展示被隐藏的策略组 (Show Hidden Groups)</span>
-              </label>
-              <span class="help-text">开启后，带有 <code>hidden: true</code> 标记的调试/默认隐藏组将默认呈现在面板中。</span>
-            </div>
+          <div id="instances-container" class="instances-container">
+            <!-- Populated dynamically -->
           </div>
         </section>
 
-        <section class="panel profile-export-panel" style="margin-top: 16px;">
-          <div class="panel-header">
-            <h2>当前 Profile（脱敏）</h2>
-            <button type="button" id="btn-load-profile-export" class="btn btn-secondary">加载</button>
-          </div>
-          <p class="help-text">只显示 core 返回的脱敏全文，不提供未脱敏导出。</p>
-          <pre id="profile-export-text" class="profile-export-text">尚未加载</pre>
-          <button type="button" id="btn-copy-profile-export" class="btn btn-secondary">复制</button>
-        </section>
-      </div>
-    </main>
+        <!-- Right Panel: Edit Form & Preferences -->
+        <div class="right-column">
+          <section class="panel instance-form-panel">
+            <div class="panel-header">
+              <h2 id="form-title">编辑实例</h2>
+            </div>
 
-    <footer class="options-footer">
-      <span>SpikeDeck v1.0.3 &bull; Surge-inspired Proxy & Instance Manager for Spike</span>
-    </footer>
-  </div>
+            <form id="instance-form" class="instance-form">
+              <input type="hidden" id="inst-id" />
 
-  <script type="module" src="options.js"></script>
-</body>
+              <div class="form-group">
+                <label for="inst-name">实例名称 *</label>
+                <input
+                  type="text"
+                  id="inst-name"
+                  placeholder="例如: 本地开发实例 / HK Edge"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="inst-url">Control API Base URL *</label>
+                <input
+                  type="url"
+                  id="inst-url"
+                  placeholder="http://127.0.0.1:9090"
+                  required
+                />
+                <span class="help-text"
+                  >Spike 控制面 HTTP 监听地址（默认端口 9090）</span
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="inst-secret">Control Secret (密码/密钥)</label>
+                <div class="secret-field">
+                  <input
+                    type="password"
+                    id="inst-secret"
+                    placeholder="未设置控制密码可留空"
+                    autocomplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    id="btn-toggle-secret"
+                    class="btn-secret-toggle"
+                    title="显示或隐藏 Secret"
+                  >
+                    显示
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>浏览器代理端口</label>
+                <p class="help-text" style="margin: 0">
+                  开启 Popup 中的「浏览器代理」时，自动从 Spike Control API
+                  <code>/spike/status.listeners</code> 读取 mixed / HTTP / SOCKS
+                  监听地址，无需手工填写。
+                </p>
+              </div>
+
+              <div class="form-actions">
+                <button
+                  type="button"
+                  id="btn-test-conn"
+                  class="btn btn-secondary"
+                >
+                  ⚡ 测试连接
+                </button>
+                <div class="right-actions">
+                  <button
+                    type="button"
+                    id="btn-delete-inst"
+                    class="btn btn-danger"
+                    style="display: none"
+                  >
+                    删除实例
+                  </button>
+                  <button
+                    type="submit"
+                    id="btn-save-inst"
+                    class="btn btn-primary"
+                  >
+                    保存实例
+                  </button>
+                </div>
+              </div>
+              <div id="test-result" class="test-result"></div>
+            </form>
+          </section>
+
+          <!-- Global Preferences Panel -->
+          <section class="panel preferences-panel" style="margin-top: 16px">
+            <div class="panel-header">
+              <h2>全局偏好</h2>
+            </div>
+
+            <div class="preference-form">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="pref-control-proxy" />
+                  <span>使用 Spike 监听地址接管当前浏览器代理</span>
+                </label>
+                <span class="help-text">
+                  开启后自动读取当前实例的 Mixed / HTTP / SOCKS5 地址并写入
+                  Chrome。 关闭后 SpikeDeck 会清除自己的代理设置，让
+                  SwitchyOmega 等其他扩展接管。
+                </span>
+                <span
+                  class="proxy-preference-state"
+                  id="proxy-preference-state"
+                ></span>
+              </div>
+
+              <div class="preference-divider"></div>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="pref-health-interval"
+                    >Spike 健康检查频率 (秒)</label
+                  >
+                  <input
+                    type="number"
+                    id="pref-health-interval"
+                    class="number-input"
+                    min="1"
+                    max="300"
+                    step="1"
+                    value="5"
+                  />
+                  <span class="help-text"
+                    >无论 Chrome 窗口是否在可视区域，均以此频率后台探测 Spike
+                    存活状态（默认 5 秒）。</span
+                  >
+                </div>
+                <div class="form-group flex-1">
+                  <label for="pref-traffic-interval"
+                    >实时网速刷新频率 (秒)</label
+                  >
+                  <input
+                    type="number"
+                    id="pref-traffic-interval"
+                    class="number-input"
+                    min="1"
+                    max="60"
+                    step="1"
+                    value="1"
+                  />
+                  <span class="help-text"
+                    >仅当 Chrome
+                    窗口处于可视/活跃状态时以此频率刷新图标网速；非可视时自动暂停以省电（默认
+                    1 秒）。</span
+                  >
+                </div>
+              </div>
+
+              <div class="preference-divider"></div>
+
+              <div class="form-group">
+                <label for="pref-expand-mode">策略组默认展开/收起状态</label>
+                <select id="pref-expand-mode" class="select-input">
+                  <option value="smart">
+                    智能展开 (仅自动展开前 2 个组与 select 组)
+                  </option>
+                  <option value="expand-all">默认全部展开 (Expand All)</option>
+                  <option value="collapse-all">
+                    默认全部收起 (Collapse All)
+                  </option>
+                  <option value="remember">
+                    记忆展开状态 (Remember Collapse State)
+                  </option>
+                </select>
+                <span class="help-text"
+                  >控制在 Popup
+                  中打开策略组面板时，所有组卡片的默认展开状态。选择「记忆展开状态」后，会记住你在
+                  Popup 中手动展开/收起的结果，以及「全部展开 /
+                  全部收起」操作。</span
+                >
+              </div>
+
+              <div class="form-group margin-top-12">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="pref-show-hidden" />
+                  <span>默认展示被隐藏的策略组 (Show Hidden Groups)</span>
+                </label>
+                <span class="help-text"
+                  >开启后，带有
+                  <code>hidden: true</code>
+                  标记的调试/默认隐藏组将默认呈现在面板中。</span
+                >
+              </div>
+            </div>
+          </section>
+
+          <section class="panel profile-export-panel" style="margin-top: 16px">
+            <div class="panel-header">
+              <h2>当前 Profile（脱敏）</h2>
+              <button
+                type="button"
+                id="btn-load-profile-export"
+                class="btn btn-secondary"
+              >
+                加载
+              </button>
+            </div>
+            <p class="help-text">
+              只显示 core 返回的脱敏全文，不提供未脱敏导出。
+            </p>
+            <pre id="profile-export-text" class="profile-export-text">
+尚未加载</pre>
+            <button
+              type="button"
+              id="btn-copy-profile-export"
+              class="btn btn-secondary"
+            >
+              复制
+            </button>
+          </section>
+        </div>
+      </main>
+
+      <footer class="options-footer">
+        <span
+          >SpikeDeck v1.0.3 &bull; Surge-inspired Proxy & Instance Manager for
+          Spike</span
+        >
+      </footer>
+    </div>
+
+    <script type="module" src="options.js"></script>
+  </body>
 </html>
