@@ -4,7 +4,7 @@ import {
   preferredProxyEndpoint,
   proxyListenersFromStatus
 } from './lib/proxy-listeners.js';
-import { formatBadgeRate, trafficTitle } from './lib/format-rate.js';
+import { badgeTraffic, trafficTitle } from './lib/format-rate.js';
 
 // Background Service Worker for SpikeDeck
 
@@ -883,14 +883,13 @@ function applyTrafficBadge(traffic, error) {
     void restoreProxyBadgeIfNeeded(Boolean(error));
     return;
   }
-  const down = Number(traffic.download_bytes_per_second) || 0;
-  const up = Number(traffic.upload_bytes_per_second) || 0;
   void StorageManager.isProxyModeEnabled()
     .then((proxyOn) => {
       setTitle(`${trafficTitle(traffic)}${proxyOn ? ' · proxy on' : ''}`);
-      if (down > 0 || up > 0) {
-        chrome.action.setBadgeBackgroundColor({ color: '#0f766e' });
-        chrome.action.setBadgeText({ text: formatBadgeRate(down) });
+      const badge = badgeTraffic(traffic);
+      if (badge) {
+        chrome.action.setBadgeBackgroundColor({ color: badge.color });
+        chrome.action.setBadgeText({ text: badge.text });
         return;
       }
       if (proxyOn) {
@@ -902,7 +901,7 @@ function applyTrafficBadge(traffic, error) {
     })
     .catch(() => {
       setTitle(trafficTitle(traffic));
-      chrome.action.setBadgeText({ text: down > 0 || up > 0 ? formatBadgeRate(down) : '' });
+      chrome.action.setBadgeText({ text: badgeTraffic(traffic)?.text || '' });
     });
 }
 
