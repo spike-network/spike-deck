@@ -75,6 +75,18 @@
 
 ---
 
+## 📦 打包与商店发布
+
+```bash
+make package          # dist/spikedeck-<version>.zip
+make store-release    # 打包 + 上传 + 提交审核
+make store-status     # 查看商店条目状态
+```
+
+`store-upload` / `store-submit` / `store-release` 调用 Chrome Web Store API v2，**不能新建条目**。请先在 [Developer Dashboard](https://chrome.google.com/webstore/devconsole) 创建 item 并填完 Store listing 与 Privacy。然后复制 `.env.example` 为 `.env`，填入 OAuth 与 publisher/extension ID（步骤见该文件注释和 [Using the API](https://developer.chrome.com/docs/webstore/using-api)）。`publish` 会把当前草稿送审，通过后按现有可见性上架。
+
+---
+
 ## 📁 目录结构
 
 ```text

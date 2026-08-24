@@ -1,4 +1,4 @@
-.PHONY: all package screenshots clean help
+.PHONY: all package screenshots store-upload store-submit store-release store-status clean help
 
 NAME := spikedeck
 MANIFEST := manifest.json
@@ -18,9 +18,13 @@ PACK_FILES := \
 all: package
 
 help:
-	@echo "make package      Chrome Web Store zip -> $(ZIP)"
-	@echo "make screenshots  1280x800 store screenshots in store/"
-	@echo "make clean        remove $(DIST)/"
+	@echo "make package         Chrome Web Store zip -> $(ZIP)"
+	@echo "make screenshots     1280x800 store screenshots in store/"
+	@echo "make store-upload    upload $(ZIP) to the existing CWS item"
+	@echo "make store-submit    submit the current CWS draft for review"
+	@echo "make store-release   package + upload + submit for review"
+	@echo "make store-status    fetch CWS item status"
+	@echo "make clean           remove $(DIST)/"
 
 package:
 	mkdir -p $(DIST)
@@ -30,6 +34,18 @@ package:
 
 screenshots:
 	bash store/capture.sh
+
+store-upload: package
+	bash scripts/cws.sh upload
+
+store-submit:
+	bash scripts/cws.sh submit
+
+store-release: package
+	bash scripts/cws.sh release
+
+store-status:
+	bash scripts/cws.sh status
 
 clean:
 	rm -rf $(DIST)

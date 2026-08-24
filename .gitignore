@@ -2,6 +2,7 @@
 .vscode/
 .idea/
 *.log
+.env
 node_modules/
 dist/
 store/screenshot-1280x800.png
