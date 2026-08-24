@@ -25,6 +25,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const prefExpandModeSelect = document.getElementById('pref-expand-mode');
   const prefShowHiddenCheckbox = document.getElementById('pref-show-hidden');
   const prefControlProxyCheckbox = document.getElementById('pref-control-proxy');
+  const prefHealthIntervalInput = document.getElementById('pref-health-interval');
+  const prefTrafficIntervalInput = document.getElementById('pref-traffic-interval');
   const proxyPreferenceState = document.getElementById('proxy-preference-state');
 
   let instances = [];
@@ -38,6 +40,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const currentShowHidden = await StorageManager.getShowHiddenGroups();
   prefShowHiddenCheckbox.checked = currentShowHidden;
+
+  const currentHealthInterval = await StorageManager.getHealthCheckInterval();
+  if (prefHealthIntervalInput) prefHealthIntervalInput.value = currentHealthInterval;
+
+  const currentTrafficInterval = await StorageManager.getTrafficRefreshInterval();
+  if (prefTrafficIntervalInput) prefTrafficIntervalInput.value = currentTrafficInterval;
 
   const currentProxyMode = await StorageManager.isProxyModeEnabled();
   prefControlProxyCheckbox.checked = currentProxyMode;
@@ -86,6 +94,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const show = e.target.checked;
     await StorageManager.setShowHiddenGroups(show);
   });
+
+  if (prefHealthIntervalInput) {
+    prefHealthIntervalInput.addEventListener('change', async (e) => {
+      const saved = await StorageManager.setHealthCheckInterval(e.target.value);
+      prefHealthIntervalInput.value = saved;
+    });
+  }
+
+  if (prefTrafficIntervalInput) {
+    prefTrafficIntervalInput.addEventListener('change', async (e) => {
+      const saved = await StorageManager.setTrafficRefreshInterval(e.target.value);
+      prefTrafficIntervalInput.value = saved;
+    });
+  }
 
   prefControlProxyCheckbox.addEventListener('change', async (e) => {
     const enabled = e.target.checked;

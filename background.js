@@ -20,9 +20,32 @@ const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
 const groupTestPollTimers = new Map();
 let trafficWatchPorts = 0;
 let healthReconcileInFlight = false;
+let isWindowFocused = true;
+
+async function updateWindowFocusState() {
+  if (!chrome.windows?.getLastFocused) return;
+  try {
+    const win = await chrome.windows.getLastFocused();
+    isWindowFocused = Boolean(win && win.focused && win.state !== 'minimized');
+  } catch {
+    isWindowFocused = true;
+  }
+}
+
+if (chrome.windows?.onFocusChanged) {
+  chrome.windows.onFocusChanged.addListener((windowId) => {
+    const wasFocused = isWindowFocused;
+    isWindowFocused = (windowId !== chrome.windows.WINDOW_ID_NONE);
+    if (!wasFocused && isWindowFocused && trafficWatchPorts === 0) {
+      void refreshTrafficBadgeFromActiveInstance();
+    }
+  });
+}
 
 chrome.runtime.onInstalled.addListener(async () => {
   await StorageManager.init();
+  await updateWindowFocusState();
+  await ensureOffscreenDocument();
   try {
     await updateProxySettings();
   } catch {
@@ -36,6 +59,8 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
+  await updateWindowFocusState();
+  await ensureOffscreenDocument();
   try {
     await updateProxySettings();
   } catch {
@@ -51,9 +76,12 @@ chrome.runtime.onStartup.addListener(async () => {
 if (chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === TRAFFIC_RATE_ALARM) {
+      void ensureOffscreenDocument();
       void reconcileProxyWithHealth();
       if (trafficWatchPorts > 0) return;
-      void refreshTrafficBadgeFromActiveInstance();
+      if (isWindowFocused) {
+        void refreshTrafficBadgeFromActiveInstance();
+      }
       return;
     }
     if (!alarm.name.startsWith(GROUP_TEST_ALARM_PREFIX)) return;
@@ -148,6 +176,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === 'SPIKE_HEALTH_TICK') {
     void reconcileProxyWithHealth();
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (message.type === 'SPIKE_TRAFFIC_TICK') {
+    if (isWindowFocused && trafficWatchPorts === 0) {
+      void refreshTrafficBadgeFromActiveInstance();
+    }
     sendResponse({ ok: true });
     return false;
   }
@@ -709,11 +744,11 @@ async function hasHealthOffscreen() {
   return false;
 }
 
-async function openHealthOffscreen() {
+async function ensureOffscreenDocument() {
   if (!chrome.offscreen?.createDocument) return;
   if (await hasHealthOffscreen()) return;
   try {
-    const justification = 'Probe Spike every few seconds while proxy takeover is enabled so a dead engine can release Chrome proxy quickly';
+    const justification = 'Probe Spike proxy health and maintain traffic badge rate updates';
     try {
       await chrome.offscreen.createDocument({
         url: HEALTH_OFFSCREEN_PATH,
@@ -734,6 +769,10 @@ async function openHealthOffscreen() {
     if (message.includes('single offscreen') || message.includes('already exists')) return;
     console.warn(`Health offscreen unavailable: ${message}`);
   }
+}
+
+async function openHealthOffscreen() {
+  await ensureOffscreenDocument();
 }
 
 async function closeHealthOffscreen() {
@@ -791,11 +830,10 @@ async function reconcileProxyWithHealth() {
     const wantProxy = await StorageManager.isProxyModeEnabled();
     if (!wantProxy) {
       await StorageManager.setProxyReleasedForUnhealthy(false);
-      await closeHealthOffscreen();
       return { action: 'idle', healthy: null };
     }
 
-    await openHealthOffscreen();
+    await ensureOffscreenDocument();
 
     const health = await probeActiveInstanceHealth();
     if (!health.ok) {
