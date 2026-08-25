@@ -1048,7 +1048,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function applyGroupTestState(tasks) {
-    const previousActiveIds = new Set(activeGroupTests.keys());
+    const previousEntries = new Map(activeGroupTests);
+    const previousActiveIds = new Set(previousEntries.keys());
     activeGroupTests.clear();
     let taskSettled = false;
 
@@ -1068,7 +1069,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       activeGroupTests.set(task.id, {
         groupName: task.group,
-        targetMember: task.member || null,
+        targetMember:
+          task.member || previousEntries.get(task.id)?.targetMember || null,
         completedMembers: new Set(
           (task.results || []).map((result) => result.member),
         ),
