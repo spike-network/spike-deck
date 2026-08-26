@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const testResultEl = document.getElementById("test-result");
 
   const prefExpandModeSelect = document.getElementById("pref-expand-mode");
-  const prefShowHiddenCheckbox = document.getElementById("pref-show-hidden");
+  const prefHiddenModeSelect = document.getElementById("pref-hidden-mode");
   const prefControlProxyCheckbox =
     document.getElementById("pref-control-proxy");
   const prefHealthIntervalInput = document.getElementById(
@@ -46,8 +46,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const currentExpandMode = await StorageManager.getGroupExpandMode();
   prefExpandModeSelect.value = currentExpandMode;
 
-  const currentShowHidden = await StorageManager.getShowHiddenGroups();
-  prefShowHiddenCheckbox.checked = currentShowHidden;
+  const currentHiddenMode = await StorageManager.getHiddenGroupsMode();
+  prefHiddenModeSelect.value = currentHiddenMode;
 
   const currentHealthInterval = await StorageManager.getHealthCheckInterval();
   if (prefHealthIntervalInput)
@@ -109,9 +109,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await StorageManager.setGroupExpandMode(e.target.value);
   });
 
-  prefShowHiddenCheckbox.addEventListener("change", async (e) => {
-    const show = e.target.checked;
-    await StorageManager.setShowHiddenGroups(show);
+  prefHiddenModeSelect.addEventListener("change", async (e) => {
+    await StorageManager.setHiddenGroupsMode(e.target.value);
   });
 
   if (prefHealthIntervalInput) {

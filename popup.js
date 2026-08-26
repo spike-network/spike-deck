@@ -6,6 +6,11 @@ import {
   proxyListenersFromStatus,
 } from "./lib/proxy-listeners.js";
 import { formatByteCount, formatRate } from "./lib/format-rate.js";
+import {
+  hiddenGroupsModeLabel,
+  nextHiddenGroupsMode,
+  visiblePolicyGroups,
+} from "./lib/hidden-groups.js";
 
 // Global latency cache for leaf nodes by member name
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
@@ -170,6 +175,56 @@ function createFlashIcon(size = 13) {
   polygon.setAttribute("points", "13 2 3 14 12 14 11 22 21 10 12 10 13 2");
   flashIcon.appendChild(polygon);
   return flashIcon;
+}
+
+/** Open-eye icon: all hidden groups are listed. */
+function createEyeIcon(size = 14) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z");
+  const circle = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "circle",
+  );
+  circle.setAttribute("cx", "12");
+  circle.setAttribute("cy", "12");
+  circle.setAttribute("r", "3");
+  svg.append(path, circle);
+  return svg;
+}
+
+/** Sparkles icon: smart mode lists hidden groups on the current selection chain. */
+function createSparklesIcon(size = 14) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("aria-hidden", "true");
+  const paths = [
+    "m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z",
+    "M5 3v4",
+    "M19 17v4",
+    "M3 5h4",
+    "M17 19h4",
+  ];
+  for (const d of paths) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.appendChild(path);
+  }
+  return svg;
 }
 
 /** Closed-eye icon for hidden policy groups (compact badge, not the word "hidden"). */
@@ -345,7 +400,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnFilter = document.getElementById("btn-filter");
   const btnFilterClear = document.getElementById("btn-filter-clear");
 
-  let showHiddenGroups = await StorageManager.getShowHiddenGroups();
+  let hiddenGroupsMode = await StorageManager.getHiddenGroupsMode();
   let groupExpandMode = await StorageManager.getGroupExpandMode();
   let groupExpandStates = await StorageManager.getGroupExpandStates();
   const activeGroupTests = new Map();
@@ -1107,8 +1162,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   btnToggleHidden.addEventListener("click", async () => {
-    showHiddenGroups = !showHiddenGroups;
-    await StorageManager.setShowHiddenGroups(showHiddenGroups);
+    hiddenGroupsMode = nextHiddenGroupsMode(hiddenGroupsMode);
+    await StorageManager.setHiddenGroupsMode(hiddenGroupsMode);
     updateHiddenToggleUI();
     renderGroups(currentGroupsData);
   });
@@ -1185,11 +1240,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function updateHiddenToggleUI() {
-    if (showHiddenGroups) {
-      btnToggleHidden.classList.add("active");
-    } else {
-      btnToggleHidden.classList.remove("active");
-    }
+    const label = hiddenGroupsModeLabel(hiddenGroupsMode);
+    btnToggleHidden.classList.toggle("active", hiddenGroupsMode === "show");
+    btnToggleHidden.classList.toggle("smart", hiddenGroupsMode === "smart");
+    btnToggleHidden.title = label.title;
+    btnToggleHidden.setAttribute("aria-label", label.aria);
+    btnToggleHidden.dataset.mode = hiddenGroupsMode;
+    const icon =
+      hiddenGroupsMode === "show"
+        ? createEyeIcon(14)
+        : hiddenGroupsMode === "smart"
+          ? createSparklesIcon(14)
+          : createEyeOffIcon(14);
+    btnToggleHidden.replaceChildren(icon);
   }
 
   /**
@@ -2144,9 +2207,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Render Policy Groups
   function renderGroups(groups) {
     const normalizedFilter = groupFilterText.toLowerCase();
-    const visibleGroups = (groups || []).filter(
-      (g) => showHiddenGroups || !g.hidden,
-    );
+    const visibleGroups = visiblePolicyGroups(groups, hiddenGroupsMode);
     const filteredGroups = normalizedFilter
       ? visibleGroups.filter(
           (g) =>

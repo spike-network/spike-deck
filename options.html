@@ -215,14 +215,20 @@
               </div>
 
               <div class="form-group margin-top-12">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="pref-show-hidden" />
-                  <span>默认展示被隐藏的策略组 (Show Hidden Groups)</span>
-                </label>
+                <label for="pref-hidden-mode">隐藏策略组展示</label>
+                <select id="pref-hidden-mode" class="select-input">
+                  <option value="hide">隐藏（不显示 hidden 组）</option>
+                  <option value="smart">
+                    智能（显示被可见组选中的 hidden 组）
+                  </option>
+                  <option value="show">全部展示 (Show Hidden Groups)</option>
+                </select>
                 <span class="help-text"
-                  >开启后，带有
+                  >隐藏：不列出
                   <code>hidden: true</code>
-                  标记的调试/默认隐藏组将默认呈现在面板中。</span
+                  的组。智能：若某个 hidden
+                  组是当前可见组的选中成员，则把它作为独立卡片列出，并沿着当前选中链路继续列出。全部展示：列出所有
+                  hidden 组。Popup 工具栏按钮可在三种形态间循环。</span
                 >
               </div>
             </div>
