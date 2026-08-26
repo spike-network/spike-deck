@@ -23,7 +23,7 @@ html, body {
 
 .popup-shell {
   width: 410px;
-  background: #0f111a;
+  background: #0a0b0e;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
@@ -35,8 +35,8 @@ html, body {
 }
 
 .status-dot.online {
-  background-color: #10b981;
-  box-shadow: 0 0 6px #10b981;
+  background-color: #30d158;
+  box-shadow: 0 0 6px #30d158;
 }
 
 /* Keep member list fully painted; inset box-shadow smears when downscaled. */
@@ -45,10 +45,10 @@ html, body {
 }
 
 .member-item.selected {
-  color: #38bdf8 !important;
+  color: #0a84ff !important;
   background: transparent !important;
   box-shadow: none !important;
-  border-left: 2px solid #38bdf8;
+  border-left: 2px solid #0a84ff;
   padding-left: 26px;
 }
 

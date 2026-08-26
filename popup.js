@@ -1528,7 +1528,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await chrome.tabs.create({ url });
       }
     } catch (err) {
-      showToast(`无法打开 Embedded UI: ${err.message || "未知错误"}`, "error");
+      showToast(`无法打开控制台: ${err.message || "未知错误"}`, "error");
     }
   }
 
@@ -1711,7 +1711,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const errorNode = el(
         "div",
         { className: "empty-state" },
-        el("p", {}, "⚠️ 无法连接到 Spike 实例"),
+        el("p", {}, "连不上这个 Spike 实例"),
         el(
           "p",
           { style: { fontSize: "11px", color: "var(--text-dim)" } },
@@ -1772,7 +1772,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       el(
         "p",
         { className: "onboarding-desc" },
-        "首次使用请先添加 Spike 实例（填入控制面 API 地址与密钥），即可开始管理节点与策略组。",
+        "添加一个 Spike 实例（控制面地址，可选密钥），就可以在这里切换节点和策略组。",
       ),
       configBtn,
     );
@@ -2223,7 +2223,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         el(
           "div",
           { className: "empty-state" },
-          normalizedFilter ? "没有匹配的策略组或节点" : "暂无策略组",
+          normalizedFilter
+            ? "没有匹配项。换个关键字试试。"
+            : "这个实例还没有策略组。",
         ),
       );
       return;

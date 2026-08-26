@@ -1,22 +1,22 @@
 :root {
-  --bg-color: #0f111a;
-  --panel-bg: #181a26;
-  --card-bg: #212436;
-  --card-hover: #2a2e45;
+  --bg-color: #0a0b0e;
+  --panel-bg: #14151a;
+  --card-bg: #1b1c22;
+  --card-hover: #23242c;
   --card-border: rgba(255, 255, 255, 0.08);
 
-  --primary-color: #6366f1;
-  --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  --accent-cyan: #38bdf8;
+  --primary-color: #0a84ff;
+  --primary-soft: rgba(10, 132, 255, 0.14);
+  --accent-cyan: #0a84ff;
 
-  --text-main: #f3f4f6;
-  --text-muted: #9ca3af;
-  --text-dim: #6b7280;
+  --text-main: #f5f5f7;
+  --text-muted: #98989d;
+  --text-dim: #636366;
 
-  --danger-color: #ef4444;
-  --success-color: #10b981;
+  --danger-color: #ff453a;
+  --success-color: #30d158;
 
-  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, sans-serif;
 }
 
 :root {
@@ -79,10 +79,9 @@ body {
 
 h1 {
   font-size: 22px;
-  font-weight: 700;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--text-main);
 }
 
 .subtitle {
@@ -153,12 +152,12 @@ h2 {
 
 .instance-card.active {
   border-color: var(--primary-color);
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .instance-card.draft-card {
   border: 1px dashed var(--accent-cyan);
-  background: rgba(56, 189, 248, 0.05);
+  background: var(--primary-soft);
 }
 
 .instance-actions {
@@ -186,7 +185,7 @@ h2 {
 
 .draft-badge {
   font-size: 10px;
-  background: rgba(56, 189, 248, 0.15);
+  background: var(--primary-soft);
   color: var(--accent-cyan);
   padding: 2px 6px;
   border-radius: 4px;
@@ -349,6 +348,7 @@ input[type="text"], input[type="url"], input[type="password"], input[type="numbe
 
 input:focus {
   border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .help-text {
@@ -383,12 +383,12 @@ legend {
 }
 
 .btn-primary {
-  background: var(--primary-gradient);
+  background: var(--primary-color);
   color: #fff;
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  background: #1a90ff;
 }
 
 .btn-secondary {
