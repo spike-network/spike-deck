@@ -6,8 +6,9 @@
   <title>SpikeDeck - Spike Proxy Manager</title>
   <script src="popup-max-height.js"></script>
   <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="interaction.css">
 </head>
-<body>
+<body class="popup-page">
   <div class="container">
     <!-- Header -->
     <header class="header">
@@ -231,7 +232,7 @@
               <path d="M1 1l22 22"></path>
             </svg>
           </button>
-          <button type="button" id="btn-filter" class="btn-section-action" title="筛选策略组 / 节点" aria-label="筛选策略组 / 节点" aria-expanded="false" aria-controls="filter-bar">
+          <button type="button" id="btn-filter" class="btn-section-action" title="筛选策略组 / 节点（快捷键 /）" aria-label="筛选策略组 / 节点" aria-keyshortcuts="/" aria-expanded="false" aria-controls="filter-bar">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>

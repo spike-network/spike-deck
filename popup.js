@@ -1240,6 +1240,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    const editing =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target?.isContentEditable;
+    if (
+      event.key === "/" &&
+      !editing &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey
+    ) {
+      event.preventDefault();
+      setFilterBarOpen(true);
+      return;
+    }
     if (event.key !== "Escape") return;
     if (isFilterBarOpen()) {
       setFilterBarOpen(false);
