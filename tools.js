@@ -6,6 +6,7 @@ import { formatRuntimeLogs } from './lib/runtime-logs.js';
 await initializeI18n();
 
 let instance = null;
+let logEntries = [];
 
 const byId = (id) => document.getElementById(id);
 const text = (tag, value, className, userContent = false) => {
@@ -88,10 +89,40 @@ async function loadSessionPools() {
 async function loadLogs() {
   const data = await SpikeApiClient.getLogs(instance, 200);
   const entries = Array.isArray(data.entries) ? data.entries : [];
-  byId('logs-output').textContent = entries.length
-    ? formatRuntimeLogs(entries)
+  mergeLogEntries(entries);
+}
+
+function mergeLogEntries(entries) {
+  const bySequence = new Map(logEntries.map((entry) => [Number(entry.sequence), entry]));
+  for (const entry of entries) {
+    const sequence = Number(entry?.sequence);
+    if (Number.isSafeInteger(sequence)) bySequence.set(sequence, entry);
+  }
+  logEntries = Array.from(bySequence.values())
+    .sort((left, right) => Number(left.sequence) - Number(right.sequence))
+    .slice(-200);
+  byId('logs-output').textContent = logEntries.length
+    ? formatRuntimeLogs(logEntries)
     : t('暂无运行日志');
 }
+
+function setLogStreamState(status) {
+  const labels = {
+    connecting: '实时日志连接中…',
+    live: '实时日志已连接',
+    retrying: '实时日志重连中…',
+    idle: '等待活动实例'
+  };
+  const node = byId('logs-stream-state');
+  node.textContent = t(labels[status] || labels.connecting);
+  node.dataset.state = status || 'connecting';
+}
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (!instance || message?.instanceId !== instance.id) return;
+  if (message.type === 'SPIKE_LOG_STREAM_ENTRY') mergeLogEntries([message.entry]);
+  if (message.type === 'SPIKE_LOG_STREAM_STATE') setLogStreamState(message.status);
+});
 
 async function loadDnsCache() {
   const data = await SpikeApiClient.getDnsCache(instance);
@@ -207,6 +238,8 @@ try {
   instance = await StorageManager.getActiveInstance();
   if (!instance) throw new Error('请先在 SpikeDeck 设置中添加并选择实例');
   byId('instance-label').textContent = `${instance.name} · ${instance.baseUrl}`;
+  const stream = await chrome.runtime.sendMessage({ type: 'ENSURE_LOG_STREAM' });
+  if (!stream?.ok) throw new Error(stream?.error || '无法启动实时日志');
   await loadAll();
 } catch (error) {
   handleError(error);

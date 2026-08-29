@@ -146,6 +146,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true;
   }
+  if (message.type === 'ENSURE_LOG_STREAM') {
+    ensureOffscreenDocument().then(() => {
+      sendResponse({ ok: true });
+    }).catch(err => {
+      sendResponse({ ok: false, error: err.message || String(err) });
+    });
+    return true;
+  }
   if (message.type === 'START_PROVIDER_REFRESH') {
     startProviderRefreshTask(message.instanceId, message.providerId, message.providerIds).then((task) => {
       sendResponse({ ok: true, task });
@@ -713,7 +721,6 @@ async function updateProxySettings() {
       // Remove this extension's value instead of replacing it with `system`.
       // That releases Chrome's proxy API for SwitchyOmega and other managers.
       await StorageManager.setProxyReleasedForUnhealthy(false);
-      await closeHealthOffscreen();
       await releaseProxyControl();
       chrome.action.setBadgeText({ text: '' });
       return { mode: 'released', ...(await getProxyControlState()) };
@@ -799,7 +806,7 @@ async function ensureOffscreenDocument() {
   if (!chrome.offscreen?.createDocument) return;
   if (await hasHealthOffscreen()) return;
   try {
-    const justification = 'Probe Spike proxy health and maintain traffic badge rate updates';
+    const justification = 'Probe runtime health, stream logs and maintain traffic badge rate updates';
     try {
       await chrome.offscreen.createDocument({
         url: HEALTH_OFFSCREEN_PATH,
@@ -824,16 +831,6 @@ async function ensureOffscreenDocument() {
 
 async function openHealthOffscreen() {
   await ensureOffscreenDocument();
-}
-
-async function closeHealthOffscreen() {
-  if (!chrome.offscreen?.closeDocument) return;
-  if (!(await hasHealthOffscreen())) return;
-  try {
-    await chrome.offscreen.closeDocument();
-  } catch {
-    // Already closed.
-  }
 }
 
 async function onTrafficSampleHealth(message) {
