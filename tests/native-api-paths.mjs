@@ -60,6 +60,7 @@ await SpikeApiClient.getStatus(instance);
 await SpikeApiClient.getGroups(instance);
 await SpikeApiClient.selectGroupMember(instance, 'Proxy / Auto', 'Direct');
 await SpikeApiClient.clearGroupSelection(instance, 'Proxy / Auto');
+await SpikeApiClient.cancelGroupTestTask(instance, 41);
 await SpikeApiClient.getProfiles(instance);
 await SpikeApiClient.getCurrentProfile(instance);
 await SpikeApiClient.checkProfile(instance, 'alt');
@@ -77,6 +78,9 @@ await SpikeApiClient.flushDns(instance);
 await SpikeApiClient.getDnsCache(instance);
 await SpikeApiClient.measureDnsDelay(instance);
 
+const cancelRequest = requests.find(({ url }) => url.endsWith('/spike/group-tests/41'));
+assert.equal(cancelRequest.options.method, 'DELETE');
+
 assert.deepEqual(
   requests.map((request) => request.url),
   [
@@ -84,6 +88,7 @@ assert.deepEqual(
     'http://127.0.0.1:9090/spike/groups',
     'http://127.0.0.1:9090/spike/groups/Proxy%20%2F%20Auto/select',
     'http://127.0.0.1:9090/spike/groups/Proxy%20%2F%20Auto/select',
+    'http://127.0.0.1:9090/spike/group-tests/41',
     'http://127.0.0.1:9090/spike/profiles',
     'http://127.0.0.1:9090/spike/profiles/current',
     'http://127.0.0.1:9090/spike/profiles/check',
@@ -102,16 +107,16 @@ assert.deepEqual(
     'http://127.0.0.1:9090/spike/dns/delay'
   ]
 );
-assert.equal(requests[6].options.method, 'POST');
 assert.equal(requests[7].options.method, 'POST');
-assert.equal(requests[9].options.method, 'POST');
-assert.equal(requests[11].options.method, 'POST');
+assert.equal(requests[8].options.method, 'POST');
+assert.equal(requests[10].options.method, 'POST');
 assert.equal(requests[12].options.method, 'POST');
-assert.equal(requests[14].options.method, 'DELETE');
-assert.equal(requests[15].options.method, 'POST');
+assert.equal(requests[13].options.method, 'POST');
+assert.equal(requests[15].options.method, 'DELETE');
 assert.equal(requests[16].options.method, 'POST');
 assert.equal(requests[17].options.method, 'POST');
-assert.equal(requests[19].options.method, 'POST');
+assert.equal(requests[18].options.method, 'POST');
+assert.equal(requests[20].options.method, 'POST');
 assert.equal(
   SpikeApiClient.profileStem('/tmp/alt.conf'),
   'alt'

@@ -17,6 +17,7 @@ import {
 const leafProbeResults = new Map();
 let currentGroupsData = [];
 const terminalGroupTestStatuses = new Set(["completed", "cancelled", "failed"]);
+const cancellingGroupTests = new Set();
 
 /** Display labels for protocol / nested-group kinds (product typography, not raw slugs). */
 function formatMemberType(type) {
@@ -1141,12 +1142,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       const testing = Array.from(activeGroupTests.values()).some(
         (task) => task.groupName === button.dataset.group,
       );
+      const cancelling = cancellingGroupTests.has(button.dataset.group);
       button.classList.toggle("testing", testing);
+      button.classList.toggle("cancelling", cancelling);
+      button.disabled = cancelling;
+      button.title = cancelling
+        ? "正在取消该组测速"
+        : testing
+          ? "取消该组测速"
+          : "测试该组延迟";
+      button.setAttribute("aria-label", button.title);
+      const label = button.querySelector(".group-test-action-label");
+      if (label) label.textContent = cancelling ? "取消中" : "取消";
     });
   }
 
   function resetGroupTestTracking() {
     activeGroupTests.clear();
+    cancellingGroupTests.clear();
     syncGroupTestButtons();
     updateAllLatencyBadgesDOM();
   }
@@ -2270,10 +2283,18 @@ document.addEventListener("DOMContentLoaded", async () => {
           dataset: { group: group.name },
           onClick: async (e) => {
             e.stopPropagation();
-            await runTestGroup(group.name);
+            const testing = Array.from(activeGroupTests.values()).some(
+              (task) => task.groupName === group.name,
+            );
+            if (testing) {
+              await cancelGroupTests(group.name);
+            } else {
+              await runTestGroup(group.name);
+            }
           },
         },
         createFlashIcon(13),
+        el("span", { className: "group-test-action-label" }, "取消"),
       );
 
       const selectedSummaryEl = el(
@@ -2570,6 +2591,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Latency Testing with visual feedback
+  async function cancelGroupTests(groupName) {
+    if (cancellingGroupTests.has(groupName)) return;
+    const taskIds = Array.from(activeGroupTests.entries())
+      .filter(([, task]) => task.groupName === groupName)
+      .map(([taskId]) => taskId);
+    if (taskIds.length === 0) return;
+
+    cancellingGroupTests.add(groupName);
+    syncGroupTestButtons();
+    try {
+      for (const taskId of taskIds) {
+        const result = await chrome.runtime.sendMessage({
+          type: "CANCEL_GROUP_TEST",
+          instanceId: activeInstance.id,
+          taskId,
+        });
+        if (!result?.ok)
+          throw new Error(result?.error || "Unable to cancel group test");
+        applyGroupTestState(result.tasks);
+      }
+      showToast("测速任务已取消", "success");
+    } catch (err) {
+      showToast(`取消测速失败: ${err.message || err}`, "error");
+      await restoreRecentGroupTests();
+    } finally {
+      cancellingGroupTests.delete(groupName);
+      syncGroupTestButtons();
+    }
+  }
+
   async function runTestGroup(groupName, targetMember = null) {
     const testBtn = document.querySelector(
       `.btn-test-group[data-group="${CSS.escape(groupName)}"]`,

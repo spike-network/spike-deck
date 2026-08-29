@@ -1213,6 +1213,13 @@ input:checked + .slider::before {
   transition: color 0.2s, background 0.2s;
 }
 
+.group-test-action-label {
+  display: none;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .btn-test-group:hover {
   color: var(--accent-cyan);
   background: rgba(255, 255, 255, 0.08);
@@ -1221,6 +1228,24 @@ input:checked + .slider::before {
 .btn-test-group.testing svg {
   animation: spin 0.8s linear infinite;
   color: var(--accent-cyan);
+}
+
+.btn-test-group.testing {
+  gap: 3px;
+}
+
+.btn-test-group.testing .group-test-action-label {
+  display: inline;
+}
+
+.btn-test-group.testing:hover {
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.btn-test-group.cancelling {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 .member-item.pinned {

@@ -73,8 +73,18 @@ SpikeApiClient.startGroupTest = async () => ({
   task: coreTasks[0]
 });
 SpikeApiClient.getGroupTestTasks = async () => ({ tasks: coreTasks });
+SpikeApiClient.cancelGroupTestTask = async (_instance, taskId) => {
+  assert.equal(taskId, 41);
+  coreTasks = [{
+    ...coreTasks[0],
+    status: 'cancelled',
+    revision: 2
+  }];
+  return coreTasks[0];
+};
 
 const {
+  cancelGroupTestTask,
   refreshGroupTestState,
   startGroupTestTask
 } = await import('../background.js');
@@ -85,6 +95,13 @@ assert.equal(storage.groupTestTasks['test-instance'][0].id, 41);
 assert.equal(alarms.has('group-test-reconcile:test-instance'), true);
 assert.equal(broadcasts.at(-1).type, 'GROUP_TEST_STATE_CHANGED');
 
+const cancelled = await cancelGroupTestTask('test-instance', 41);
+assert.equal(cancelled.task.status, 'cancelled');
+assert.equal(cancelled.tasks[0].status, 'cancelled');
+assert.equal(storage.groupTestTasks?.['test-instance'], undefined);
+assert.equal(alarms.has('group-test-reconcile:test-instance'), false);
+assert.equal(broadcasts.at(-1).tasks[0].status, 'cancelled');
+
 coreTasks = [{
   ...coreTasks[0],
   status: 'completed',
@@ -92,9 +109,9 @@ coreTasks = [{
   total: 1,
   completed_at_unix_ms: Date.now(),
   results: [{ member: 'Mock Node', ok: true, latency_ms: 24 }],
-  revision: 2
+  revision: 3
 }];
-const completed = await refreshGroupTestState('test-instance');
+const completed = await refreshGroupTestState('test-instance', { broadcast: true });
 assert.equal(completed[0].status, 'completed');
 assert.equal(completed[0].results[0].latency_ms, 24);
 assert.equal(storage.groupTestTasks?.['test-instance'], undefined);

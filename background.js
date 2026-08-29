@@ -156,6 +156,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true;
   }
+  if (message.type === 'CANCEL_GROUP_TEST') {
+    cancelGroupTestTask(message.instanceId, message.taskId).then((result) => {
+      sendResponse({ ok: true, ...result });
+    }).catch(err => {
+      sendResponse({ ok: false, error: safeGroupTestError(err) });
+    });
+    return true;
+  }
   if (message.type === 'START_MODULE_UPDATE') {
     startModuleUpdate(message.instanceId, message.body).then((task) => {
       sendResponse({ ok: true, task });
@@ -232,6 +240,27 @@ async function startGroupTestTask(instanceId, groupName, memberName) {
   broadcastGroupTestState(instanceId, tasks);
   scheduleGroupTestPoll(instanceId);
   return result;
+}
+
+async function cancelGroupTestTask(instanceId, taskId) {
+  const id = Number(taskId);
+  if (!Number.isSafeInteger(id) || id < 1) throw new Error('Group test task is required');
+
+  const instance = await findInstance(instanceId);
+  const task = await SpikeApiClient.cancelGroupTestTask(instance, id);
+  const tasks = mergeGroupTestTasks(
+    await StorageManager.getGroupTestTasks(instanceId),
+    [task]
+  );
+  const activeTasks = tasks.filter(candidate => !terminalGroupTestStatuses.has(candidate.status));
+  await StorageManager.setGroupTestTasks(instanceId, activeTasks);
+  broadcastGroupTestState(instanceId, tasks);
+  if (activeTasks.length > 0) {
+    scheduleGroupTestPoll(instanceId);
+  } else {
+    stopGroupTestPoll(instanceId);
+  }
+  return { task, tasks };
 }
 
 async function refreshGroupTestState(instanceId, { broadcast = false } = {}) {
@@ -941,6 +970,7 @@ async function getProxyControlState() {
 }
 
 export {
+  cancelGroupTestTask,
   refreshGroupTestState,
   getProviderRefreshTask,
   safeProviderRefreshError,
