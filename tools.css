@@ -38,6 +38,7 @@ th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 10px 8
 th { color: var(--muted); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; }
 .table-wrap { overflow-x: auto; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 42px; max-height: 360px; overflow: auto; color: #bfeacf; background: #0d110f; border-radius: 12px; padding: 12px; }
+.runtime-logs { margin: 0; max-height: 520px; font: .75rem/1.55 "SFMono-Regular", "Cascadia Code", monospace; }
 #notice { position: fixed; right: 20px; bottom: 20px; max-width: 420px; padding: 12px 16px; border-radius: 12px; background: #222b27; box-shadow: 0 12px 40px #0008; opacity: 0; pointer-events: none; transition: opacity .2s; }
 #notice.visible { opacity: 1; }
 @media (max-width: 760px) { main { grid-template-columns: 1fr; padding-inline: 14px; } .wide { grid-column: auto; } .hero { padding: 34px 16px 18px; align-items: center; } .form-grid { grid-template-columns: 1fr; } }

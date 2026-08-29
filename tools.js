@@ -1,6 +1,7 @@
 import { SpikeApiClient } from './lib/spike-client.js';
 import { StorageManager } from './lib/storage.js';
 import { initializeI18n, t } from './lib/i18n.js';
+import { formatRuntimeLogs } from './lib/runtime-logs.js';
 
 await initializeI18n();
 
@@ -64,6 +65,14 @@ async function loadConnections() {
     : text('p', '暂无连接'));
 }
 
+async function loadLogs() {
+  const data = await SpikeApiClient.getLogs(instance, 200);
+  const entries = Array.isArray(data.entries) ? data.entries : [];
+  byId('logs-output').textContent = entries.length
+    ? formatRuntimeLogs(entries)
+    : t('暂无运行日志');
+}
+
 async function loadDnsCache() {
   const data = await SpikeApiClient.getDnsCache(instance);
   const rows = (data.dnsCache || []).map((entry) => {
@@ -113,12 +122,18 @@ function handleError(error) {
 
 async function loadAll() {
   if (!instance) return;
-  const results = await Promise.allSettled([loadConnections(), loadDnsCache(), loadScripts()]);
+  const results = await Promise.allSettled([
+    loadConnections(),
+    loadLogs(),
+    loadDnsCache(),
+    loadScripts()
+  ]);
   const failed = results.find((result) => result.status === 'rejected');
   if (failed) handleError(failed.reason);
 }
 
 byId('refresh-all').addEventListener('click', loadAll);
+byId('logs-refresh').addEventListener('click', () => loadLogs().catch(handleError));
 byId('dns-cache-refresh').addEventListener('click', () => loadDnsCache().catch(handleError));
 byId('dns-flush').addEventListener('click', async () => {
   try {

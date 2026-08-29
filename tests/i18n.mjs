@@ -45,6 +45,7 @@ assert.equal(resolvePreferredLanguage("zh-TW"), "zh-CN");
 assert.equal(resolvePreferredLanguage("en-GB"), "en");
 assert.equal(translateForLanguage("外部资源", "en"), "Resources");
 assert.equal(translateForLanguage("首个健康", "en"), "First available");
+assert.equal(translateForLanguage("运行日志", "en"), "Runtime logs");
 assert.equal(translateForLanguage("External value", "en"), "External value");
 assert.equal(translateForLanguage("3 分钟前", "en"), "3 min ago");
 assert.equal(translateForLanguage("Peer", "zh-CN"), "对端");

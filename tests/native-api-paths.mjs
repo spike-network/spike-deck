@@ -71,6 +71,7 @@ await SpikeApiClient.getScripts(instance);
 await SpikeApiClient.evaluateScript(instance, { name: 'health' });
 await SpikeApiClient.evaluateCronScript(instance, 'hourly');
 await SpikeApiClient.getConnections(instance);
+await SpikeApiClient.getLogs(instance, 200);
 await SpikeApiClient.killConnection(instance, 42);
 await SpikeApiClient.explainRoute(instance, { host: 'example.com', port: 443, protocol: 'TCP' });
 await SpikeApiClient.queryDns(instance, { name: 'example.com', qtype: 'A' });
@@ -99,6 +100,7 @@ assert.deepEqual(
     'http://127.0.0.1:9090/spike/scripts/evaluate',
     'http://127.0.0.1:9090/spike/scripts/cron/evaluate',
     'http://127.0.0.1:9090/spike/connections',
+    'http://127.0.0.1:9090/spike/logs?limit=200',
     'http://127.0.0.1:9090/spike/connections/42',
     'http://127.0.0.1:9090/spike/rules/explain',
     'http://127.0.0.1:9090/spike/dns/query',
@@ -112,11 +114,11 @@ assert.equal(requests[8].options.method, 'POST');
 assert.equal(requests[10].options.method, 'POST');
 assert.equal(requests[12].options.method, 'POST');
 assert.equal(requests[13].options.method, 'POST');
-assert.equal(requests[15].options.method, 'DELETE');
-assert.equal(requests[16].options.method, 'POST');
+assert.equal(requests[16].options.method, 'DELETE');
 assert.equal(requests[17].options.method, 'POST');
 assert.equal(requests[18].options.method, 'POST');
-assert.equal(requests[20].options.method, 'POST');
+assert.equal(requests[19].options.method, 'POST');
+assert.equal(requests[21].options.method, 'POST');
 assert.equal(
   SpikeApiClient.profileStem('/tmp/alt.conf'),
   'alt'
