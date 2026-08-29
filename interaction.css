@@ -1,5 +1,101 @@
 /* Interaction and accessibility refinements. This layer does not own theme colors. */
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.popup-page .runtime-task-hub,
+.popup-page .interaction-banner {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--primary-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+}
+
+.popup-page .runtime-task-title {
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.popup-page .runtime-task-list {
+  display: grid;
+  gap: 6px;
+}
+
+.popup-page .runtime-task-item,
+.popup-page .interaction-banner,
+.popup-page .interaction-banner-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.popup-page .runtime-task-item,
+.popup-page .interaction-banner {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.popup-page .btn-task-action {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.popup-page .interaction-banner a {
+  color: var(--primary-color);
+  white-space: nowrap;
+}
+
+.popup-page .filter-summary {
+  padding: 4px 2px 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: right;
+}
+
+.popup-page .search-highlight {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  text-decoration: underline;
+  text-decoration-color: var(--primary-color);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+.popup-page .copyable-value {
+  cursor: copy;
+}
+
+.popup-page #groups-container[data-snapshot="cached"]::before {
+  content: "缓存快照";
+  display: block;
+  margin: 7px 0 3px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-align: right;
+}
+
 .popup-page input:focus-visible,
 .popup-page select:focus-visible,
 .popup-page textarea:focus-visible,
@@ -80,6 +176,16 @@
 
   .popup-page .module-install-form {
     grid-template-columns: 1fr;
+  }
+
+  .popup-page .runtime-task-item,
+  .popup-page .interaction-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .popup-page .interaction-banner-actions {
+    align-self: stretch;
   }
 }
 

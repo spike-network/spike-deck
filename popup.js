@@ -11,6 +11,7 @@ import {
   nextHiddenGroupsMode,
   visiblePolicyGroups,
 } from "./lib/hidden-groups.js";
+import { installPopupInteractions } from "./lib/popup-interactions.js";
 
 // Global latency cache for leaf nodes by member name
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
@@ -330,6 +331,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   await StorageManager.init();
   const instances = await StorageManager.getInstances();
   let activeInstance = await StorageManager.getActiveInstance();
+  const popupInteractions = installPopupInteractions({
+    getInstanceId: () => activeInstance?.id || null,
+  });
 
   const instanceSelect = document.getElementById("instance-select");
   const btnQuickInstance = document.getElementById("btn-quick-instance");
@@ -1767,6 +1771,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (cachedGroupsRendered) {
         setStatus("offline", "离线 · 缓存");
+        popupInteractions.announce("实时连接不可用，正在显示缓存策略组");
         scheduleOfflineRetry();
         return;
       }

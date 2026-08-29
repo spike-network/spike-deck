@@ -241,10 +241,29 @@
         </div>
       </div>
 
+      <section class="runtime-task-hub" id="runtime-task-hub" aria-label="运行中的任务" hidden>
+        <div class="runtime-task-title">运行中的任务</div>
+        <div id="runtime-task-list" class="runtime-task-list"></div>
+      </section>
+
+      <section class="interaction-banner" id="outbound-safety-banner" role="status" hidden>
+        <span id="outbound-safety-label"></span>
+        <button type="button" id="btn-restore-rule-mode" class="btn-task-action">恢复规则模式</button>
+      </section>
+
+      <section class="interaction-banner" id="selection-impact-banner" role="status" hidden>
+        <span id="selection-impact-message"></span>
+        <div class="interaction-banner-actions">
+          <a href="tools.html#connections" target="_blank">查看连接</a>
+          <button type="button" id="btn-undo-selection" class="btn-task-action">撤销</button>
+        </div>
+      </section>
+
       <div class="filter-bar" id="filter-bar" hidden>
         <input type="text" id="group-filter" class="filter-input" placeholder="筛选策略组 / 节点" autocomplete="off" spellcheck="false" aria-label="筛选策略组或节点">
         <button type="button" id="btn-filter-clear" class="filter-clear" title="清除筛选" aria-label="清除筛选">&times;</button>
       </div>
+      <div class="filter-summary" id="filter-summary" aria-live="polite" hidden></div>
 
       <div id="groups-container" class="groups-container">
         <!-- Skeleton loading or dynamic groups -->
@@ -255,6 +274,8 @@
       </div>
     </main>
   </div>
+
+  <div id="popup-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script type="module" src="popup.js"></script>
 </body>
