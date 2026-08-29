@@ -1684,6 +1684,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
     groupsContainer.replaceChildren(loadingNode);
 
+    let cachedGroupsRendered = false;
+    try {
+      const snapshot = await StorageManager.getPopupGroupSnapshot(
+        activeInstance.id,
+      );
+      if (snapshot?.groups?.length) {
+        currentGroupsData = snapshot.groups;
+        ingestPersistedMemberInfo(currentGroupsData);
+        renderGroups(currentGroupsData);
+        groupsContainer.dataset.snapshot = "cached";
+        cachedGroupsRendered = true;
+      }
+    } catch (error) {
+      console.warn(`Unable to restore popup group snapshot: ${error.message}`);
+    }
+
     try {
       const [status, groupsData, outbound, policies] = await Promise.all([
         SpikeApiClient.getStatus(activeInstance),
@@ -1709,6 +1725,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       void refreshDnsDelay();
 
       currentGroupsData = groupsData.groups || [];
+      delete groupsContainer.dataset.snapshot;
+      void StorageManager.setPopupGroupSnapshot(
+        activeInstance.id,
+        currentGroupsData,
+      ).catch((error) => {
+        console.warn(`Unable to persist popup group snapshot: ${error.message}`);
+      });
       renderOutboundMode(
         outbound,
         outboundPolicyNames(
@@ -1741,6 +1764,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         el("span", { className: "proxy-listener-empty" }, "-"),
       );
       renderOutboundMode(null, [], "连接后可用");
+
+      if (cachedGroupsRendered) {
+        setStatus("offline", "离线 · 缓存");
+        scheduleOfflineRetry();
+        return;
+      }
 
       const retryBtn = el(
         "button",
