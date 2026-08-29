@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpikeDeck 运行工具</title>
+  <link rel="stylesheet" href="tools.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">SPIKEDECK</p>
+      <h1>运行工具</h1>
+      <p id="instance-label">正在连接活动实例…</p>
+    </div>
+    <button id="refresh-all" class="primary">刷新全部</button>
+  </header>
+
+  <main>
+    <section class="panel wide">
+      <div class="panel-head"><div><p class="eyebrow">TRAFFIC</p><h2>连接</h2></div></div>
+      <div id="connections" class="table-wrap"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><p class="eyebrow">ROUTER</p><h2>路由解释</h2></div></div>
+      <form id="route-form" class="form-grid">
+        <label>Host<input id="route-host" required placeholder="example.com"></label>
+        <label>Port<input id="route-port" type="number" min="1" max="65535" value="443"></label>
+        <label>Protocol<select id="route-protocol"><option>TCP</option><option>UDP</option></select></label>
+        <label>Source IP<input id="route-source" placeholder="可选"></label>
+        <button class="primary">解释</button>
+      </form>
+      <pre id="route-output"></pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><p class="eyebrow">RESOLVER</p><h2>DNS 查询</h2></div><button id="dns-flush" class="danger">清空缓存</button></div>
+      <form id="dns-form" class="form-grid">
+        <label>Name<input id="dns-name" required placeholder="example.com"></label>
+        <label>Type<select id="dns-type"><option>A</option><option>AAAA</option></select></label>
+        <label class="check"><input id="dns-client" type="checkbox"> Client / fake-IP</label>
+        <button class="primary">查询</button>
+      </form>
+      <pre id="dns-output"></pre>
+    </section>
+
+    <section class="panel wide">
+      <div class="panel-head"><div><p class="eyebrow">CACHE</p><h2>DNS Cache</h2></div><button id="dns-cache-refresh">刷新</button></div>
+      <div id="dns-cache" class="table-wrap"></div>
+    </section>
+
+    <section class="panel wide">
+      <div class="panel-head"><div><p class="eyebrow">AUTOMATION</p><h2>Scripts</h2></div></div>
+      <div id="scripts" class="table-wrap"></div>
+      <form id="script-form" class="script-form">
+        <label>mock_type<select id="script-mock"><option>cron</option><option>generic</option><option>http-request</option><option>http-response</option><option>rule</option><option>dns</option><option>event</option></select></label>
+        <label>临时脚本<textarea id="script-text" rows="6">$done({trigger: $trigger, cron: $cronexp});</textarea></label>
+        <button class="primary">执行文本</button>
+      </form>
+      <pre id="script-output"></pre>
+    </section>
+  </main>
+  <div id="notice" role="status" aria-live="polite"></div>
+  <script type="module" src="tools.js"></script>
+</body>
+</html>

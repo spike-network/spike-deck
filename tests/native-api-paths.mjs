@@ -67,6 +67,13 @@ await SpikeApiClient.switchProfile(instance, 'alt');
 await SpikeApiClient.getModules(instance);
 await SpikeApiClient.updateModules(instance, { Ads: true });
 await SpikeApiClient.getScripts(instance);
+await SpikeApiClient.evaluateScript(instance, { name: 'health' });
+await SpikeApiClient.evaluateCronScript(instance, 'hourly');
+await SpikeApiClient.getConnections(instance);
+await SpikeApiClient.killConnection(instance, 42);
+await SpikeApiClient.explainRoute(instance, { host: 'example.com', port: 443, protocol: 'TCP' });
+await SpikeApiClient.queryDns(instance, { name: 'example.com', qtype: 'A' });
+await SpikeApiClient.flushDns(instance);
 await SpikeApiClient.getDnsCache(instance);
 await SpikeApiClient.measureDnsDelay(instance);
 
@@ -84,6 +91,13 @@ assert.deepEqual(
     'http://127.0.0.1:9090/spike/modules',
     'http://127.0.0.1:9090/spike/modules',
     'http://127.0.0.1:9090/spike/scripts',
+    'http://127.0.0.1:9090/spike/scripts/evaluate',
+    'http://127.0.0.1:9090/spike/scripts/cron/evaluate',
+    'http://127.0.0.1:9090/spike/connections',
+    'http://127.0.0.1:9090/spike/connections/42',
+    'http://127.0.0.1:9090/spike/rules/explain',
+    'http://127.0.0.1:9090/spike/dns/query',
+    'http://127.0.0.1:9090/spike/dns/flush',
     'http://127.0.0.1:9090/spike/dns/cache',
     'http://127.0.0.1:9090/spike/dns/delay'
   ]
@@ -91,7 +105,13 @@ assert.deepEqual(
 assert.equal(requests[6].options.method, 'POST');
 assert.equal(requests[7].options.method, 'POST');
 assert.equal(requests[9].options.method, 'POST');
+assert.equal(requests[11].options.method, 'POST');
 assert.equal(requests[12].options.method, 'POST');
+assert.equal(requests[14].options.method, 'DELETE');
+assert.equal(requests[15].options.method, 'POST');
+assert.equal(requests[16].options.method, 'POST');
+assert.equal(requests[17].options.method, 'POST');
+assert.equal(requests[19].options.method, 'POST');
 assert.equal(
   SpikeApiClient.profileStem('/tmp/alt.conf'),
   'alt'

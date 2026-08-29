@@ -12,6 +12,7 @@ PACK_FILES := \
 	popup.html popup.css popup.js popup-max-height.js \
 	offscreen.html offscreen.js \
 	options.html options.css options.js \
+	tools.html tools.css tools.js \
 	lib \
 	icons
 
