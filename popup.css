@@ -49,6 +49,7 @@
 html {
   height: var(--popup-max-height, 600px);
   max-height: var(--popup-max-height, 600px);
+  overflow: hidden;
 }
 
 html.popup-sizing {
@@ -64,7 +65,7 @@ body {
   font-family: var(--font-family);
   font-size: 13px;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
 }
 
