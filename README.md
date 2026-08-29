@@ -39,6 +39,12 @@
    - 后台定时刷新与手工刷新都会自动轮询到结束；下载或校验失败时继续使用原有运行时快照。
    - 资源 URL 默认隐藏查询参数，避免订阅凭据出现在 Popup 或截图中。
 
+6. **运行工具**
+   - 从 Popup 顶栏打开独立工具页，不受 Popup 生命周期限制。
+   - 查看 live/recent 连接并终止 live 连接。
+   - 查看 DNS cache，执行 DNS query/flush 和路由解释。
+   - 查看并执行已配置脚本，也可执行带 mock type 的临时脚本文本。
+
 ---
 
 ## 🛠️ 安装与使用方法
@@ -99,6 +105,7 @@ extension/
 ├── options.html           # 实例管理与设置页面
 ├── options.css            # 设置页面样式表
 ├── options.js             # 实例 CRUD 与测试连接逻辑
+├── tools.html/js/css      # 连接、DNS、路由与 Script 运行工具
 ├── lib/
 │   ├── storage.js         # Chrome Local Storage 数据持久化层
 │   └── spike-client.js    # Spike Control REST API 客户端
