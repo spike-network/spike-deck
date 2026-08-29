@@ -6,6 +6,7 @@ import {
   proxyListenersFromStatus,
 } from "./lib/proxy-listeners.js";
 import { formatByteCount, formatRate } from "./lib/format-rate.js";
+import { groupSelectionBasisLabel } from "./lib/group-selection.js";
 import {
   hiddenGroupsModeLabel,
   nextHiddenGroupsMode,
@@ -2321,6 +2322,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         group.selected ||
         (group.members && group.members[0]) ||
         "-";
+      const selectionBasis = groupSelectionBasisLabel(group.selection_basis);
 
       // Chevron Icon SVG
       const svgIcon = document.createElementNS(
@@ -2371,6 +2373,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         currentSelected,
       );
+      const selectionBasisEl = selectionBasis
+        ? el(
+            "span",
+            {
+              className: "selection-basis-badge",
+              title: selectionBasis,
+            },
+            selectionBasis,
+          )
+        : null;
 
       // Clear pin/override for automatic groups (url-test / fallback / smart).
       const resumeAutoBtn = isOverridden
@@ -2434,6 +2446,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           "div",
           { className: "group-summary" },
           selectedSummaryEl,
+          selectionBasisEl,
           resumeAutoBtn,
           testBtn,
         ),
