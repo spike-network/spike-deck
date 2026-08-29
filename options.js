@@ -5,6 +5,7 @@ import {
   proxyListenerSummary,
   proxyListenersFromStatus,
 } from "./lib/proxy-listeners.js";
+import { describePopupShortcut } from "./lib/shortcut-state.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   await StorageManager.init();
@@ -39,6 +40,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const proxyPreferenceState = document.getElementById(
     "proxy-preference-state",
   );
+  const popupShortcutState = document.getElementById("popup-shortcut-state");
 
   let instances = [];
   let activeInstanceId = "";
@@ -67,6 +69,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   prefPopupShortcutCheckbox.checked =
     await StorageManager.isPopupShortcutEnabled();
+  void refreshPopupShortcutState();
 
   const profileExportText = document.getElementById("profile-export-text");
   const btnLoadProfileExport = document.getElementById(
@@ -121,7 +124,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   prefPopupShortcutCheckbox.addEventListener("change", async (e) => {
     await StorageManager.setPopupShortcutEnabled(e.target.checked);
+    await refreshPopupShortcutState();
   });
+
+  async function refreshPopupShortcutState() {
+    try {
+      const [enabled, commands] = await Promise.all([
+        StorageManager.isPopupShortcutEnabled(),
+        chrome.commands.getAll(),
+      ]);
+      const state = describePopupShortcut(enabled, commands);
+      popupShortcutState.className = state.kind
+        ? `proxy-preference-state ${state.kind}`
+        : "proxy-preference-state";
+      popupShortcutState.textContent = state.text;
+    } catch (error) {
+      popupShortcutState.className = "proxy-preference-state error";
+      popupShortcutState.textContent = `无法读取快捷键状态: ${error.message}`;
+    }
+  }
 
   if (prefHealthIntervalInput) {
     prefHealthIntervalInput.addEventListener("change", async (e) => {
