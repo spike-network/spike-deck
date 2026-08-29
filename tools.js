@@ -65,6 +65,26 @@ async function loadConnections() {
     : text('p', '暂无连接'));
 }
 
+async function loadSessionPools() {
+  const data = await SpikeApiClient.getMetrics(instance);
+  const pools = Array.isArray(data.session_pools) ? data.session_pools : [];
+  const rows = pools.map((pool) => {
+    const tr = document.createElement('tr');
+    [
+      pool.name,
+      `${pool.keys}/${pool.max_keys} keys · ${pool.sessions} sessions · ${pool.max_sessions_per_key}/key`,
+      pool.active ?? '—',
+      `${pool.reuses_total} / ${pool.misses_total}`,
+      `${pool.created_total} / ${pool.rebuilds_total} / ${pool.evictions_total}`,
+      pool.last_failure ? `${pool.failures_total} · ${pool.last_failure}` : pool.failures_total
+    ].forEach((value) => tr.append(text('td', value, undefined, true)));
+    return tr;
+  });
+  byId('session-pools').replaceChildren(rows.length
+    ? makeTable(['池', '占用', '活跃', '复用 / 未命中', '创建 / 重建 / 淘汰', '失败'], rows)
+    : text('p', '暂无会话池指标'));
+}
+
 async function loadLogs() {
   const data = await SpikeApiClient.getLogs(instance, 200);
   const entries = Array.isArray(data.entries) ? data.entries : [];
@@ -124,6 +144,7 @@ async function loadAll() {
   if (!instance) return;
   const results = await Promise.allSettled([
     loadConnections(),
+    loadSessionPools(),
     loadLogs(),
     loadDnsCache(),
     loadScripts()
