@@ -22,6 +22,7 @@ main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16p
 .panel { background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--line); border-radius: 20px; padding: 20px; box-shadow: 0 18px 50px #0004; }
 .wide { grid-column: 1 / -1; }
 .panel-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 16px; }
+.panel-description { margin: -6px 0 14px; color: var(--muted); font-size: .84rem; }
 button { border: 1px solid var(--line); border-radius: 10px; background: #242b28; color: var(--text); padding: 8px 12px; cursor: pointer; }
 button:hover { border-color: var(--accent); }
 button.primary, .primary { background: var(--accent); border-color: var(--accent); color: #07120b; font-weight: 800; }

@@ -134,6 +134,11 @@ async function loadAll() {
 
 byId('refresh-all').addEventListener('click', loadAll);
 byId('logs-refresh').addEventListener('click', () => loadLogs().catch(handleError));
+byId('reload-preview').addEventListener('click', async () => {
+  try {
+    output('reload-preview-output', await SpikeApiClient.previewReload(instance));
+  } catch (error) { handleError(error); }
+});
 byId('dns-cache-refresh').addEventListener('click', () => loadDnsCache().catch(handleError));
 byId('dns-flush').addEventListener('click', async () => {
   try {
