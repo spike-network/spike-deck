@@ -1072,12 +1072,6 @@ input:checked + .slider::before {
   border-color: rgba(10, 132, 255, 0.45);
 }
 
-.btn-toggle-hidden.smart {
-  background: rgba(255, 214, 10, 0.1);
-  color: var(--pin);
-  border-color: rgba(255, 214, 10, 0.4);
-}
-
 .hidden-kind-badge {
   display: inline-flex;
   align-items: center;
