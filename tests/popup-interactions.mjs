@@ -36,4 +36,10 @@ assert.match(
   /\.popup-page \.interaction-banner\[hidden\][\s\S]*?display:\s*none;/,
 );
 
+const popupInteractionsSource = readFileSync(
+  new URL("../lib/popup-interactions.js", import.meta.url),
+  "utf8",
+);
+assert.doesNotMatch(popupInteractionsSource, /btn-test-group\.testing/);
+
 console.log("popup interaction tests passed");
