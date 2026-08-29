@@ -27,6 +27,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const prefHiddenModeSelect = document.getElementById("pref-hidden-mode");
   const prefControlProxyCheckbox =
     document.getElementById("pref-control-proxy");
+  const prefPopupShortcutCheckbox = document.getElementById(
+    "pref-popup-shortcut",
+  );
   const prefHealthIntervalInput = document.getElementById(
     "pref-health-interval",
   );
@@ -61,6 +64,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const currentProxyMode = await StorageManager.isProxyModeEnabled();
   prefControlProxyCheckbox.checked = currentProxyMode;
   void refreshProxyPreferenceState();
+
+  prefPopupShortcutCheckbox.checked =
+    await StorageManager.isPopupShortcutEnabled();
 
   const profileExportText = document.getElementById("profile-export-text");
   const btnLoadProfileExport = document.getElementById(
@@ -111,6 +117,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   prefHiddenModeSelect.addEventListener("change", async (e) => {
     await StorageManager.setHiddenGroupsMode(e.target.value);
+  });
+
+  prefPopupShortcutCheckbox.addEventListener("change", async (e) => {
+    await StorageManager.setPopupShortcutEnabled(e.target.checked);
   });
 
   if (prefHealthIntervalInput) {

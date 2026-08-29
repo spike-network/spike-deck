@@ -13,6 +13,7 @@ const providerRefreshOperations = new Map();
 const moduleOperations = new Map();
 const GROUP_TEST_POLL_INTERVAL_MS = 700;
 const GROUP_TEST_ALARM_PREFIX = 'group-test-reconcile:';
+const OPEN_POPUP_COMMAND = 'open-popup';
 const TRAFFIC_RATE_ALARM = 'traffic-rate';
 const STATUS_PROBE_TIMEOUT_MS = 2500;
 const HEALTH_OFFSCREEN_PATH = 'offscreen.html';
@@ -104,6 +105,24 @@ if (chrome.runtime?.onConnect?.addListener) {
       trafficWatchPorts = Math.max(0, trafficWatchPorts - 1);
     });
   });
+}
+
+if (chrome.commands?.onCommand?.addListener) {
+  chrome.commands.onCommand.addListener((command) => {
+    if (command !== OPEN_POPUP_COMMAND) return;
+    void openPopupFromCommand().catch((error) => {
+      console.warn(`Unable to open popup from shortcut: ${error?.message || error}`);
+    });
+  });
+}
+
+async function openPopupFromCommand() {
+  if (!(await StorageManager.isPopupShortcutEnabled())) return false;
+  if (typeof chrome.action?.openPopup !== 'function') {
+    throw new Error('Popup shortcut requires Chrome 127 or newer');
+  }
+  await chrome.action.openPopup();
+  return true;
 }
 
 // Listen for message from popup or options page
@@ -971,6 +990,7 @@ async function getProxyControlState() {
 
 export {
   cancelGroupTestTask,
+  openPopupFromCommand,
   refreshGroupTestState,
   getProviderRefreshTask,
   safeProviderRefreshError,

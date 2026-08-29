@@ -23,6 +23,7 @@ assert.equal(await StorageManager.getHealthCheckInterval(), 5);
 
 assert.equal(await StorageManager.getTrafficRefreshInterval(), DEFAULT_TRAFFIC_REFRESH_INTERVAL);
 assert.equal(await StorageManager.getTrafficRefreshInterval(), 1);
+assert.equal(await StorageManager.isPopupShortcutEnabled(), true);
 
 // Test custom settings
 await StorageManager.setHealthCheckInterval(10);
@@ -32,6 +33,12 @@ assert.equal(storage.healthCheckInterval, 10);
 await StorageManager.setTrafficRefreshInterval(2);
 assert.equal(await StorageManager.getTrafficRefreshInterval(), 2);
 assert.equal(storage.trafficRefreshInterval, 2);
+
+await StorageManager.setPopupShortcutEnabled(false);
+assert.equal(await StorageManager.isPopupShortcutEnabled(), false);
+assert.equal(storage.enablePopupShortcut, false);
+await StorageManager.setPopupShortcutEnabled(true);
+assert.equal(await StorageManager.isPopupShortcutEnabled(), true);
 
 // Test boundary constraints
 await StorageManager.setHealthCheckInterval(0);
