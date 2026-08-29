@@ -14,7 +14,8 @@ PACK_FILES := \
 	options.html options.css options.js \
 	tools.html tools.css tools.js interaction.css \
 	lib \
-	icons
+	icons \
+	_locales
 
 all: package
 

@@ -1,5 +1,9 @@
 /* Interaction and accessibility refinements. This layer does not own theme colors. */
 
+html.i18n-pending {
+  visibility: hidden;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

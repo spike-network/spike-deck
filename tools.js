@@ -1,12 +1,16 @@
 import { SpikeApiClient } from './lib/spike-client.js';
 import { StorageManager } from './lib/storage.js';
+import { initializeI18n, t } from './lib/i18n.js';
+
+await initializeI18n();
 
 let instance = null;
 
 const byId = (id) => document.getElementById(id);
-const text = (tag, value, className) => {
+const text = (tag, value, className, userContent = false) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
+  if (userContent) node.dataset.i18nIgnore = '';
   node.textContent = value == null ? '—' : String(value);
   return node;
 };
@@ -32,13 +36,14 @@ function makeTable(headers, rows) {
 
 function connectionRow(row, live) {
   const tr = document.createElement('tr');
-  [row.id, row.peer, `${row.host || '—'}:${row.port || '—'}`, row.policy, row.kind, row.ok === false ? row.error || 'failed' : live ? 'live' : 'finished']
-    .forEach((value) => tr.append(text('td', value)));
+  [row.id, row.peer, `${row.host || '—'}:${row.port || '—'}`, row.policy, row.kind]
+    .forEach((value) => tr.append(text('td', value, undefined, true)));
+  tr.append(text('td', row.ok === false ? row.error || 'failed' : live ? 'live' : 'finished'));
   const action = document.createElement('td');
   if (live) {
     const button = text('button', 'Kill');
     button.addEventListener('click', async () => {
-      if (!window.confirm(`Terminate connection #${row.id}?`)) return;
+      if (!window.confirm(t(`Terminate connection #${row.id}?`))) return;
       await SpikeApiClient.killConnection(instance, row.id);
       await loadConnections();
     });
@@ -63,7 +68,8 @@ async function loadDnsCache() {
   const data = await SpikeApiClient.getDnsCache(instance);
   const rows = (data.dnsCache || []).map((entry) => {
     const tr = document.createElement('tr');
-    [entry.domain, entry.address, entry.expires].forEach((value) => tr.append(text('td', value)));
+    [entry.domain, entry.address, entry.expires]
+      .forEach((value) => tr.append(text('td', value, undefined, true)));
     return tr;
   });
   byId('dns-cache').replaceChildren(rows.length
@@ -82,7 +88,8 @@ async function loadScripts() {
   const data = await SpikeApiClient.getScripts(instance);
   const rows = (data.scripts || []).map((script) => {
     const tr = document.createElement('tr');
-    [script.name, script.type, script.cronexp || script.event_name || '—'].forEach((value) => tr.append(text('td', value)));
+    [script.name, script.type, script.cronexp || script.event_name || '—']
+      .forEach((value) => tr.append(text('td', value, undefined, true)));
     const action = document.createElement('td');
     const evaluate = text('button', 'Evaluate');
     evaluate.addEventListener('click', () => runScript({ name: script.name }).catch(handleError));

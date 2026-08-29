@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "SpikeDeck - Spike 代理管理器"
+  },
+  "extensionDescription": {
+    "message": "多实例 Spike 网络代理引擎控制面板：支持实例切换、策略组选择、节点延迟测试及浏览器代理托管。"
+  },
+  "openPopupCommand": {
+    "message": "打开 SpikeDeck 控制面板"
+  }
+}

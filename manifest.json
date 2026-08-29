@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "SpikeDeck - Spike Proxy Manager",
+  "default_locale": "en",
+  "name": "__MSG_extensionName__",
   "version": "1.2.0",
   "minimum_chrome_version": "127",
-  "description": "多实例 Spike 网络代理引擎控制面板：支持实例切换、Surge 风格线路与策略组选择菜单、节点一键测速及浏览器代理托管。",
+  "description": "__MSG_extensionDescription__",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -24,7 +25,7 @@
         "default": "Ctrl+Shift+K",
         "mac": "Command+Shift+K"
       },
-      "description": "打开 SpikeDeck 控制面板"
+      "description": "__MSG_openPopupCommand__"
     }
   },
   "options_page": "options.html",

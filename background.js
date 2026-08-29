@@ -5,6 +5,9 @@ import {
   proxyListenersFromStatus
 } from './lib/proxy-listeners.js';
 import { badgeTraffic, trafficTitle } from './lib/format-rate.js';
+import { initializeI18n } from './lib/i18n.js';
+
+void initializeI18n();
 
 // Background Service Worker for SpikeDeck
 

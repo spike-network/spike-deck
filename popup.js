@@ -11,6 +11,7 @@ import {
   nextHiddenGroupsMode,
   visiblePolicyGroups,
 } from "./lib/hidden-groups.js";
+import { initializeI18n } from "./lib/i18n.js";
 import { installPopupInteractions } from "./lib/popup-interactions.js";
 
 // Global latency cache for leaf nodes by member name
@@ -328,6 +329,7 @@ function hasLatencyResult(latInfo) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await initializeI18n();
   await StorageManager.init();
   const instances = await StorageManager.getInstances();
   let activeInstance = await StorageManager.getActiveInstance();

@@ -6,14 +6,22 @@ import {
   proxyListenersFromStatus,
 } from "./lib/proxy-listeners.js";
 import { describePopupShortcut } from "./lib/shortcut-state.js";
+import {
+  getCurrentLanguage,
+  initializeI18n,
+  setCurrentLanguage,
+  t,
+} from "./lib/i18n.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await initializeI18n();
   await StorageManager.init();
 
   const instancesContainer = document.getElementById("instances-container");
   const btnAddInstance = document.getElementById("btn-add-instance");
   const instanceForm = document.getElementById("instance-form");
   const formTitle = document.getElementById("form-title");
+  const prefLanguageSelect = document.getElementById("pref-language");
 
   const instIdInput = document.getElementById("inst-id");
   const instNameInput = document.getElementById("inst-name");
@@ -48,6 +56,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   let isCreating = false;
 
   // Load preferences
+  prefLanguageSelect.value = getCurrentLanguage();
+  prefLanguageSelect.addEventListener("change", async (event) => {
+    await setCurrentLanguage(event.target.value);
+  });
+
   const currentExpandMode = await StorageManager.getGroupExpandMode();
   prefExpandModeSelect.value = currentExpandMode;
 
@@ -405,7 +418,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   btnDeleteInst.addEventListener("click", async () => {
     if (!editingId) return;
-    if (confirm("确定要删除该 Spike 实例吗？")) {
+    if (confirm(t("确定要删除该 Spike 实例吗？"))) {
       try {
         await StorageManager.deleteInstance(editingId);
         editingId = null;
