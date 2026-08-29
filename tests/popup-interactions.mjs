@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   nextNavigationIndex,
@@ -25,5 +26,14 @@ assert.deepEqual(splitMatchSegments("Alpha alpha", "ALPHA"), [
 assert.deepEqual(splitMatchSegments("unchanged", ""), [
   { text: "unchanged", match: false },
 ]);
+
+const interactionCss = readFileSync(
+  new URL("../interaction.css", import.meta.url),
+  "utf8",
+);
+assert.match(
+  interactionCss,
+  /\.popup-page \.interaction-banner\[hidden\][\s\S]*?display:\s*none;/,
+);
 
 console.log("popup interaction tests passed");

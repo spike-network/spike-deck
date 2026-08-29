@@ -22,6 +22,12 @@
   background: var(--card-bg);
 }
 
+.popup-page .runtime-task-hub[hidden],
+.popup-page .interaction-banner[hidden],
+.popup-page .filter-summary[hidden] {
+  display: none;
+}
+
 .popup-page .runtime-task-title {
   margin-bottom: 6px;
   color: var(--text-secondary);
