@@ -8,6 +8,9 @@ const sizing = readFileSync(
 );
 
 assert.match(css, /body\s*\{[\s\S]*?height:\s*var\(--popup-max-height, 600px\);/);
+assert.match(css, /html\s*\{[\s\S]*?width:\s*410px;[\s\S]*?max-width:\s*410px;/);
+assert.match(css, /body\s*\{[\s\S]*?width:\s*410px;[\s\S]*?max-width:\s*410px;/);
+assert.match(css, /\.provider-row\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/);
 assert.match(css, /body\s*\{[\s\S]*?overflow-y:\s*scroll;/);
 assert.match(css, /scrollbar-gutter:\s*stable;/);
 assert.match(css, /html\s*\{[\s\S]*?overflow:\s*hidden;/);
