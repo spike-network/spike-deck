@@ -1229,14 +1229,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     groupFilterInput.focus();
   });
 
+  function cancelGroupFilter() {
+    if (filterRenderTimer !== null) {
+      clearTimeout(filterRenderTimer);
+      filterRenderTimer = null;
+    }
+    groupFilterInput.value = "";
+    groupFilterText = "";
+    filterBar.classList.remove("has-value");
+    updateFilterButtonUI();
+    renderGroups(currentGroupsData);
+    setFilterBarOpen(false);
+  }
+
   groupFilterInput.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    event.preventDefault();
     event.stopPropagation();
-    if (groupFilterInput.value) {
-      btnFilterClear.click();
-      return;
-    }
-    setFilterBarOpen(false);
+    cancelGroupFilter();
   });
 
   document.addEventListener("keydown", (event) => {
@@ -1259,7 +1269,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     if (event.key !== "Escape") return;
     if (isFilterBarOpen()) {
-      setFilterBarOpen(false);
+      event.preventDefault();
+      cancelGroupFilter();
     } else if (currentQuickPanel()) {
       setQuickPanel(null);
     } else if (!providersPanel.hidden) {
