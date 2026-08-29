@@ -4,6 +4,17 @@
 
 ---
 
+## [1.1.0] - 2026-08-29
+
+### 🧰 运行工具工作区 (Runtime Workspace)
+
+- **独立工具页**：Popup 顶栏新增扳手入口，打开独立页面，不受 Popup 生命周期限制。
+- **连接**：查看 live / recent 连接，并可终止 live 连接。
+- **DNS 与路由**：查看 DNS cache，执行 query / flush，以及对指定 host / port / protocol 做规则解释。
+- **脚本**：列出已配置脚本并 Evaluate / Run cron，也可执行带 mock type 的临时脚本文本。
+
+---
+
 ## [1.0.8] - 2026-08-26
 
 ### 🎛 交互与视觉精修 (Grouped List UI)
