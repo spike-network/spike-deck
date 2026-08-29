@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 🎨 延迟状态辨识 (Latency Status Colors)
+
+- **高延迟独立配色**：高延迟数字改用深橙色，与测速失败状态的错误色明确区分。
+
 ### 🌐 多语言界面 (Localization)
 
 - **中文与英文**：Popup、Options、运行工具、动态状态和扩展元数据支持中文与英文界面。

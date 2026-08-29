@@ -23,7 +23,8 @@
 
   --lat-green: #30d158;
   --lat-yellow: #ffd60a;
-  --lat-red: #ff453a;
+  --lat-slow: #d97706;
+  --lat-error: #ff453a;
   --lat-gray: #636366;
 
   --radius-group: 11px;
@@ -1459,12 +1460,12 @@ input:checked + .slider::before {
 
 .latency-badge.lat-slow {
   opacity: 1;
-  color: var(--lat-red);
+  color: var(--lat-slow);
 }
 
 .latency-badge.lat-error {
   opacity: 1;
-  color: var(--lat-red);
+  color: var(--lat-error);
   font-weight: 700;
 }
 
