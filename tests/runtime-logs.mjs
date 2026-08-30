@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  filterRuntimeLogs,
   formatRuntimeLogEntry,
   formatRuntimeLogs,
 } from "../lib/runtime-logs.js";
@@ -19,5 +20,9 @@ assert.equal(
 );
 assert.equal(formatRuntimeLogs([entry, entry]).split("\n").length, 2);
 assert.equal(formatRuntimeLogs(null), "");
+assert.deepEqual(filterRuntimeLogs([entry], "RUNTIME"), [entry]);
+assert.deepEqual(filterRuntimeLogs([entry], "node a"), [entry]);
+assert.deepEqual(filterRuntimeLogs([entry], "missing"), []);
+assert.deepEqual(filterRuntimeLogs([entry], "  "), [entry]);
 
 console.log("runtime log tests passed");

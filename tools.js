@@ -1,7 +1,7 @@
 import { SpikeApiClient } from './lib/spike-client.js';
 import { StorageManager } from './lib/storage.js';
 import { initializeI18n, t } from './lib/i18n.js';
-import { formatRuntimeLogs } from './lib/runtime-logs.js';
+import { filterRuntimeLogs, formatRuntimeLogs } from './lib/runtime-logs.js';
 import { formatConnectionTrace } from './lib/connection-trace.js';
 
 await initializeI18n();
@@ -109,9 +109,20 @@ function mergeLogEntries(entries) {
   logEntries = Array.from(bySequence.values())
     .sort((left, right) => Number(left.sequence) - Number(right.sequence))
     .slice(-200);
-  byId('logs-output').textContent = logEntries.length
-    ? formatRuntimeLogs(logEntries)
-    : t('暂无运行日志');
+  renderLogs();
+}
+
+function renderLogs() {
+  const input = byId('logs-filter');
+  const keyword = input?.value || '';
+  const filtered = filterRuntimeLogs(logEntries, keyword);
+  byId('logs-output').textContent = filtered.length
+    ? formatRuntimeLogs(filtered)
+    : logEntries.length
+      ? t('无匹配日志')
+      : t('暂无运行日志');
+  byId('logs-filter-count').textContent = `${filtered.length} / ${logEntries.length}`;
+  byId('logs-filter-clear').disabled = !keyword;
 }
 
 function setLogStreamState(status) {
@@ -194,6 +205,13 @@ async function loadAll() {
 
 byId('refresh-all').addEventListener('click', loadAll);
 byId('logs-refresh').addEventListener('click', () => loadLogs().catch(handleError));
+byId('logs-filter').addEventListener('input', renderLogs);
+byId('logs-filter-clear').addEventListener('click', () => {
+  const input = byId('logs-filter');
+  input.value = '';
+  renderLogs();
+  input.focus();
+});
 byId('reload-preview').addEventListener('click', async () => {
   try {
     output('reload-preview-output', await SpikeApiClient.previewReload(instance));
