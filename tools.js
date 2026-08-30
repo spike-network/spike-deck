@@ -2,6 +2,7 @@ import { SpikeApiClient } from './lib/spike-client.js';
 import { StorageManager } from './lib/storage.js';
 import { initializeI18n, t } from './lib/i18n.js';
 import { formatRuntimeLogs } from './lib/runtime-logs.js';
+import { formatConnectionTrace } from './lib/connection-trace.js';
 
 await initializeI18n();
 
@@ -38,7 +39,14 @@ function makeTable(headers, rows) {
 
 function connectionRow(row, live) {
   const tr = document.createElement('tr');
-  [row.id, row.peer, `${row.host || '—'}:${row.port || '—'}`, row.policy, row.kind]
+  [
+    row.id,
+    row.peer,
+    `${row.host || '—'}:${row.port || '—'}`,
+    row.policy,
+    formatConnectionTrace(row.decision_trace),
+    row.kind
+  ]
     .forEach((value) => tr.append(text('td', value, undefined, true)));
   tr.append(text('td', row.ok === false ? row.error || 'failed' : live ? 'live' : 'finished'));
   const action = document.createElement('td');
@@ -62,7 +70,7 @@ async function loadConnections() {
     ...(data.recent || []).map((row) => connectionRow(row, false))
   ];
   byId('connections').replaceChildren(rows.length
-    ? makeTable(['ID', 'Peer', 'Target', 'Policy', 'Kind', 'Status', 'Action'], rows)
+    ? makeTable(['ID', 'Peer', 'Target', 'Policy', 'Decision', 'Kind', 'Status', 'Action'], rows)
     : text('p', '暂无连接'));
 }
 
