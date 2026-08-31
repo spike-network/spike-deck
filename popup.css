@@ -1563,6 +1563,60 @@ input:checked + .slider::before {
   background: var(--primary-soft);
 }
 
+.current-site-panel {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+}
+
+.current-site-head,
+.current-site-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.current-site-head {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.current-site-heading {
+  gap: 7px;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.current-site-host {
+  min-width: 0;
+  max-width: 210px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.current-site-result {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.current-site-result strong {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.current-site-result .current-site-warning {
+  color: #c87922;
+}
+
 /* Onboarding State */
 .onboarding-state {
   text-align: center;

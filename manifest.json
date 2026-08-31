@@ -34,6 +34,7 @@
     "type": "module"
   },
   "permissions": [
+    "activeTab",
     "alarms",
     "storage",
     "proxy",

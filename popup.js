@@ -1,5 +1,9 @@
 import { StorageManager } from "./lib/storage.js";
 import { SpikeApiClient } from "./lib/spike-client.js";
+import {
+  activeTabTarget,
+  summarizeCurrentSite,
+} from "./lib/current-site.js";
 import { ensureHostPermission } from "./lib/permissions.js";
 import {
   proxyListenerSummary,
@@ -407,6 +411,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const groupFilterInput = document.getElementById("group-filter");
   const btnFilter = document.getElementById("btn-filter");
   const btnFilterClear = document.getElementById("btn-filter-clear");
+  const btnCurrentSiteCheck = document.getElementById("btn-current-site-check");
+  const currentSiteHost = document.getElementById("current-site-host");
+  const currentSiteResult = document.getElementById("current-site-result");
 
   let hiddenGroupsMode = await StorageManager.getHiddenGroupsMode();
   let groupExpandMode = await StorageManager.getGroupExpandMode();
@@ -1470,6 +1477,54 @@ document.addEventListener("DOMContentLoaded", async () => {
       ]);
     } else {
       loadDashboard();
+    }
+  });
+
+  btnCurrentSiteCheck.addEventListener("click", async () => {
+    if (!activeInstance) {
+      currentSiteResult.textContent = "请先配置并连接 Spike 实例。";
+      return;
+    }
+    btnCurrentSiteCheck.disabled = true;
+    currentSiteResult.textContent = "正在检查当前标签页…";
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const target = activeTabTarget(tab);
+      if (!target) {
+        currentSiteHost.textContent = "不可检查";
+        currentSiteResult.textContent = "当前页面不是可检查的 HTTP 或 HTTPS 网站。";
+        return;
+      }
+      currentSiteHost.textContent = target.host;
+      currentSiteHost.title = target.host;
+      const [route, connections] = await Promise.all([
+        SpikeApiClient.explainRoute(activeInstance, target),
+        SpikeApiClient.getConnections(activeInstance),
+      ]);
+      const summary = summarizeCurrentSite(target, route, connections);
+      currentSiteResult.replaceChildren(
+        el("span", {}, "预期："),
+        el("strong", {}, summary.expectedPolicy),
+        el("span", {}, ` · 规则：${summary.rule}`),
+        el("br"),
+        el("span", {}, "现有连接："),
+        el("strong", {}, summary.actualPolicy),
+        el("span", {}, ` · ${summary.connectionCount} 条`),
+        ...(summary.reused
+          ? [
+              el("br"),
+              el(
+                "span",
+                { className: "current-site-warning" },
+                "现有连接可能早于最近一次线路切换；只有新连接使用新决策。",
+              ),
+            ]
+          : []),
+      );
+    } catch (error) {
+      currentSiteResult.textContent = `检查失败：${error.message || "未知错误"}`;
+    } finally {
+      btnCurrentSiteCheck.disabled = false;
     }
   });
 

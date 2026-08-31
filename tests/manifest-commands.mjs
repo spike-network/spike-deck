@@ -11,6 +11,7 @@ assert.equal(manifest.default_locale, 'en');
 assert.equal(manifest.name, '__MSG_extensionName__');
 assert.equal(manifest.description, '__MSG_extensionDescription__');
 assert.equal(manifest.action.default_popup, 'popup.html');
+assert.ok(manifest.permissions.includes('activeTab'));
 assert.deepEqual(manifest.commands?.['open-popup']?.suggested_key, {
   default: 'Ctrl+Shift+K',
   mac: 'Command+Shift+K'
