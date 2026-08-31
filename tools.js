@@ -8,6 +8,7 @@ await initializeI18n();
 
 let instance = null;
 let logEntries = [];
+let eventEntries = [];
 
 const byId = (id) => document.getElementById(id);
 const text = (tag, value, className, userContent = false) => {
@@ -98,6 +99,39 @@ async function loadLogs() {
   const data = await SpikeApiClient.getLogs(instance, 200);
   const entries = Array.isArray(data.entries) ? data.entries : [];
   mergeLogEntries(entries);
+}
+
+function eventRow(entry) {
+  const tr = document.createElement('tr');
+  tr.className = `event-severity-${entry.severity || 'info'}`;
+  [
+    new Date(entry.occurred_at_unix_ms || 0).toLocaleString(),
+    entry.severity || 'info',
+    entry.category || 'runtime',
+    entry.summary || entry.kind,
+    entry.kind,
+    entry.action?.label || '—'
+  ].forEach((value) => tr.append(text('td', value, undefined, true)));
+  return tr;
+}
+
+async function loadEvents() {
+  const data = await SpikeApiClient.getEvents(instance, 500);
+  eventEntries = (data.events || []).filter((entry) => entry.kind !== 'log').reverse();
+  renderEvents();
+}
+
+function renderEvents() {
+  const keyword = (byId('events-filter').value || '').trim().toLowerCase();
+  const severity = byId('events-severity').value;
+  const filtered = eventEntries.filter((entry) => {
+    if (severity !== 'all' && entry.severity !== severity) return false;
+    return !keyword || [entry.category, entry.kind, entry.summary].join(' ').toLowerCase().includes(keyword);
+  });
+  byId('events-filter-count').textContent = `${filtered.length} / ${eventEntries.length}`;
+  byId('events').replaceChildren(filtered.length
+    ? makeTable(['Time', 'Severity', 'Category', 'Event', 'Kind', 'Action'], filtered.map(eventRow))
+    : text('p', '暂无匹配事件'));
 }
 
 function mergeLogEntries(entries) {
@@ -196,6 +230,7 @@ async function loadAll() {
     loadConnections(),
     loadSessionPools(),
     loadLogs(),
+    loadEvents(),
     loadDnsCache(),
     loadScripts()
   ]);
@@ -205,6 +240,9 @@ async function loadAll() {
 
 byId('refresh-all').addEventListener('click', loadAll);
 byId('logs-refresh').addEventListener('click', () => loadLogs().catch(handleError));
+byId('events-refresh').addEventListener('click', () => loadEvents().catch(handleError));
+byId('events-filter').addEventListener('input', renderEvents);
+byId('events-severity').addEventListener('change', renderEvents);
 byId('logs-filter').addEventListener('input', renderLogs);
 byId('logs-filter-clear').addEventListener('click', () => {
   const input = byId('logs-filter');

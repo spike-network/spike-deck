@@ -41,6 +41,17 @@
     </section>
 
     <section class="panel wide">
+      <div class="panel-head"><div><p class="eyebrow">OPERATIONS</p><h2>事件中心</h2></div><button id="events-refresh">刷新</button></div>
+      <p class="panel-description">由 Core 分类的有界操作事件；原始运行日志保留在上方面板。</p>
+      <div class="event-filter">
+        <input id="events-filter" type="search" placeholder="筛选分类、类型或摘要" autocomplete="off">
+        <select id="events-severity"><option value="all">全部严重性</option><option value="info">Info</option><option value="warning">Warning</option><option value="error">Error</option></select>
+        <span id="events-filter-count" class="muted">0 / 0</span>
+      </div>
+      <div id="events" class="table-wrap"></div>
+    </section>
+
+    <section class="panel wide">
       <div class="panel-head"><div><p class="eyebrow">CONFIG SAFETY</p><h2>重载预览</h2></div><button id="reload-preview" class="primary">预览</button></div>
       <p class="panel-description">在应用 Profile 前检查热更新和需要重启的变更。</p>
       <pre id="reload-preview-output"></pre>
