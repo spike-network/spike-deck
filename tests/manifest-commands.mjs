@@ -18,6 +18,8 @@ assert.deepEqual(manifest.commands?.['open-popup']?.suggested_key, {
 });
 assert.equal(manifest.commands?.['open-popup']?.description, '__MSG_openPopupCommand__');
 
+const CWS_SHORT_DESCRIPTION_LIMIT = 132;
+
 for (const locale of ['en', 'zh_CN']) {
   const messages = JSON.parse(
     await readFile(new URL(`../_locales/${locale}/messages.json`, import.meta.url), 'utf8')
@@ -25,6 +27,10 @@ for (const locale of ['en', 'zh_CN']) {
   assert.ok(messages.extensionName?.message);
   assert.ok(messages.extensionDescription?.message);
   assert.ok(messages.openPopupCommand?.message);
+  assert.ok(
+    messages.extensionDescription.message.length <= CWS_SHORT_DESCRIPTION_LIMIT,
+    `${locale} extensionDescription exceeds Chrome Web Store 132-character limit`
+  );
 }
 
 console.log('manifest command tests passed');

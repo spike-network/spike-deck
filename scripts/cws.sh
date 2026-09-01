@@ -59,7 +59,7 @@ api() {
   local method="$1"
   local url="$2"
   shift 2
-  curl -sS -X "$method" "$url" \
+  curl -sS --fail-with-body -X "$method" "$url" \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "x-goog-api-client: spikedeck-makefile" \
     "$@"
@@ -96,6 +96,16 @@ cmd_submit() {
   echo
 }
 
+cmd_cancel() {
+  need
+  TOKEN="$(access_token)"
+  echo "Cancelling pending Chrome Web Store submission for ${CWS_EXTENSION_ID}…"
+  api POST "https://chromewebstore.googleapis.com/v2/$(item_path):cancelSubmission" \
+    -H "Content-Type: application/json" \
+    -d '{}'
+  echo
+}
+
 cmd_release() {
   cmd_upload
   cmd_submit
@@ -103,12 +113,13 @@ cmd_release() {
 
 usage() {
   cat <<EOF
-Usage: scripts/cws.sh <upload|submit|release|status>
+Usage: scripts/cws.sh <upload|submit|release|status|cancel>
 
   upload   POST the zip at ${ZIP} to the existing store item
   submit   submit the current draft for review (publishes after approval)
   release  upload then submit
   status   fetchStatus of the store item
+  cancel   cancel a pending store review submission
 
 Requires CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN,
 CWS_PUBLISHER_ID, CWS_EXTENSION_ID (env or .env).
@@ -121,5 +132,6 @@ case "${1:-}" in
   submit) cmd_submit ;;
   release) cmd_release ;;
   status) cmd_status ;;
+  cancel) cmd_cancel ;;
   *) usage; exit 1 ;;
 esac

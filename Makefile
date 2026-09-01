@@ -1,4 +1,4 @@
-.PHONY: all package screenshots store-upload store-submit store-release store-status clean help
+.PHONY: all package screenshots store-upload store-submit store-release store-status store-cancel clean help
 
 NAME := spikedeck
 MANIFEST := manifest.json
@@ -26,6 +26,7 @@ help:
 	@echo "make store-submit    submit the current CWS draft for review"
 	@echo "make store-release   package + upload + submit for review"
 	@echo "make store-status    fetch CWS item status"
+	@echo "make store-cancel    cancel a pending CWS review"
 	@echo "make clean           remove $(DIST)/"
 
 package:
@@ -48,6 +49,9 @@ store-release: package
 
 store-status:
 	bash scripts/cws.sh status
+
+store-cancel:
+	bash scripts/cws.sh cancel
 
 clean:
 	rm -rf $(DIST)

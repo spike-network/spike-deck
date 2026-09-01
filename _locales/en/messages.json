@@ -3,7 +3,7 @@
     "message": "SpikeDeck - Spike Proxy Manager"
   },
   "extensionDescription": {
-    "message": "Multi-instance Spike proxy control panel with instance switching, policy group selection, latency tests, and browser proxy management."
+    "message": "Multi-instance Spike proxy control panel: instance switching, policy group selection, latency tests, and browser proxy management."
   },
   "openPopupCommand": {
     "message": "Open the SpikeDeck control panel"
