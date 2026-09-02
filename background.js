@@ -474,6 +474,18 @@ async function resolveRequestedProviderIds(instance, providerId, providerIds) {
   return [...new Set(providers.map(provider => provider?.id).filter(Boolean))];
 }
 
+function providerIsAvailable(provider) {
+  return provider?.availability
+    ? provider.availability === 'available'
+    : provider?.status !== 'missing';
+}
+
+function providerIsMissing(provider) {
+  return provider?.availability
+    ? provider.availability === 'missing'
+    : provider?.status === 'missing';
+}
+
 async function executeProviderRefreshTask(instance, task) {
   try {
     const result = await SpikeApiClient.refreshProviders(instance, task.providerId || undefined);
@@ -484,8 +496,8 @@ async function executeProviderRefreshTask(instance, task) {
       finishedAtUnix: Math.floor(Date.now() / 1000),
       revision: Number(result?.reload?.revision) || null,
       total: providers.length,
-      ready: providers.filter(provider => provider.status === 'ready').length,
-      missing: providers.filter(provider => provider.status === 'missing').length,
+      ready: providers.filter(providerIsAvailable).length,
+      missing: providers.filter(providerIsMissing).length,
       error: null
     };
     await persistProviderRefreshTask(instance.id, completed);
@@ -582,10 +594,10 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
       revision: Number(coreTask.revision) || null,
       total: providers.length || null,
       ready: providers.length
-        ? providers.filter(provider => provider.status === 'ready').length
+        ? providers.filter(providerIsAvailable).length
         : null,
       missing: providers.length
-        ? providers.filter(provider => provider.status === 'missing').length
+        ? providers.filter(providerIsMissing).length
         : null,
       error: null,
       providerResults
@@ -642,10 +654,10 @@ async function reconcileProviderRefreshTask(instance, task, requestError = null)
         revision: Number(status?.revision) || null,
         total: providers.length || null,
         ready: providers.length
-          ? providers.filter(provider => provider.status === 'ready').length
+          ? providers.filter(providerIsAvailable).length
           : null,
         missing: providers.length
-          ? providers.filter(provider => provider.status === 'missing').length
+          ? providers.filter(providerIsMissing).length
           : null,
         error: null
       };
@@ -660,7 +672,7 @@ async function reconcileProviderRefreshTask(instance, task, requestError = null)
           : '外部资源更新失败；当前运行配置未改变'
       };
     }
-  } catch (error) {
+  } catch {
     if (requestError) {
       return {
         ...task,

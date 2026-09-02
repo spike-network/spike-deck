@@ -437,6 +437,11 @@ body {
   background: rgba(239, 68, 68, 0.12);
 }
 
+.provider-status.status-stale {
+  color: var(--latency-high);
+  background: rgba(217, 119, 6, 0.12);
+}
+
 .provider-status.status-refreshing,
 .provider-status.status-unknown {
   color: var(--status-testing);

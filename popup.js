@@ -478,6 +478,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function providerStatusLabel(status) {
     if (status === "ready") return "就绪";
     if (status === "missing") return "缺失";
+    if (status === "stale") return "已过期";
     if (status === "refreshing") return "更新中";
     if (status === "update_failed") return "更新失败";
     if (status === "unknown") return "待确认";
@@ -861,13 +862,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (providersBusyKey === "*" || providersBusyKey === provider.id) {
       return "refreshing";
     }
-    if (providersRefreshing && provider.status === "refreshing") {
+    if (
+      providersRefreshing &&
+      (provider.refreshing || provider.status === "refreshing")
+    ) {
       return "refreshing";
     }
-    if (providerRefreshFailures[provider.id]) {
+    const availability =
+      provider.availability ||
+      (provider.status === "missing" ? "missing" : "available");
+    if (availability === "missing" && providerRefreshFailures[provider.id]) {
       return "update_failed";
     }
-    return provider.status || "unknown";
+    if (availability === "missing") return "missing";
+    if (provider.freshness === "stale") return "stale";
+    return "ready";
   }
 
   function renderProvidersList() {
@@ -907,6 +916,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         safeSource,
         provider.group ? `组: ${provider.group}` : null,
         `来源: ${provider.source_kind || "unknown"}`,
+        `可用性: ${provider.availability || "unknown"}`,
+        `新鲜度: ${provider.freshness || "unknown"}`,
         `间隔: ${formatProviderInterval(provider.update_interval_seconds)}`,
         `更新: ${formatProviderAbsoluteTime(provider.last_updated_unix)}`,
       ]
