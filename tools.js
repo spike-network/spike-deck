@@ -1,7 +1,11 @@
 import { SpikeApiClient } from './lib/spike-client.js';
 import { StorageManager } from './lib/storage.js';
 import { initializeI18n, t } from './lib/i18n.js';
-import { filterRuntimeLogs, formatRuntimeLogs } from './lib/runtime-logs.js';
+import {
+  filterRuntimeLogs,
+  formatRuntimeLogs,
+  sortRuntimeLogs
+} from './lib/runtime-logs.js';
 import { formatConnectionTrace } from './lib/connection-trace.js';
 
 await initializeI18n();
@@ -147,16 +151,18 @@ function mergeLogEntries(entries) {
 }
 
 function renderLogs() {
-  const input = byId('logs-filter');
-  const keyword = input?.value || '';
-  const filtered = filterRuntimeLogs(logEntries, keyword);
-  byId('logs-output').textContent = filtered.length
-    ? formatRuntimeLogs(filtered)
+  const includeKeyword = byId('logs-filter').value;
+  const excludeKeyword = byId('logs-filter-exclude').value;
+  const direction = byId('logs-sort').value;
+  const filtered = filterRuntimeLogs(logEntries, includeKeyword, excludeKeyword);
+  const visibleEntries = sortRuntimeLogs(filtered, direction);
+  byId('logs-output').textContent = visibleEntries.length
+    ? formatRuntimeLogs(visibleEntries)
     : logEntries.length
       ? t('无匹配日志')
       : t('暂无运行日志');
-  byId('logs-filter-count').textContent = `${filtered.length} / ${logEntries.length}`;
-  byId('logs-filter-clear').disabled = !keyword;
+  byId('logs-filter-count').textContent = `${visibleEntries.length} / ${logEntries.length}`;
+  byId('logs-filter-clear').disabled = !includeKeyword && !excludeKeyword;
 }
 
 function setLogStreamState(status) {
@@ -244,11 +250,19 @@ byId('events-refresh').addEventListener('click', () => loadEvents().catch(handle
 byId('events-filter').addEventListener('input', renderEvents);
 byId('events-severity').addEventListener('change', renderEvents);
 byId('logs-filter').addEventListener('input', renderLogs);
+byId('logs-filter-exclude').addEventListener('input', renderLogs);
+byId('logs-sort').addEventListener('change', renderLogs);
 byId('logs-filter-clear').addEventListener('click', () => {
   const input = byId('logs-filter');
   input.value = '';
+  byId('logs-filter-exclude').value = '';
   renderLogs();
   input.focus();
+});
+byId('logs-view-clear').addEventListener('click', () => {
+  logEntries = [];
+  renderLogs();
+  showNotice(t('当前视图日志已清空'));
 });
 byId('reload-preview').addEventListener('click', async () => {
   try {

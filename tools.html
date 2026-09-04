@@ -30,12 +30,13 @@
     </section>
 
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">OBSERVABILITY</p><h2>运行日志</h2></div><div class="log-actions"><span id="logs-stream-state" data-state="connecting">实时日志连接中…</span><button id="logs-refresh">刷新</button></div></div>
+      <div class="panel-head"><div><p class="eyebrow">OBSERVABILITY</p><h2>运行日志</h2></div><div class="log-actions"><span id="logs-stream-state" data-state="connecting">实时日志连接中…</span><button id="logs-refresh">刷新</button><button id="logs-view-clear" class="danger" type="button">清空当前视图</button></div></div>
       <div class="log-filter">
-        <label for="logs-filter">关键字</label>
-        <input id="logs-filter" type="search" placeholder="筛选消息、目标或字段" autocomplete="off">
+        <label>包含关键字<input id="logs-filter" type="search" placeholder="包含消息、目标或字段" autocomplete="off"></label>
+        <label>排除关键字<input id="logs-filter-exclude" type="search" placeholder="排除消息、目标或字段" autocomplete="off"></label>
+        <label>时间顺序<select id="logs-sort"><option value="asc">时间升序</option><option value="desc">时间降序</option></select></label>
         <span id="logs-filter-count" class="muted" aria-live="polite">0 / 0</span>
-        <button id="logs-filter-clear" type="button">清除</button>
+        <button id="logs-filter-clear" type="button">重置筛选</button>
       </div>
       <pre id="logs-output" class="runtime-logs" data-i18n-ignore></pre>
     </section>

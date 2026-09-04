@@ -4,6 +4,7 @@ import {
   filterRuntimeLogs,
   formatRuntimeLogEntry,
   formatRuntimeLogs,
+  sortRuntimeLogs,
 } from "../lib/runtime-logs.js";
 
 const entry = {
@@ -24,5 +25,20 @@ assert.deepEqual(filterRuntimeLogs([entry], "RUNTIME"), [entry]);
 assert.deepEqual(filterRuntimeLogs([entry], "node a"), [entry]);
 assert.deepEqual(filterRuntimeLogs([entry], "missing"), []);
 assert.deepEqual(filterRuntimeLogs([entry], "  "), [entry]);
+assert.deepEqual(filterRuntimeLogs([entry], "runtime", "node a"), []);
+assert.deepEqual(filterRuntimeLogs([entry], "runtime", "missing"), [entry]);
+assert.deepEqual(filterRuntimeLogs([entry], "", "DEBUG"), []);
+
+const newerEntry = { ...entry, sequence: 2, occurred_at_unix_ms: 2 };
+const olderEntry = { ...entry, sequence: 1, occurred_at_unix_ms: 1 };
+assert.deepEqual(sortRuntimeLogs([newerEntry, olderEntry], "asc"), [
+  olderEntry,
+  newerEntry,
+]);
+assert.deepEqual(sortRuntimeLogs([olderEntry, newerEntry], "desc"), [
+  newerEntry,
+  olderEntry,
+]);
+assert.deepEqual(sortRuntimeLogs(null, "desc"), []);
 
 console.log("runtime log tests passed");
