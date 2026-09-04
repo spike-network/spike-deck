@@ -1,14 +1,8 @@
 import { StorageManager } from "./lib/storage.js";
 import { SpikeApiClient } from "./lib/spike-client.js";
-import {
-  activeTabTarget,
-  summarizeCurrentSite,
-} from "./lib/current-site.js";
+import { activeTabTarget, summarizeCurrentSite } from "./lib/current-site.js";
 import { ensureHostPermission } from "./lib/permissions.js";
-import {
-  proxyListenerSummary,
-  proxyListenersFromStatus,
-} from "./lib/proxy-listeners.js";
+import { proxyListenerSummary, proxyListenersFromStatus } from "./lib/proxy-listeners.js";
 import { formatByteCount, formatRate } from "./lib/format-rate.js";
 import { groupSelectionBasisLabel } from "./lib/group-selection.js";
 import {
@@ -165,10 +159,7 @@ function attachKeyboardActivate(element, handler) {
 
 /** Lightning bolt icon used by group test button and empty-node probe affordance. */
 function createFlashIcon(size = 13) {
-  const flashIcon = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "svg",
-  );
+  const flashIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   flashIcon.setAttribute("viewBox", "0 0 24 24");
   flashIcon.setAttribute("width", String(size));
   flashIcon.setAttribute("height", String(size));
@@ -176,10 +167,7 @@ function createFlashIcon(size = 13) {
   flashIcon.setAttribute("stroke-width", "2");
   flashIcon.setAttribute("fill", "none");
   flashIcon.setAttribute("class", "flash-icon");
-  const polygon = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "polygon",
-  );
+  const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
   polygon.setAttribute("points", "13 2 3 14 12 14 11 22 21 10 12 10 13 2");
   flashIcon.appendChild(polygon);
   return flashIcon;
@@ -197,10 +185,7 @@ function createEyeIcon(size = 14) {
   svg.setAttribute("aria-hidden", "true");
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute("d", "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z");
-  const circle = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "circle",
-  );
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   circle.setAttribute("cx", "12");
   circle.setAttribute("cy", "12");
   circle.setAttribute("r", "3");
@@ -366,12 +351,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const appContainer = document.querySelector(".container");
   const outboundModeCard = document.getElementById("outbound-mode-card");
   const outboundModeState = document.getElementById("outbound-mode-state");
-  const outboundPolicySelect = document.getElementById(
-    "outbound-policy-select",
-  );
-  const outboundModeButtons = Array.from(
-    document.querySelectorAll(".btn-outbound-mode"),
-  );
+  const outboundPolicySelect = document.getElementById("outbound-policy-select");
+  const outboundModeButtons = Array.from(document.querySelectorAll(".btn-outbound-mode"));
 
   const managedBadge = document.getElementById("managed-badge");
   const badgeDnsDelay = document.getElementById("badge-dns-delay");
@@ -392,13 +373,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnOptions = document.getElementById("btn-options");
   const providersPanel = document.getElementById("providers-panel");
   const providersPanelCount = document.getElementById("providers-panel-count");
-  const providersPanelNotice = document.getElementById(
-    "providers-panel-notice",
-  );
+  const providersPanelNotice = document.getElementById("providers-panel-notice");
   const providersList = document.getElementById("providers-list");
-  const btnProvidersRefreshAll = document.getElementById(
-    "btn-providers-refresh-all",
-  );
+  const btnProvidersRefreshAll = document.getElementById("btn-providers-refresh-all");
   const btnProvidersClose = document.getElementById("btn-providers-close");
   const toggleProxy = document.getElementById("toggle-chrome-proxy");
   const proxyToggleWrapper = document.getElementById("proxy-toggle-wrapper");
@@ -498,12 +475,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function providerDisplayName(provider) {
-    return (
-      provider?.group ||
-      safeProviderSource(provider) ||
-      provider?.id ||
-      "未命名资源"
-    );
+    return provider?.group || safeProviderSource(provider) || provider?.id || "未命名资源";
   }
 
   function formatProviderInterval(seconds) {
@@ -529,9 +501,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function outboundPolicyNames(policies, groups, rememberedPolicy) {
     const names = new Set();
     if (rememberedPolicy) names.add(rememberedPolicy);
-    const policyRows = Array.isArray(policies?.policies)
-      ? policies.policies
-      : [];
+    const policyRows = Array.isArray(policies?.policies) ? policies.policies : [];
     if (policyRows.length > 0) {
       policyRows.forEach((policy) => {
         if (policy?.name) names.add(policy.name);
@@ -560,16 +530,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         outboundPolicySelect.appendChild(option);
       });
       const preferred =
-        previousPolicySelection ||
-        outbound?.global_policy ||
-        currentOutboundPolicies[0];
+        previousPolicySelection || outbound?.global_policy || currentOutboundPolicies[0];
       outboundPolicySelect.value = currentOutboundPolicies.includes(preferred)
         ? preferred
         : currentOutboundPolicies[0];
     } else {
-      outboundPolicySelect.appendChild(
-        el("option", { value: "" }, "无可用策略"),
-      );
+      outboundPolicySelect.appendChild(el("option", { value: "" }, "无可用策略"));
       outboundPolicySelect.value = "";
     }
 
@@ -631,12 +597,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   function summarizeProviderRefreshTask(task) {
     const parts = [];
     if (task.providerId) {
-      const target = currentProviders.find(
-        (provider) => provider.id === task.providerId,
-      );
-      parts.push(
-        `已更新：${target ? providerDisplayName(target) : "所选资源"}`,
-      );
+      const target = currentProviders.find((provider) => provider.id === task.providerId);
+      parts.push(`已更新：${target ? providerDisplayName(target) : "所选资源"}`);
     } else {
       parts.push("全部外部资源更新完成");
     }
@@ -679,9 +641,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     quickInstanceValue.textContent = instanceName;
     btnQuickInstance.title = `实例：${instanceName}`;
 
-    const outboundShort = currentOutbound
-      ? outboundModeLabel(currentOutbound.mode)
-      : "—";
+    const outboundShort = currentOutbound ? outboundModeLabel(currentOutbound.mode) : "—";
     quickOutboundValue.textContent = outboundShort;
     btnQuickOutbound.title = currentOutbound
       ? currentOutbound.mode === "global"
@@ -691,10 +651,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const profileText = currentProfileStem || profileSelect.value || "—";
     quickProfileValue.textContent = profileText;
-    const fullProfile =
-      profileName.title || profileName.textContent || profileText;
-    btnQuickProfile.title =
-      fullProfile && fullProfile !== "-" ? fullProfile : "Profile";
+    const fullProfile = profileName.title || profileName.textContent || profileText;
+    btnQuickProfile.title = fullProfile && fullProfile !== "-" ? fullProfile : "Profile";
   }
 
   function setProvidersPanelOpen(open) {
@@ -722,10 +680,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function openProvidersPanel() {
     setProvidersPanelOpen(true);
-    await Promise.all([
-      loadProvidersList(),
-      syncProviderRefreshTask({ announce: true }),
-    ]);
+    await Promise.all([loadProvidersList(), syncProviderRefreshTask({ announce: true })]);
     renderProvidersList();
   }
 
@@ -810,15 +765,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const previousStatus = providerRefreshTask?.status;
     providerRefreshTask = response.task || null;
     providerRefreshFailures =
-      response.failures && typeof response.failures === "object"
-        ? response.failures
-        : {};
+      response.failures && typeof response.failures === "object" ? response.failures : {};
     const running = providerRefreshTask?.status === "running";
     providersBusyKey = running ? providerRefreshTask.providerId || "*" : "";
-    btnRefreshProviders.classList.toggle(
-      "testing",
-      running || providersRefreshing,
-    );
+    btnRefreshProviders.classList.toggle("testing", running || providersRefreshing);
 
     if (running) {
       clearProvidersPanelNotice();
@@ -836,16 +786,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (providerRefreshTask.status === "succeeded") {
         if (isProvidersPanelOpen()) {
           handledProviderTaskState = stateKey;
-          showProvidersPanelNotice(
-            summarizeProviderRefreshTask(providerRefreshTask),
-            "success",
-          );
+          showProvidersPanelNotice(summarizeProviderRefreshTask(providerRefreshTask), "success");
         }
         void loadDashboard();
-      } else if (
-        providerRefreshTask.status === "failed" &&
-        isProvidersPanelOpen()
-      ) {
+      } else if (providerRefreshTask.status === "failed" && isProvidersPanelOpen()) {
         handledProviderTaskState = stateKey;
         showProvidersPanelNotice(
           `更新失败：${providerRefreshTask.error || "未知错误"}；当前运行配置未改变。`,
@@ -862,15 +806,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (providersBusyKey === "*" || providersBusyKey === provider.id) {
       return "refreshing";
     }
-    if (
-      providersRefreshing &&
-      (provider.refreshing || provider.status === "refreshing")
-    ) {
+    if (providersRefreshing && (provider.refreshing || provider.status === "refreshing")) {
       return "refreshing";
     }
     const availability =
-      provider.availability ||
-      (provider.status === "missing" ? "missing" : "available");
+      provider.availability || (provider.status === "missing" ? "missing" : "available");
     if (availability === "missing" && providerRefreshFailures[provider.id]) {
       return "update_failed";
     }
@@ -885,8 +825,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const anyLocalBusy = Boolean(providersBusyKey);
     const headerBusy = anyLocalBusy || providersRefreshing;
 
-    btnProvidersRefreshAll.disabled =
-      count === 0 || anyLocalBusy || providersRefreshing;
+    btnProvidersRefreshAll.disabled = count === 0 || anyLocalBusy || providersRefreshing;
     btnProvidersRefreshAll.textContent = headerBusy ? "更新中…" : "全部更新";
     btnProvidersRefreshAll.classList.toggle("testing", headerBusy);
     btnRefreshProviders.classList.toggle("testing", headerBusy);
@@ -904,8 +843,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     providersList.replaceChildren();
     currentProviders.forEach((provider) => {
-      const rowUpdating =
-        providersBusyKey === "*" || providersBusyKey === provider.id;
+      const rowUpdating = providersBusyKey === "*" || providersBusyKey === provider.id;
       const displayStatus = resolveProviderDisplayStatus(provider);
       const statusClass = `provider-status status-${displayStatus}`;
       const typeLabel = providerTypeLabel(provider.type);
@@ -930,10 +868,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           type: "button",
           className: "btn-provider-row-update",
           disabled: anyLocalBusy || providersRefreshing,
-          title:
-            provider.source_kind === "local"
-              ? "重新读取此本地资源"
-              : "强制下载并应用此资源",
+          title: provider.source_kind === "local" ? "重新读取此本地资源" : "强制下载并应用此资源",
           onClick: (e) => {
             e.stopPropagation();
             void runProviderRefresh(provider.id);
@@ -984,11 +919,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             providerDisplayName(provider),
           ),
           provider.group && safeSource
-            ? el(
-                "div",
-                { className: "provider-origin", title: safeSource },
-                safeSource,
-              )
+            ? el("div", { className: "provider-origin", title: safeSource }, safeSource)
             : null,
           el(
             "div",
@@ -1002,11 +933,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               formatProviderRelativeTime(provider.last_updated_unix),
             ),
             el("span", { className: "provider-meta-sep" }, "·"),
-            el(
-              "span",
-              { className: "provider-meta-extra" },
-              metaParts.join(" · "),
-            ),
+            el("span", { className: "provider-meta-extra" }, metaParts.join(" · ")),
           ),
         ),
       );
@@ -1033,9 +960,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: "START_PROVIDER_REFRESH",
         instanceId: targetInstance.id,
         providerId: providerId || null,
-        providerIds: providerId
-          ? [providerId]
-          : currentProviders.map((provider) => provider.id),
+        providerIds: providerId ? [providerId] : currentProviders.map((provider) => provider.id),
       });
       if (activeInstance?.id !== targetInstance?.id) return;
       if (!response?.ok || !response.task) {
@@ -1067,9 +992,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       targetMember: task.member || null,
       completedMembers: new Set(),
     };
-    metadata.completedMembers = new Set(
-      (task.results || []).map((result) => result.member),
-    );
+    metadata.completedMembers = new Set((task.results || []).map((result) => result.member));
     activeGroupTests.set(task.id, metadata);
     if (Array.isArray(task.results) && task.results.length > 0) {
       const recordedAt =
@@ -1120,8 +1043,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: "GET_GROUP_TEST_STATE",
         instanceId: activeInstance.id,
       });
-      if (!response?.ok)
-        throw new Error(response?.error || "Unable to restore group tests");
+      if (!response?.ok) throw new Error(response?.error || "Unable to restore group tests");
       applyGroupTestState(response.tasks);
     } catch (error) {
       console.warn(`Unable to restore group tests: ${error.message}`);
@@ -1150,11 +1072,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       activeGroupTests.set(task.id, {
         groupName: task.group,
-        targetMember:
-          task.member || previousEntries.get(task.id)?.targetMember || null,
-        completedMembers: new Set(
-          (task.results || []).map((result) => result.member),
-        ),
+        targetMember: task.member || previousEntries.get(task.id)?.targetMember || null,
+        completedMembers: new Set((task.results || []).map((result) => result.member)),
       });
     }
     syncGroupTestButtons();
@@ -1171,11 +1090,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       button.classList.toggle("testing", testing);
       button.classList.toggle("cancelling", cancelling);
       button.disabled = cancelling;
-      button.title = cancelling
-        ? "正在取消该组测速"
-        : testing
-          ? "取消该组测速"
-          : "测试该组延迟";
+      button.title = cancelling ? "正在取消该组测速" : testing ? "取消该组测速" : "测试该组延迟";
       button.setAttribute("aria-label", button.title);
       const label = button.querySelector(".group-test-action-label");
       if (label) label.textContent = cancelling ? "取消中" : "取消";
@@ -1190,10 +1105,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   chrome.runtime.onMessage.addListener((message) => {
-    if (
-      message.type !== "GROUP_TEST_STATE_CHANGED" ||
-      message.instanceId !== activeInstance?.id
-    ) {
+    if (message.type !== "GROUP_TEST_STATE_CHANGED" || message.instanceId !== activeInstance?.id) {
       return;
     }
     applyGroupTestState(message.tasks);
@@ -1281,13 +1193,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       target instanceof HTMLTextAreaElement ||
       target instanceof HTMLSelectElement ||
       target?.isContentEditable;
-    if (
-      event.key === "/" &&
-      !editing &&
-      !event.altKey &&
-      !event.ctrlKey &&
-      !event.metaKey
-    ) {
+    if (event.key === "/" && !editing && !event.altKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault();
       setFilterBarOpen(true);
       return;
@@ -1470,10 +1376,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     chrome.runtime.sendMessage({ type: "UPDATE_PROXY_SETTING" });
     if (isProvidersPanelOpen()) {
       clearProvidersPanelNotice();
-      await Promise.all([
-        loadProvidersList(),
-        syncProviderRefreshTask({ announce: true }),
-      ]);
+      await Promise.all([loadProvidersList(), syncProviderRefreshTask({ announce: true })]);
     } else {
       void syncProviderRefreshTask();
     }
@@ -1482,10 +1385,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   btnRefresh.addEventListener("click", () => {
     if (isProvidersPanelOpen()) {
-      void Promise.all([
-        loadProvidersList(),
-        syncProviderRefreshTask({ announce: true }),
-      ]);
+      void Promise.all([loadProvidersList(), syncProviderRefreshTask({ announce: true })]);
     } else {
       loadDashboard();
     }
@@ -1627,9 +1527,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     try {
-      const existing = chrome.tabs?.query
-        ? await chrome.tabs.query({ url: `${url}*` })
-        : [];
+      const existing = chrome.tabs?.query ? await chrome.tabs.query({ url: `${url}*` }) : [];
       const tab = existing.find((item) => item.id != null);
       if (tab) {
         await chrome.tabs.update(tab.id, { active: true });
@@ -1651,11 +1549,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   outboundPolicySelect.addEventListener("change", () => {
-    renderOutboundMode(
-      currentOutbound,
-      currentOutboundPolicies,
-      "核心未暴露 /spike/outbound",
-    );
+    renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
   });
 
   outboundModeButtons.forEach((button) => {
@@ -1665,12 +1559,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   async function switchOutboundMode(mode) {
-    if (
-      !activeInstance ||
-      outboundBusy ||
-      !["rule", "direct", "global"].includes(mode)
-    )
-      return;
+    if (!activeInstance || outboundBusy || !["rule", "direct", "global"].includes(mode)) return;
     const policy =
       outboundPolicySelect.value ||
       currentOutbound?.global_policy ||
@@ -1681,11 +1570,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     outboundBusy = true;
-    renderOutboundMode(
-      currentOutbound,
-      currentOutboundPolicies,
-      "核心未暴露 /spike/outbound",
-    );
+    renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
     let errorMessage = "";
     try {
       const outbound = await SpikeApiClient.setOutbound(
@@ -1705,11 +1590,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       errorMessage = `切换失败: ${err.message || "未知错误"}`;
     } finally {
       outboundBusy = false;
-      renderOutboundMode(
-        currentOutbound,
-        currentOutboundPolicies,
-        "核心未暴露 /spike/outbound",
-      );
+      renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
       if (errorMessage) outboundModeState.textContent = errorMessage;
     }
   }
@@ -1738,9 +1619,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       profileSelect.replaceChildren(el("option", { value: "" }, "—"));
       renderTraffic(null);
       publishTrafficSample(null, "no instance");
-      proxyListeners.replaceChildren(
-        el("span", { className: "proxy-listener-empty" }, "-"),
-      );
+      proxyListeners.replaceChildren(el("span", { className: "proxy-listener-empty" }, "-"));
       renderOutboundMode(null, [], "未配置实例");
       renderNoInstanceGuidance();
       return;
@@ -1759,9 +1638,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     let cachedGroupsRendered = false;
     try {
-      const snapshot = await StorageManager.getPopupGroupSnapshot(
-        activeInstance.id,
-      );
+      const snapshot = await StorageManager.getPopupGroupSnapshot(activeInstance.id);
       if (snapshot?.groups?.length) {
         currentGroupsData = snapshot.groups;
         ingestPersistedMemberInfo(currentGroupsData);
@@ -1777,12 +1654,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const [status, groupsData, outbound, policies] = await Promise.all([
         SpikeApiClient.getStatus(activeInstance),
         SpikeApiClient.getGroups(activeInstance),
-        optionalApiRequest("outbound mode", () =>
-          SpikeApiClient.getOutbound(activeInstance),
-        ),
-        optionalApiRequest("policy inventory", () =>
-          SpikeApiClient.getPolicies(activeInstance),
-        ),
+        optionalApiRequest("outbound mode", () => SpikeApiClient.getOutbound(activeInstance)),
+        optionalApiRequest("policy inventory", () => SpikeApiClient.getPolicies(activeInstance)),
       ]);
 
       setStatus("online", "已连接");
@@ -1799,19 +1672,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       currentGroupsData = groupsData.groups || [];
       delete groupsContainer.dataset.snapshot;
-      void StorageManager.setPopupGroupSnapshot(
-        activeInstance.id,
-        currentGroupsData,
-      ).catch((error) => {
-        console.warn(`Unable to persist popup group snapshot: ${error.message}`);
-      });
+      void StorageManager.setPopupGroupSnapshot(activeInstance.id, currentGroupsData).catch(
+        (error) => {
+          console.warn(`Unable to persist popup group snapshot: ${error.message}`);
+        },
+      );
       renderOutboundMode(
         outbound,
-        outboundPolicyNames(
-          policies,
-          currentGroupsData,
-          outbound?.global_policy,
-        ),
+        outboundPolicyNames(policies, currentGroupsData, outbound?.global_policy),
         "核心未暴露 /spike/outbound",
       );
 
@@ -1833,9 +1701,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       profileSelect.replaceChildren(el("option", { value: "" }, "—"));
       renderTraffic(null);
       publishTrafficSample(null, err.message || "unreachable");
-      proxyListeners.replaceChildren(
-        el("span", { className: "proxy-listener-empty" }, "-"),
-      );
+      proxyListeners.replaceChildren(el("span", { className: "proxy-listener-empty" }, "-"));
       renderOutboundMode(null, [], "连接后可用");
 
       if (cachedGroupsRendered) {
@@ -1889,7 +1755,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute(
       "d",
-      "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+      "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z",
     );
     iconSvg.appendChild(path);
 
@@ -1974,16 +1840,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderProxyListeners(status) {
-    const listeners = proxyListenerSummary(
-      proxyListenersFromStatus(status, activeInstance),
-    );
+    const listeners = proxyListenerSummary(proxyListenersFromStatus(status, activeInstance));
     if (listeners.length === 0) {
       proxyListeners.replaceChildren(
-        el(
-          "span",
-          { className: "proxy-listener-empty" },
-          "未发现 HTTP / SOCKS5 / Mixed",
-        ),
+        el("span", { className: "proxy-listener-empty" }, "未发现 HTTP / SOCKS5 / Mixed"),
       );
       return;
     }
@@ -2005,8 +1865,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const state = await chrome.runtime.sendMessage({
         type: "GET_PROXY_SETTING_STATE",
       });
-      if (!state || !state.ok)
-        throw new Error(state?.error || "无法读取 Chrome 代理状态");
+      if (!state || !state.ok) throw new Error(state?.error || "无法读取 Chrome 代理状态");
       renderProxyControlState(state, enabled);
     } catch (err) {
       setProxyControlDot("blocked", `代理状态未知: ${err.message}`);
@@ -2014,19 +1873,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function setProxyControlDot(kind, message) {
-    proxyControlState.className = kind
-      ? `proxy-control-dot ${kind}`
-      : "proxy-control-dot";
+    proxyControlState.className = kind ? `proxy-control-dot ${kind}` : "proxy-control-dot";
     proxyControlState.title = message;
     proxyControlState.setAttribute("aria-label", message);
   }
 
   function renderProxyControlState(state, enabled) {
     if (enabled && state.releasedForUnhealthy) {
-      setProxyControlDot(
-        "blocked",
-        "Spike 不可达，已交回代理控制；恢复后将自动接管",
-      );
+      setProxyControlDot("blocked", "Spike 不可达，已交回代理控制；恢复后将自动接管");
       return;
     }
     if (enabled && state.controlledBySpikeDeck) {
@@ -2099,9 +1953,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ? currentProfileStem
         : names[0] || "";
       updateQuickSummaries();
-      const managed = SpikeApiClient.parseManagedProfile(
-        current?.profile || "",
-      );
+      const managed = SpikeApiClient.parseManagedProfile(current?.profile || "");
       if (managed) {
         const parts = ["Managed"];
         if (managed.intervalSeconds) parts.push(`${managed.intervalSeconds}s`);
@@ -2160,14 +2012,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!activeInstance) {
       currentModules = [];
       modulesPanelCount.textContent = "";
-      modulesList.replaceChildren(
-        el("div", { className: "providers-empty" }, "未配置 Spike 实例"),
-      );
+      modulesList.replaceChildren(el("div", { className: "providers-empty" }, "未配置 Spike 实例"));
       return;
     }
-    modulesList.replaceChildren(
-      el("div", { className: "providers-empty" }, "正在加载模块…"),
-    );
+    modulesList.replaceChildren(el("div", { className: "providers-empty" }, "正在加载模块…"));
     try {
       const data = await SpikeApiClient.getModules(activeInstance);
       currentModules = Array.isArray(data.modules) ? data.modules : [];
@@ -2177,20 +2025,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       currentModules = [];
       modulesList.replaceChildren(
-        el(
-          "div",
-          { className: "providers-empty error" },
-          error.message || "加载失败",
-        ),
+        el("div", { className: "providers-empty error" }, error.message || "加载失败"),
       );
     }
   }
 
   function renderModulesList() {
     if (!currentModules.length) {
-      modulesList.replaceChildren(
-        el("div", { className: "providers-empty" }, "没有已安装模块"),
-      );
+      modulesList.replaceChildren(el("div", { className: "providers-empty" }, "没有已安装模块"));
       return;
     }
     modulesList.replaceChildren(
@@ -2199,11 +2041,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           "div",
           { className: "provider-row" },
           el("div", { className: "provider-source" }, module.name),
-          el(
-            "div",
-            { className: "provider-origin" },
-            module.url || module.source || "",
-          ),
+          el("div", { className: "provider-origin" }, module.url || module.source || ""),
           el(
             "div",
             { className: "provider-row-meta" },
@@ -2300,9 +2138,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // 2. Sub-group match
     const memberIdentity = memberName.toLocaleLowerCase();
-    const subGroup = currentGroupsData.find(
-      (g) => g.name.toLocaleLowerCase() === memberIdentity,
-    );
+    const subGroup = currentGroupsData.find((g) => g.name.toLocaleLowerCase() === memberIdentity);
     if (!subGroup) return null;
     const groupIdentity = subGroup.name.toLocaleLowerCase();
     if (visited.has(groupIdentity)) return null;
@@ -2311,18 +2147,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // 2a. Check latency of current selected member of subGroup
     const selectedMember =
-      subGroup.override_member ||
-      subGroup.selected ||
-      (subGroup.members && subGroup.members[0]);
-    if (
-      selectedMember &&
-      selectedMember.toLocaleLowerCase() !== memberIdentity
-    ) {
-      const selectedRes = resolveMemberLatency(
-        selectedMember,
-        nextVisited,
-        depth + 1,
-      );
+      subGroup.override_member || subGroup.selected || (subGroup.members && subGroup.members[0]);
+    if (selectedMember && selectedMember.toLocaleLowerCase() !== memberIdentity) {
+      const selectedRes = resolveMemberLatency(selectedMember, nextVisited, depth + 1);
       if (selectedRes) return selectedRes;
     }
 
@@ -2332,12 +2159,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (child.toLocaleLowerCase() === memberIdentity) return;
       const res = resolveMemberLatency(child, nextVisited, depth + 1);
       if (res && res.ok && typeof res.ms === "number") {
-        if (
-          !bestResult ||
-          !bestResult.ok ||
-          bestResult.ms === null ||
-          res.ms < bestResult.ms
-        ) {
+        if (!bestResult || !bestResult.ok || bestResult.ms === null || res.ms < bestResult.ms) {
           bestResult = res;
         }
       } else if (res && !bestResult) {
@@ -2356,9 +2178,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ? visibleGroups.filter(
           (g) =>
             g.name.toLowerCase().includes(normalizedFilter) ||
-            (g.members || []).some((member) =>
-              member.toLowerCase().includes(normalizedFilter),
-            ),
+            (g.members || []).some((member) => member.toLowerCase().includes(normalizedFilter)),
         )
       : visibleGroups;
 
@@ -2367,9 +2187,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         el(
           "div",
           { className: "empty-state" },
-          normalizedFilter
-            ? "没有匹配项。换个关键字试试。"
-            : "这个实例还没有策略组。",
+          normalizedFilter ? "没有匹配项。换个关键字试试。" : "这个实例还没有策略组。",
         ),
       );
       return;
@@ -2378,32 +2196,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     groupsContainer.replaceChildren();
 
     filteredGroups.forEach((group, idx) => {
-      const isExpand = normalizedFilter
-        ? true
-        : resolveInitialExpand(group, idx);
+      const isExpand = normalizedFilter ? true : resolveInitialExpand(group, idx);
 
       const isOverridden = Boolean(group.override_member);
       const currentSelected =
-        group.override_member ||
-        group.selected ||
-        (group.members && group.members[0]) ||
-        "-";
+        group.override_member || group.selected || (group.members && group.members[0]) || "-";
       const selectionBasis = groupSelectionBasisLabel(group.selection_basis);
 
       // Chevron Icon SVG
-      const svgIcon = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "svg",
-      );
+      const svgIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svgIcon.setAttribute("class", "expand-icon");
       svgIcon.setAttribute("viewBox", "0 0 24 24");
       svgIcon.setAttribute("fill", "none");
       svgIcon.setAttribute("stroke", "currentColor");
       svgIcon.setAttribute("stroke-width", "2");
-      const polyline = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "polyline",
-      );
+      const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
       polyline.setAttribute("points", "9 18 15 12 9 6");
       svgIcon.appendChild(polyline);
 
@@ -2439,34 +2246,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         currentSelected,
       );
-      const selectionBasisEl = selectionBasis
-        ? el(
-            "span",
-            {
-              className: "selection-basis-badge",
-              title: selectionBasis,
-            },
-            selectionBasis,
-          )
-        : null;
+      const selectionBasisEl = el(
+        "span",
+        {
+          className: "selection-basis-badge",
+          title: selectionBasis,
+        },
+        selectionBasis,
+      );
+      selectionBasisEl.hidden = !selectionBasis;
 
       // Clear pin/override for automatic groups (url-test / fallback / smart).
-      const resumeAutoBtn = isOverridden
-        ? el(
-            "button",
-            {
-              className: "btn-resume-auto",
-              title: "恢复自动选择",
-              "aria-label": "恢复自动选择",
-              dataset: { group: group.name },
-              onClick: async (e) => {
-                e.stopPropagation();
-                await resumeAutomaticSelection(group.name);
-              },
-            },
-            createPinOffIcon(13),
-          )
-        : null;
+      const resumeAutoBtn = el(
+        "button",
+        {
+          className: "btn-resume-auto",
+          title: "恢复自动选择",
+          "aria-label": "恢复自动选择",
+          dataset: { group: group.name },
+          onClick: async (e) => {
+            e.stopPropagation();
+            await resumeAutomaticSelection(group.name);
+          },
+        },
+        createPinOffIcon(13),
+      );
+      resumeAutoBtn.hidden = !isOverridden;
 
       const hiddenBadge = group.hidden
         ? el(
@@ -2480,17 +2285,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           )
         : null;
 
-      const overrideBadge = isOverridden
-        ? el(
-            "span",
-            {
-              className: "override-kind-badge",
-              title: "已手动固定节点",
-              "aria-label": "已固定",
-            },
-            createPinIcon(11),
-          )
-        : null;
+      const overrideBadge = el(
+        "span",
+        {
+          className: "override-kind-badge",
+          title: "已手动固定节点",
+          "aria-label": "已固定",
+        },
+        createPinIcon(11),
+      );
+      overrideBadge.hidden = !isOverridden;
 
       const headerEl = el(
         "div",
@@ -2500,11 +2304,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           { className: "group-title-wrapper" },
           svgIcon,
           el("span", { className: "group-name" }, group.name),
-          el(
-            "span",
-            { className: "group-kind-badge" },
-            formatMemberType(group.kind || "select"),
-          ),
+          el("span", { className: "group-kind-badge" }, formatMemberType(group.kind || "select")),
           overrideBadge,
           hiddenBadge,
         ),
@@ -2530,9 +2330,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
       }
 
-      const groupNameMatches = group.name
-        .toLowerCase()
-        .includes(normalizedFilter);
+      const groupNameMatches = group.name.toLowerCase().includes(normalizedFilter);
 
       (group.members || []).forEach((member) => {
         if (
@@ -2549,11 +2347,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Resolve latency for leaf node or sub-group
         const latencyInfo = resolveMemberLatency(member);
 
-        const checkMark = el(
-          "span",
-          { className: "check-mark" },
-          isSelected ? "✓" : "",
-        );
+        const checkMark = el("span", { className: "check-mark" }, isSelected ? "✓" : "");
         const memberNameEl = el("span", { className: "member-name" }, member);
 
         // Type tag badge (product casing; nested groups use group kind)
@@ -2562,11 +2356,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           : memberTypeLabel(memberInfo);
 
         const typeTag = typeLabel
-          ? el(
-              "span",
-              { className: "member-type-tag", title: typeLabel },
-              typeLabel,
-            )
+          ? el("span", { className: "member-type-tag", title: typeLabel }, typeLabel)
           : null;
 
         const latencyBadge = el("span", {
@@ -2580,7 +2370,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // On automatic groups, re-clicking the pinned member clears the override.
         const activateMember = async () => {
-          if (isPinnedMember) {
+          const currentGroup = currentGroupsData.find((candidate) => candidate.name === group.name);
+          if (currentGroup?.override_member === member) {
             await resumeAutomaticSelection(group.name);
             return;
           }
@@ -2597,13 +2388,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             role: "button",
             onClick: activateMember,
           },
-          el(
-            "div",
-            { className: "member-left" },
-            checkMark,
-            memberNameEl,
-            typeTag,
-          ),
+          el("div", { className: "member-left" }, checkMark, memberNameEl, typeTag),
           el("div", { className: "member-right" }, latencyBadge),
         );
         attachKeyboardActivate(memberItem, activateMember);
@@ -2643,67 +2428,106 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  /** Re-fetch groups so selected / override_member stay in sync with Spike. */
-  async function refreshGroupsSelectionState() {
+  /** Re-fetch groups and patch one card when the visible group set is stable. */
+  async function refreshGroupsSelectionState(groupName = null) {
+    const previousVisible = visiblePolicyGroups(currentGroupsData, hiddenGroupsMode).map(
+      (group) => group.name,
+    );
     const groupsData = await SpikeApiClient.getGroups(activeInstance);
     currentGroupsData = groupsData.groups || [];
     ingestPersistedMemberInfo(currentGroupsData);
-    renderGroups(currentGroupsData);
+    const nextVisible = visiblePolicyGroups(currentGroupsData, hiddenGroupsMode).map(
+      (group) => group.name,
+    );
+    const visibleGroupsStable =
+      previousVisible.length === nextVisible.length &&
+      previousVisible.every((name, index) => name === nextVisible[index]);
+    const group = currentGroupsData.find((candidate) => candidate.name === groupName);
+    const groupCard = groupName
+      ? document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`)
+      : null;
+    if (group && groupCard && visibleGroupsStable) {
+      paintSelection(groupCard, group);
+    } else {
+      renderGroups(currentGroupsData);
+    }
     updateAllLatencyBadgesDOM();
   }
 
-  function paintSelection(groupCard, memberName) {
-    if (!groupCard) return;
+  function paintSelection(groupCard, group) {
+    if (!groupCard || !group) return;
+    const memberName =
+      group.override_member || group.selected || (group.members && group.members[0]) || "-";
+    const isOverridden = Boolean(group.override_member);
+    groupCard.classList.toggle("overridden", isOverridden);
     groupCard.querySelectorAll(".member-item").forEach((item) => {
       const isTarget = item.dataset.member === memberName;
+      const isPinned = item.dataset.member === group.override_member;
       item.classList.toggle("selected", isTarget);
+      item.classList.toggle("pinned", isPinned);
+      item.title = isPinned ? "再次点击可恢复自动选择" : "";
       const check = item.querySelector(".check-mark");
       if (check) check.textContent = isTarget ? "✓" : "";
     });
-    if (!memberName) return;
     const selectedSummary = groupCard.querySelector(".current-selected");
-    if (selectedSummary) selectedSummary.textContent = memberName;
+    if (selectedSummary) {
+      selectedSummary.textContent = memberName;
+      selectedSummary.classList.toggle("pinned", isOverridden);
+      selectedSummary.title = isOverridden
+        ? `已固定: ${memberName}（点击图钉可恢复自动选择）`
+        : memberName;
+    }
+    const selectionBasis = groupSelectionBasisLabel(group.selection_basis);
+    const selectionBasisEl = groupCard.querySelector(".selection-basis-badge");
+    if (selectionBasisEl) {
+      selectionBasisEl.textContent = selectionBasis;
+      selectionBasisEl.title = selectionBasis;
+      selectionBasisEl.hidden = !selectionBasis;
+    }
+    const resumeAutoBtn = groupCard.querySelector(".btn-resume-auto");
+    if (resumeAutoBtn) resumeAutoBtn.hidden = !isOverridden;
+    const overrideBadge = groupCard.querySelector(".override-kind-badge");
+    if (overrideBadge) overrideBadge.hidden = !isOverridden;
   }
 
   async function selectMember(groupName, memberName) {
     if (selectingGroups.has(groupName)) return;
     selectingGroups.add(groupName);
 
-    const groupCard = document.querySelector(
-      `.group-card[data-group="${CSS.escape(groupName)}"]`,
-    );
-    paintSelection(groupCard, memberName);
+    const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
+    const group = currentGroupsData.find((g) => g.name === groupName);
+    const optimisticGroup = group
+      ? {
+          ...group,
+          selected: memberName,
+          override_member: isAutomaticGroupKind(group.kind) ? memberName : group.override_member,
+        }
+      : null;
+    paintSelection(groupCard, optimisticGroup);
 
     try {
-      await SpikeApiClient.selectGroupMember(
-        activeInstance,
-        groupName,
-        memberName,
-      );
+      await SpikeApiClient.selectGroupMember(activeInstance, groupName, memberName);
 
-      const group = currentGroupsData.find((g) => g.name === groupName);
       if (group) {
         group.selected = memberName;
         if (isAutomaticGroupKind(group.kind)) {
           group.override_member = memberName;
         }
+        paintSelection(groupCard, group);
       }
 
       try {
-        await refreshGroupsSelectionState();
+        await refreshGroupsSelectionState(groupName);
       } catch {
         updateAllLatencyBadgesDOM();
       }
     } catch (err) {
       showToast(`切换节点失败: ${err.message || err}`, "error");
       try {
-        await refreshGroupsSelectionState();
+        await refreshGroupsSelectionState(groupName);
       } catch {
         const group = currentGroupsData.find((g) => g.name === groupName);
-        paintSelection(
-          groupCard,
-          group?.override_member || group?.selected || null,
-        );
+        paintSelection(groupCard, group);
       }
     } finally {
       selectingGroups.delete(groupName);
@@ -2715,7 +2539,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       await SpikeApiClient.clearGroupSelection(activeInstance, groupName);
       try {
-        await refreshGroupsSelectionState();
+        await refreshGroupsSelectionState(groupName);
       } catch (err) {
         // Still try to drop local override so the reverse affordance goes away.
         const group = currentGroupsData.find((g) => g.name === groupName);
@@ -2724,9 +2548,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         renderGroups(currentGroupsData);
         updateAllLatencyBadgesDOM();
-        console.warn(
-          `Cleared override but failed to refresh groups: ${err.message}`,
-        );
+        console.warn(`Cleared override but failed to refresh groups: ${err.message}`);
       }
     } catch (err) {
       showToast(`恢复自动选择失败: ${err.message || err}`, "error");
@@ -2750,8 +2572,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           instanceId: activeInstance.id,
           taskId,
         });
-        if (!result?.ok)
-          throw new Error(result?.error || "Unable to cancel group test");
+        if (!result?.ok) throw new Error(result?.error || "Unable to cancel group test");
         applyGroupTestState(result.tasks);
       }
       showToast("测速任务已取消", "success");
@@ -2782,8 +2603,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         groupName,
         memberName: targetMember,
       });
-      if (!result?.ok)
-        throw new Error(result?.error || "Unable to start group test");
+      if (!result?.ok) throw new Error(result?.error || "Unable to start group test");
       if (result.mode === "async") {
         asyncTaskStarted = true;
         activeGroupTests.set(result.task.id, {
@@ -2813,9 +2633,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function setGroupBadgesTesting(groupName, targetMember = null) {
-    const groupCard = document.querySelector(
-      `.group-card[data-group="${CSS.escape(groupName)}"]`,
-    );
+    const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
     if (!groupCard) return;
 
     const badges = groupCard.querySelectorAll(".latency-badge");
@@ -2835,10 +2653,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (task.groupName !== groupName) return false;
       if (task.targetMember && task.targetMember !== memberName) return false;
       if (task.completedMembers.has(memberName)) return false;
-      return (
-        !latencyInfo?.sourceMember ||
-        !task.completedMembers.has(latencyInfo.sourceMember)
-      );
+      return !latencyInfo?.sourceMember || !task.completedMembers.has(latencyInfo.sourceMember);
     });
   }
 
@@ -2866,11 +2681,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   /**
    * Paint a member latency badge: spinner / result text / empty (hover flash).
    */
-  function applyLatencyBadge(
-    badgeEl,
-    latInfo,
-    { member = "", pending = false } = {},
-  ) {
+  function applyLatencyBadge(badgeEl, latInfo, { member = "", pending = false } = {}) {
     if (pending) {
       badgeEl.className = "latency-badge lat-testing";
       badgeEl.title = "正在测速...";
