@@ -14,6 +14,9 @@ assert.match(popup, /async function refreshGroupsSelectionState\(groupName = nul
 assert.match(popup, /paintSelection\(groupCard, group\)/);
 assert.match(popup, /await refreshGroupsSelectionState\(groupName\)/);
 assert.match(popup, /visibleGroupsStable/);
-assert.match(popup, /resumeAutoBtn\.hidden = !isOverridden/);
+assert.doesNotMatch(popup, /className: "selection-basis-badge"/);
+assert.doesNotMatch(popup, /className: "btn-resume-auto"/);
+assert.doesNotMatch(popup, /className: "override-kind-badge"/);
+assert.match(popup, /currentGroup\?\.override_member === member/);
 
 console.log("group selection tests passed");

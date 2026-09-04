@@ -4,7 +4,6 @@ import { activeTabTarget, summarizeCurrentSite } from "./lib/current-site.js";
 import { ensureHostPermission } from "./lib/permissions.js";
 import { proxyListenerSummary, proxyListenersFromStatus } from "./lib/proxy-listeners.js";
 import { formatByteCount, formatRate } from "./lib/format-rate.js";
-import { groupSelectionBasisLabel } from "./lib/group-selection.js";
 import {
   hiddenGroupsModeLabel,
   nextHiddenGroupsMode,
@@ -239,54 +238,6 @@ function createEyeOffIcon(size = 11) {
     "M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19",
     "M14.12 14.12a3 3 0 1 1-4.24-4.24",
     "M1 1l22 22",
-  ];
-  for (const d of paths) {
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", d);
-    svg.appendChild(path);
-  }
-  return svg;
-}
-
-/** Filled pin icon: group currently has a manual override. */
-function createPinIcon(size = 11) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", String(size));
-  svg.setAttribute("height", String(size));
-  svg.setAttribute("fill", "currentColor");
-  svg.setAttribute("stroke", "none");
-  svg.setAttribute("class", "pin-icon");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  // Compact pin (head + needle).
-  path.setAttribute(
-    "d",
-    "M16 3a1 1 0 0 1 1 1v1.382a3 3 0 0 1-.879 2.121L14 9.624V13a1 1 0 0 1-.553.894l-3 1.5A1 1 0 0 1 9 14.5V9.624L6.879 7.503A3 3 0 0 1 6 5.382V4a1 1 0 0 1 1-1h9zM12 17v4a1 1 0 1 1-2 0v-4.118l1-.5 1 .5z",
-  );
-  svg.appendChild(path);
-  return svg;
-}
-
-/** Pin-off icon: clear manual override and resume automatic selection. */
-function createPinOffIcon(size = 13) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", String(size));
-  svg.setAttribute("height", String(size));
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "2");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("class", "pin-off-icon");
-  svg.setAttribute("aria-hidden", "true");
-
-  const paths = [
-    "M12 17v5",
-    "M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89",
-    "M2 2l20 20",
-    "M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16h12",
   ];
   for (const d of paths) {
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -2201,7 +2152,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isOverridden = Boolean(group.override_member);
       const currentSelected =
         group.override_member || group.selected || (group.members && group.members[0]) || "-";
-      const selectionBasis = groupSelectionBasisLabel(group.selection_basis);
 
       // Chevron Icon SVG
       const svgIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -2239,39 +2189,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const selectedSummaryEl = el(
         "span",
         {
-          className: `current-selected${isOverridden ? " pinned" : ""}`,
-          title: isOverridden
-            ? `已固定: ${currentSelected}（点击图钉可恢复自动选择）`
-            : currentSelected,
+          className: "current-selected",
+          title: currentSelected,
         },
         currentSelected,
       );
-      const selectionBasisEl = el(
-        "span",
-        {
-          className: "selection-basis-badge",
-          title: selectionBasis,
-        },
-        selectionBasis,
-      );
-      selectionBasisEl.hidden = !selectionBasis;
-
-      // Clear pin/override for automatic groups (url-test / fallback / smart).
-      const resumeAutoBtn = el(
-        "button",
-        {
-          className: "btn-resume-auto",
-          title: "恢复自动选择",
-          "aria-label": "恢复自动选择",
-          dataset: { group: group.name },
-          onClick: async (e) => {
-            e.stopPropagation();
-            await resumeAutomaticSelection(group.name);
-          },
-        },
-        createPinOffIcon(13),
-      );
-      resumeAutoBtn.hidden = !isOverridden;
 
       const hiddenBadge = group.hidden
         ? el(
@@ -2285,17 +2207,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           )
         : null;
 
-      const overrideBadge = el(
-        "span",
-        {
-          className: "override-kind-badge",
-          title: "已手动固定节点",
-          "aria-label": "已固定",
-        },
-        createPinIcon(11),
-      );
-      overrideBadge.hidden = !isOverridden;
-
       const headerEl = el(
         "div",
         { className: "group-header" },
@@ -2305,17 +2216,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           svgIcon,
           el("span", { className: "group-name" }, group.name),
           el("span", { className: "group-kind-badge" }, formatMemberType(group.kind || "select")),
-          overrideBadge,
           hiddenBadge,
         ),
-        el(
-          "div",
-          { className: "group-summary" },
-          selectedSummaryEl,
-          selectionBasisEl,
-          resumeAutoBtn,
-          testBtn,
-        ),
+        el("div", { className: "group-summary" }, selectedSummaryEl, testBtn),
       );
 
       // Members List
@@ -2418,7 +2321,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
 
       headerEl.addEventListener("click", (e) => {
-        if (e.target.closest(".btn-test-group, .btn-resume-auto")) return;
+        if (e.target.closest(".btn-test-group")) return;
         toggleExpand();
       });
 
@@ -2472,22 +2375,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selectedSummary = groupCard.querySelector(".current-selected");
     if (selectedSummary) {
       selectedSummary.textContent = memberName;
-      selectedSummary.classList.toggle("pinned", isOverridden);
-      selectedSummary.title = isOverridden
-        ? `已固定: ${memberName}（点击图钉可恢复自动选择）`
-        : memberName;
+      selectedSummary.title = memberName;
     }
-    const selectionBasis = groupSelectionBasisLabel(group.selection_basis);
-    const selectionBasisEl = groupCard.querySelector(".selection-basis-badge");
-    if (selectionBasisEl) {
-      selectionBasisEl.textContent = selectionBasis;
-      selectionBasisEl.title = selectionBasis;
-      selectionBasisEl.hidden = !selectionBasis;
-    }
-    const resumeAutoBtn = groupCard.querySelector(".btn-resume-auto");
-    if (resumeAutoBtn) resumeAutoBtn.hidden = !isOverridden;
-    const overrideBadge = groupCard.querySelector(".override-kind-badge");
-    if (overrideBadge) overrideBadge.hidden = !isOverridden;
   }
 
   async function selectMember(groupName, memberName) {
