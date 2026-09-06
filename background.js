@@ -22,6 +22,7 @@ const STATUS_PROBE_TIMEOUT_MS = 2500;
 const HEALTH_OFFSCREEN_PATH = 'offscreen.html';
 const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
 const groupTestPollTimers = new Map();
+const groupTestOperations = new Map();
 let trafficWatchPorts = 0;
 let healthReconcileInFlight = false;
 let isWindowFocused = true;
@@ -256,7 +257,22 @@ async function findInstance(instanceId) {
   return instance;
 }
 
-async function startGroupTestTask(instanceId, groupName, memberName) {
+function serializeGroupTestOperation(instanceId, operation) {
+  const previous = groupTestOperations.get(instanceId) || Promise.resolve();
+  const current = previous.catch(() => {}).then(operation);
+  groupTestOperations.set(instanceId, current);
+  return current.finally(() => {
+    if (groupTestOperations.get(instanceId) === current) groupTestOperations.delete(instanceId);
+  });
+}
+
+function startGroupTestTask(instanceId, groupName, memberName) {
+  return serializeGroupTestOperation(instanceId, () =>
+    startGroupTestTaskInner(instanceId, groupName, memberName)
+  );
+}
+
+async function startGroupTestTaskInner(instanceId, groupName, memberName) {
   if (!groupName) throw new Error('Policy group is required');
   const instance = await findInstance(instanceId);
   const result = await SpikeApiClient.startGroupTest(instance, groupName, memberName || undefined);
@@ -272,7 +288,13 @@ async function startGroupTestTask(instanceId, groupName, memberName) {
   return result;
 }
 
-async function cancelGroupTestTask(instanceId, taskId) {
+function cancelGroupTestTask(instanceId, taskId) {
+  return serializeGroupTestOperation(instanceId, () =>
+    cancelGroupTestTaskInner(instanceId, taskId)
+  );
+}
+
+async function cancelGroupTestTaskInner(instanceId, taskId) {
   const id = Number(taskId);
   if (!Number.isSafeInteger(id) || id < 1) throw new Error('Group test task is required');
 
@@ -293,14 +315,19 @@ async function cancelGroupTestTask(instanceId, taskId) {
   return { task, tasks };
 }
 
-async function refreshGroupTestState(instanceId, { broadcast = false } = {}) {
+function refreshGroupTestState(instanceId, { broadcast = false } = {}) {
+  return serializeGroupTestOperation(instanceId, () =>
+    refreshGroupTestStateInner(instanceId, { broadcast })
+  );
+}
+
+async function refreshGroupTestStateInner(instanceId, { broadcast = false } = {}) {
   const instance = await findInstance(instanceId);
   let tasks;
   try {
     const response = await SpikeApiClient.getGroupTestTasks(instance, 100);
-    tasks = Array.isArray(response?.tasks)
-      ? response.tasks.slice().sort((left, right) => left.id - right.id)
-      : [];
+    const snapshots = [...(response?.tasks || []), ...(response?.active_tasks || [])];
+    tasks = mergeGroupTestTasks([], snapshots);
   } catch (error) {
     if (error?.status !== 404) throw error;
     // Legacy Core has only the synchronous endpoint. Keep any already stored
@@ -325,9 +352,30 @@ async function refreshGroupTestState(instanceId, { broadcast = false } = {}) {
 }
 
 function mergeGroupTestTasks(current, incoming) {
+  const incomingNamespaces = new Set(
+    (incoming || []).map(task => task?.task_namespace).filter(Boolean)
+  );
+  const compatibleCurrent = incomingNamespaces.size === 1
+    ? (current || []).filter(task => !task?.task_namespace || incomingNamespaces.has(task.task_namespace))
+    : (current || []);
   const byId = new Map();
-  for (const task of [...(current || []), ...(incoming || [])]) {
-    if (task && Number.isFinite(Number(task.id))) byId.set(Number(task.id), task);
+  for (const task of [...compatibleCurrent, ...(incoming || [])]) {
+    if (!task || !Number.isFinite(Number(task.id))) continue;
+    const key = `${task.task_namespace || "legacy"}:${Number(task.id)}`;
+    const previous = byId.get(key);
+    const previousSequence = Number(previous?.update_sequence || 0);
+    const incomingSequence = Number(task.update_sequence || 0);
+    const previousTerminal = terminalGroupTestStatuses.has(previous?.status);
+    const incomingTerminal = terminalGroupTestStatuses.has(task.status);
+    if (
+      previous &&
+      ((previousSequence || incomingSequence)
+        ? incomingSequence < previousSequence
+        : (previousTerminal && !incomingTerminal) || Number(task.completed || 0) < Number(previous.completed || 0))
+    ) {
+      continue;
+    }
+    byId.set(key, task);
   }
   return Array.from(byId.values())
     .sort((left, right) => Number(left.id) - Number(right.id))

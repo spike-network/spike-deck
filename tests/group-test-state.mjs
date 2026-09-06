@@ -59,13 +59,18 @@ globalThis.chrome = {
 };
 
 const { SpikeApiClient } = await import('../lib/spike-client.js');
+const { StorageManager } = await import('../lib/storage.js');
 let coreTasks = [{
   id: 41,
   group: 'Mock Group',
   member: null,
   status: 'queued',
   results: [],
-  revision: 1
+  revision: 1,
+  task_namespace: 'mock-process-1',
+  update_sequence: 1,
+  requested_member: null,
+  targets: ['Mock Node']
 }];
 
 SpikeApiClient.startGroupTest = async () => ({
@@ -78,7 +83,8 @@ SpikeApiClient.cancelGroupTestTask = async (_instance, taskId) => {
   coreTasks = [{
     ...coreTasks[0],
     status: 'cancelled',
-    revision: 2
+    cancel_requested: true,
+    update_sequence: 2
   }];
   return coreTasks[0];
 };
@@ -109,7 +115,7 @@ coreTasks = [{
   total: 1,
   completed_at_unix_ms: Date.now(),
   results: [{ member: 'Mock Node', ok: true, latency_ms: 24 }],
-  revision: 3
+  update_sequence: 3
 }];
 const completed = await refreshGroupTestState('test-instance', { broadcast: true });
 assert.equal(completed[0].status, 'completed');
@@ -117,3 +123,29 @@ assert.equal(completed[0].results[0].latency_ms, 24);
 assert.equal(storage.groupTestTasks?.['test-instance'], undefined);
 assert.equal(alarms.has('group-test-reconcile:test-instance'), false);
 assert.equal(broadcasts.at(-1).tasks[0].status, 'completed');
+
+let releaseFirstRefresh;
+let refreshCalls = 0;
+SpikeApiClient.getGroupTestTasks = async () => {
+  refreshCalls += 1;
+  if (refreshCalls === 1) {
+    await new Promise(resolve => {
+      releaseFirstRefresh = resolve;
+    });
+  }
+  return { task_namespace: 'mock-process-1', active_tasks: [], tasks: [] };
+};
+const firstRefresh = refreshGroupTestState('test-instance');
+const secondRefresh = refreshGroupTestState('test-instance');
+await new Promise(resolve => setTimeout(resolve, 0));
+assert.equal(refreshCalls, 1, 'same-instance refreshes must be serialized');
+releaseFirstRefresh();
+await Promise.all([firstRefresh, secondRefresh]);
+assert.equal(refreshCalls, 2);
+
+await Promise.all([
+  StorageManager.setGroupTestTasks('instance-a', [{ id: 1 }]),
+  StorageManager.setGroupTestTasks('instance-b', [{ id: 2 }])
+]);
+assert.equal(storage.groupTestTasks['instance-a'][0].id, 1);
+assert.equal(storage.groupTestTasks['instance-b'][0].id, 2);

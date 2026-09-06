@@ -18,6 +18,9 @@ const leafProbeResults = new Map();
 let currentGroupsData = [];
 const terminalGroupTestStatuses = new Set(["completed", "cancelled", "failed"]);
 const cancellingGroupTests = new Set();
+const submittingGroupTests = new Set();
+const groupTestTaskVersions = new Map();
+let groupTestEpoch = 0;
 
 /** Display labels for protocol / nested-group kinds (product typography, not raw slugs). */
 function formatMemberType(type) {
@@ -938,20 +941,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function handleGroupTestTask(task) {
+    if (!acceptGroupTestTask(task)) return;
     const metadata = activeGroupTests.get(task.id) || {
       groupName: task.group,
-      targetMember: task.member || null,
+      targetMember: task.requested_member || task.member || null,
       completedMembers: new Set(),
     };
     metadata.completedMembers = new Set((task.results || []).map((result) => result.member));
     activeGroupTests.set(task.id, metadata);
     if (Array.isArray(task.results) && task.results.length > 0) {
-      const recordedAt =
-        task.completed_at_unix_ms ||
-        task.started_at_unix_ms ||
-        task.created_at_unix_ms ||
-        Date.now();
-      recordProbeResults(task.results, recordedAt);
+      recordProbeResults(task.group, task.results, task.created_at_unix_ms || Date.now());
     }
     updateAllLatencyBadgesDOM();
     if (terminalGroupTestStatuses.has(task.status)) {
@@ -978,10 +977,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function refreshProbeSnapshots() {
+    const targetInstance = activeInstance;
+    const epoch = groupTestEpoch;
     try {
-      const groupsData = await SpikeApiClient.getGroups(activeInstance);
+      const groupsData = await SpikeApiClient.getGroups(targetInstance);
+      if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstance?.id) return;
       currentGroupsData = groupsData.groups || [];
       ingestPersistedMemberInfo(currentGroupsData);
+      document.querySelectorAll(".group-card").forEach((card) => {
+        const group = currentGroupsData.find((candidate) => candidate.name === card.dataset.group);
+        if (group) paintSelection(card, group);
+      });
       updateAllLatencyBadgesDOM();
     } catch {
       // Progressive task results already populated the UI; retry on refresh.
@@ -989,11 +995,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function restoreRecentGroupTests() {
+    const targetInstanceId = activeInstance.id;
+    const epoch = groupTestEpoch;
     try {
       const response = await chrome.runtime.sendMessage({
         type: "GET_GROUP_TEST_STATE",
-        instanceId: activeInstance.id,
+        instanceId: targetInstanceId,
       });
+      if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;
       if (!response?.ok) throw new Error(response?.error || "Unable to restore group tests");
       applyGroupTestState(response.tasks);
     } catch (error) {
@@ -1011,19 +1020,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       ? tasks.slice().sort((left, right) => left.id - right.id)
       : [];
     for (const task of ordered) {
-      const recordedAt =
-        task.completed_at_unix_ms ||
-        task.started_at_unix_ms ||
-        task.created_at_unix_ms ||
-        Date.now();
-      recordProbeResults(task.results, recordedAt);
+      if (!acceptGroupTestTask(task)) continue;
+      recordProbeResults(task.group, task.results, task.created_at_unix_ms || Date.now());
       if (terminalGroupTestStatuses.has(task.status)) {
         if (previousActiveIds.has(task.id)) taskSettled = true;
         continue;
       }
       activeGroupTests.set(task.id, {
         groupName: task.group,
-        targetMember: task.member || previousEntries.get(task.id)?.targetMember || null,
+        targetMember:
+          task.requested_member || task.member || previousEntries.get(task.id)?.targetMember || null,
         completedMembers: new Set((task.results || []).map((result) => result.member)),
       });
     }
@@ -1049,8 +1055,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function resetGroupTestTracking() {
+    groupTestEpoch += 1;
     activeGroupTests.clear();
     cancellingGroupTests.clear();
+    submittingGroupTests.clear();
+    groupTestTaskVersions.clear();
     syncGroupTestButtons();
     updateAllLatencyBadgesDOM();
   }
@@ -1845,21 +1854,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     setProxyControlDot("", "未接管；其他代理扩展可控制浏览器");
   }
 
-  /** Ingest member_info last_test_* fields into leafProbeResults map */
+  function probeResultKey(groupName, memberName) {
+    return `${groupName}\0${memberName}`;
+  }
+
+  function groupTestTaskKey(task) {
+    return `${task.task_namespace || "legacy"}:${task.id}`;
+  }
+
+  function acceptGroupTestTask(task) {
+    const key = groupTestTaskKey(task);
+    const previous = groupTestTaskVersions.get(key);
+    if (previous) {
+      const previousSequence = Number(previous.update_sequence || 0);
+      const nextSequence = Number(task.update_sequence || 0);
+      if (previousSequence || nextSequence) {
+        if (nextSequence < previousSequence) return false;
+      } else if (
+        (terminalGroupTestStatuses.has(previous.status) &&
+          !terminalGroupTestStatuses.has(task.status)) ||
+        Number(task.completed || 0) < Number(previous.completed || 0)
+      ) {
+        return false;
+      }
+    }
+    groupTestTaskVersions.set(key, task);
+    return true;
+  }
+
+  /** Ingest group-scoped member_info last_test_* fields. */
   function ingestPersistedMemberInfo(groups) {
     (groups || []).forEach((g) => {
       if (Array.isArray(g.member_info)) {
         g.member_info.forEach((info) => {
           if (info && info.name && typeof info.last_test_ok === "boolean") {
-            const existing = leafProbeResults.get(info.name);
+            const key = probeResultKey(g.name, info.name);
+            const existing = leafProbeResults.get(key);
             const newAt = info.last_test_at_unix_ms || 0;
             if (!existing || !existing.at || newAt >= existing.at) {
-              leafProbeResults.set(info.name, {
+              leafProbeResults.set(key, {
                 sourceMember: info.name,
                 ms: info.last_test_ms ?? null,
                 ok: info.last_test_ok === true,
                 err: info.last_test_ok ? null : "Timeout",
                 at: newAt,
+                udpOk: info.last_udp_test_ok,
+                udpMs: info.last_udp_test_ms ?? null,
               });
             }
           }
@@ -1868,16 +1908,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  function recordProbeResults(results, recordedAt = Date.now()) {
+  function recordProbeResults(groupName, results, fallbackAt = Date.now()) {
     (results || []).forEach((result) => {
-      const existing = leafProbeResults.get(result.member);
+      const key = probeResultKey(groupName, result.member);
+      const recordedAt = result.tested_at_unix_ms || fallbackAt;
+      const existing = leafProbeResults.get(key);
       if (existing && existing.at && recordedAt < existing.at) return;
-      leafProbeResults.set(result.member, {
+      leafProbeResults.set(key, {
         sourceMember: result.member,
         ms: result.latency_ms ?? null,
         ok: result.ok === true,
         err: result.error || (result.ok ? null : "Timeout"),
         at: recordedAt,
+        udpOk: result.udp_ok,
+        udpMs: result.udp_latency_ms ?? null,
+        udpErr: result.udp_error || null,
       });
     });
   }
@@ -2076,49 +2121,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  /**
-   * Resolve latency information for any member (leaf node or sub-group).
-   * Supports recursive lookup for nested policy groups.
-   */
-  function resolveMemberLatency(memberName, visited = new Set(), depth = 0) {
-    // 1. Direct leaf node match
-    const directResult = leafProbeResults.get(memberName);
-    if (directResult) return directResult;
-
-    if (depth >= 64) return null;
-
-    // 2. Sub-group match
-    const memberIdentity = memberName.toLocaleLowerCase();
-    const subGroup = currentGroupsData.find((g) => g.name.toLocaleLowerCase() === memberIdentity);
-    if (!subGroup) return null;
-    const groupIdentity = subGroup.name.toLocaleLowerCase();
-    if (visited.has(groupIdentity)) return null;
-    const nextVisited = new Set(visited);
-    nextVisited.add(groupIdentity);
-
-    // 2a. Check latency of current selected member of subGroup
-    const selectedMember =
-      subGroup.override_member || subGroup.selected || (subGroup.members && subGroup.members[0]);
-    if (selectedMember && selectedMember.toLocaleLowerCase() !== memberIdentity) {
-      const selectedRes = resolveMemberLatency(selectedMember, nextVisited, depth + 1);
-      if (selectedRes) return selectedRes;
-    }
-
-    // 2b. Fallback to best (lowest RTT) member latency in subGroup
-    let bestResult = null;
-    (subGroup.members || []).forEach((child) => {
-      if (child.toLocaleLowerCase() === memberIdentity) return;
-      const res = resolveMemberLatency(child, nextVisited, depth + 1);
-      if (res && res.ok && typeof res.ms === "number") {
-        if (!bestResult || !bestResult.ok || bestResult.ms === null || res.ms < bestResult.ms) {
-          bestResult = res;
-        }
-      } else if (res && !bestResult) {
-        bestResult = res;
-      }
-    });
-
-    return bestResult;
+  function resolveMemberLatency(groupName, memberName) {
+    return leafProbeResults.get(probeResultKey(groupName, memberName)) || null;
   }
 
   // Render Policy Groups
@@ -2248,7 +2252,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const subGroupTarget = currentGroupsData.find((g) => g.name === member);
 
         // Resolve latency for leaf node or sub-group
-        const latencyInfo = resolveMemberLatency(member);
+        const latencyInfo = resolveMemberLatency(group.name, member);
 
         const checkMark = el("span", { className: "check-mark" }, isSelected ? "✓" : "");
         const memberNameEl = el("span", { className: "member-name" }, member);
@@ -2453,18 +2457,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (taskIds.length === 0) return;
 
     cancellingGroupTests.add(groupName);
+    const targetInstanceId = activeInstance.id;
+    const epoch = groupTestEpoch;
     syncGroupTestButtons();
     try {
       for (const taskId of taskIds) {
         const result = await chrome.runtime.sendMessage({
           type: "CANCEL_GROUP_TEST",
-          instanceId: activeInstance.id,
+          instanceId: targetInstanceId,
           taskId,
         });
         if (!result?.ok) throw new Error(result?.error || "Unable to cancel group test");
+        if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;
         applyGroupTestState(result.tasks);
       }
-      showToast("测速任务已取消", "success");
+      showToast("已请求取消测速任务", "success");
     } catch (err) {
       showToast(`取消测速失败: ${err.message || err}`, "error");
       await restoreRecentGroupTests();
@@ -2475,6 +2482,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function runTestGroup(groupName, targetMember = null) {
+    const operationKey = `${groupName}\0${targetMember || "*"}`;
+    if (submittingGroupTests.has(operationKey)) return;
+    const duplicate = Array.from(activeGroupTests.values()).some(
+      (task) => task.groupName === groupName && (task.targetMember || null) === targetMember,
+    );
+    if (duplicate) return;
+    submittingGroupTests.add(operationKey);
+    const targetInstanceId = activeInstance.id;
+    const epoch = groupTestEpoch;
     const testBtn = document.querySelector(
       `.btn-test-group[data-group="${CSS.escape(groupName)}"]`,
     );
@@ -2488,10 +2504,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const result = await chrome.runtime.sendMessage({
         type: "START_GROUP_TEST",
-        instanceId: activeInstance.id,
+        instanceId: targetInstanceId,
         groupName,
         memberName: targetMember,
       });
+      if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;
       if (!result?.ok) throw new Error(result?.error || "Unable to start group test");
       if (result.mode === "async") {
         asyncTaskStarted = true;
@@ -2502,21 +2519,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
         handleGroupTestTask(result.task);
       } else {
-        recordProbeResults(result.results);
+        recordProbeResults(groupName, result.results);
         updateAllLatencyBadgesDOM();
       }
     } catch (err) {
+      if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;
       console.error(`Group test failed: ${err.message}`);
-      // Mark as error if failed
-      if (targetMember) {
-        leafProbeResults.set(targetMember, {
-          ok: false,
-          err: "Failed",
-          at: Date.now(),
-        });
-      }
+      showToast(`无法启动测速: ${err.message || err}`, "error");
       updateAllLatencyBadgesDOM();
     } finally {
+      submittingGroupTests.delete(operationKey);
       if (!asyncTaskStarted && testBtn) testBtn.classList.remove("testing");
     }
   }
@@ -2553,7 +2565,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const badgeEl = memberItem.querySelector(".latency-badge");
       if (!groupName || !member || !badgeEl) return;
 
-      const latData = resolveMemberLatency(member);
+      const latData = resolveMemberLatency(groupName, member);
       const pending = memberProbeIsPending(groupName, member, latData);
       // Avoid rebuilding spinner DOM every poll tick while still testing.
       if (
@@ -2579,14 +2591,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const subGroupTarget = currentGroupsData.find((g) => g.name === member);
+    const udpSummary =
+      latInfo?.udpOk === true
+        ? ` · UDP ${typeof latInfo.udpMs === "number" ? `${latInfo.udpMs}ms` : "ok"}`
+        : latInfo?.udpOk === false
+          ? ` · UDP ${latInfo.udpErr || "failed"}`
+          : "";
     if (hasLatencyResult(latInfo) && !latInfo.ok) {
       // Failure reason only in native tooltip; badge shows a red "F".
-      badgeEl.title = latInfo.err || "Timeout";
+      badgeEl.title = `${latInfo.err || "Timeout"}${udpSummary}`;
     } else if (subGroupTarget) {
       const subSel = subGroupTarget.override_member || subGroupTarget.selected;
       badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ""} - 点击测试`;
     } else if (hasLatencyResult(latInfo) && latInfo.at) {
-      badgeEl.title = `测试时间: ${new Date(latInfo.at).toLocaleTimeString()} - 点击重新测试`;
+      badgeEl.title = `测试时间: ${new Date(latInfo.at).toLocaleTimeString()}${udpSummary} - 点击重新测试`;
     } else {
       badgeEl.title = "点击单独测试该节点";
     }
