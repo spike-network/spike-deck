@@ -1,4 +1,4 @@
-.PHONY: all icons package screenshots store-upload store-submit store-release store-status store-cancel clean help
+.PHONY: all icons package screenshots screenshots-setup screenshots-check store-upload store-submit store-release store-status store-cancel clean help
 
 NAME := spikedeck
 MANIFEST := manifest.json
@@ -27,7 +27,9 @@ icons:
 
 help:
 	@echo "make package         Chrome Web Store zip -> $(ZIP)"
-	@echo "make screenshots     1280x800 store screenshots in store/"
+	@echo "make screenshots-setup  install pinned screenshot tools and Chromium"
+	@echo "make screenshots     1280x800 store screenshots in dist/screenshots/"
+	@echo "make screenshots-check  UI layout checks in dist/ui-check/"
 	@echo "make store-upload    upload $(ZIP) to the existing CWS item"
 	@echo "make store-submit    submit the current CWS draft for review"
 	@echo "make store-release   package + upload + submit for review"
@@ -42,7 +44,14 @@ package:
 	@echo "wrote $(ZIP)"
 
 screenshots:
-	bash store/capture.sh
+	node store/capture.mjs
+
+screenshots-setup:
+	npm ci --prefix store
+	cd store && npx playwright install chromium
+
+screenshots-check:
+	node store/capture.mjs --check
 
 store-upload: package
 	bash scripts/cws.sh upload
