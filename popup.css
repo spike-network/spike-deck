@@ -126,23 +126,28 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: block;
 }
 
 .title-group {
   display: flex;
   flex-direction: column;
+  gap: 1px;
 }
 
 .title {
   font-family: var(--sd-font);
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 18px;
   letter-spacing: 0;
   color: var(--text-main);
 }
@@ -151,13 +156,15 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 15px;
   color: var(--text-muted);
 }
 
 .status-dot {
   width: 6px;
   height: 6px;
+  flex-shrink: 0;
   border-radius: 50%;
   background-color: var(--status-offline);
   box-shadow: none;

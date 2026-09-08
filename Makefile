@@ -1,4 +1,4 @@
-.PHONY: all package screenshots store-upload store-submit store-release store-status store-cancel clean help
+.PHONY: all icons package screenshots store-upload store-submit store-release store-status store-cancel clean help
 
 NAME := spikedeck
 MANIFEST := manifest.json
@@ -19,6 +19,11 @@ PACK_FILES := \
 	_locales
 
 all: package
+
+icons:
+	rsvg-convert -w 16 -h 16 icons/icon.svg -o icons/icon16.png
+	rsvg-convert -w 48 -h 48 icons/icon.svg -o icons/icon48.png
+	rsvg-convert -w 128 -h 128 icons/icon.svg -o icons/icon128.png
 
 help:
 	@echo "make package         Chrome Web Store zip -> $(ZIP)"
