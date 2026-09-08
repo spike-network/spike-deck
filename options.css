@@ -26,7 +26,9 @@
 :root {
   color-scheme: light;
 }
-:root[data-spike-theme="dark"] { color-scheme: dark; }
+:root[data-spike-theme="dark"] {
+  color-scheme: dark;
+}
 
 * {
   box-sizing: border-box;
@@ -94,10 +96,49 @@ h1 {
   font-size: 13px;
 }
 
-.options-main {
+.instances-layout {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 20px;
+}
+
+.options-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--sd-line);
+  margin-bottom: 20px;
+}
+
+.options-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 10px 0;
+  background: transparent;
+  color: var(--sd-muted);
+  font: 600 16px/1.5 var(--sd-font);
+  cursor: pointer;
+}
+
+.options-tab[aria-selected="true"] {
+  color: var(--sd-accent);
+  border-bottom-color: var(--sd-accent);
+}
+
+.options-main [role="tabpanel"][hidden] {
+  display: none;
+}
+
+#options-global {
+  max-width: 720px;
+}
+
+.preference-form > .theme-switcher {
+  margin-bottom: 16px;
+}
+
+.options-page [role="tabpanel"] > .panel {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .panel {
@@ -250,7 +291,12 @@ label {
   color: var(--text-muted);
 }
 
-input[type="text"], input[type="url"], input[type="password"], input[type="number"], .number-input, .select-input {
+input[type="text"],
+input[type="url"],
+input[type="password"],
+input[type="number"],
+.number-input,
+.select-input {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   color: var(--text-main);

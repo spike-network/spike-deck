@@ -1,4 +1,5 @@
 import { StorageManager } from "./lib/storage.js";
+import { initializeOptionsTabs } from "./lib/options-tabs.js";
 import { SpikeApiClient } from "./lib/spike-client.js";
 import { ensureHostPermission } from "./lib/permissions.js";
 import {
@@ -14,6 +15,7 @@ import {
 } from "./lib/i18n.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
+  initializeOptionsTabs(document, window);
   await initializeI18n();
   await StorageManager.init();
 

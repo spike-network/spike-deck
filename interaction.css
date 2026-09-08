@@ -201,7 +201,7 @@ html.i18n-pending {
     gap: 14px;
   }
 
-  .options-page .options-main {
+  .options-page .instances-layout {
     grid-template-columns: 1fr;
     gap: 14px;
   }
