@@ -14,7 +14,7 @@ No running Core, extension installation, user browser profile, or real credentia
 
 ## Outputs
 
-- `dist/screenshots/`: twelve 1280x800 store images, six scenes in light and dark themes, Chinese text.
+- `dist/screenshots/`: twelve 1280x800 24-bit RGB store images (no alpha), six scenes in light and dark themes, Chinese text.
 - `dist/ui-check/`: thirty-two native viewport images, light/dark and Chinese/English; popup at 415x600, options at 320/1200px wide.
 - Each directory includes `report.json` with the browser version and measured layout.
 

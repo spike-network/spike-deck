@@ -203,7 +203,12 @@ async function capture(browser, scene, theme, language, width, staging) {
         Math.floor((1280 - shot.width) / 2),
         Math.floor((800 - shot.height) / 2),
       );
-      result = PNG.sync.write(canvas);
+      result = PNG.sync.write(canvas, {
+        colorType: 2,
+        inputColorType: 6,
+        inputHasAlpha: true,
+      });
+      assert.equal(result[25], 2, "Store screenshots must be 24-bit RGB");
     }
     const name = `${scene.name}-${theme}-${language}-${width}.png`;
     await writeFile(resolve(staging, name), result);
