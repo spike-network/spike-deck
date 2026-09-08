@@ -1382,9 +1382,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       ]);
       const summary = summarizeCurrentSite(target, route, connections);
       currentSiteResult.replaceChildren(
-        el("span", {}, "预期："),
+        el("span", {}, summary.resolutionError ? "预期（解析失败）：" : "预期："),
         el("strong", {}, summary.expectedPolicy),
         el("span", {}, ` · 规则：${summary.rule}`),
+        ...(summary.resolutionError
+          ? [el("br"), el("span", { className: "current-site-warning" }, summary.resolutionError)]
+          : []),
         el("br"),
         el("span", {}, "现有连接："),
         el("strong", {}, summary.actualPolicy),
