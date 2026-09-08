@@ -1161,6 +1161,7 @@ input:checked + .slider::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 9px 12px;
   cursor: pointer;
   background: var(--panel-bg);
@@ -1170,11 +1171,15 @@ input:checked + .slider::before {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 55%;
+  flex-wrap: wrap;
 }
 
 .expand-icon {
   width: 12px;
   height: 12px;
+  flex-shrink: 0;
   transition: transform 0.2s ease;
   color: var(--text-muted);
 }
@@ -1184,6 +1189,8 @@ input:checked + .slider::before {
 }
 
 .group-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-family: var(--sd-font);
   font-weight: 590;
   font-size: 13px;
@@ -1205,20 +1212,26 @@ input:checked + .slider::before {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.group-summary > button {
+  flex-shrink: 0;
 }
 
 .current-selected {
   font-size: 13px;
   color: var(--accent-cyan);
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .current-selected.pinned {
   color: var(--pin);
-  max-width: 100px;
 }
 
 .selection-basis-badge {
@@ -1360,7 +1373,7 @@ input:checked + .slider::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 12px 7px 26px;
+  padding: 7px 12px;
   cursor: pointer;
   font-size: 13px;
   color: var(--text-main);
@@ -1408,6 +1421,7 @@ input:checked + .slider::before {
 
 .check-mark {
   width: 14px;
+  flex-shrink: 0;
   text-align: center;
   font-weight: 600;
   color: var(--primary-color);

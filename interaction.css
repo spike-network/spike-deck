@@ -159,8 +159,7 @@ html.i18n-pending {
     padding-inline: 8px;
   }
 
-  .popup-page .quick-tab-value,
-  .popup-page .current-selected {
+  .popup-page .quick-tab-value {
     max-width: 82px;
     overflow: hidden;
     text-overflow: ellipsis;

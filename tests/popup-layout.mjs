@@ -40,3 +40,10 @@ assert.match(sizing, /const MAX_PX = 600;/);
 assert.match(sizing, /requestAnimationFrame\(reveal\);/);
 
 console.log("popup layout tests passed");
+const memberRule = css.match(/\.member-item\s*\{([^}]+)\}/)[1];
+assert.match(memberRule, /padding:\s*7px 12px;/);
+const selectedRule = css.match(/\.current-selected\s*\{([^}]+)\}/)[1];
+assert.match(selectedRule, /white-space:\s*normal;/);
+assert.match(selectedRule, /overflow-wrap:\s*anywhere;/);
+assert.doesNotMatch(selectedRule, /max-width:|text-overflow:/);
+assert.doesNotMatch(interaction, /\.popup-page \.current-selected/);
