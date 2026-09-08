@@ -54,6 +54,7 @@
 
 html {
   width: 410px;
+  min-width: 410px;
   max-width: 410px;
   height: var(--popup-max-height, 600px);
   max-height: var(--popup-max-height, 600px);
@@ -66,6 +67,7 @@ html.popup-sizing {
 
 body {
   width: 410px;
+  min-width: 410px;
   max-width: 410px;
   height: var(--popup-max-height, 600px);
   max-height: var(--popup-max-height, 600px);
@@ -73,9 +75,7 @@ body {
   color: var(--text-main);
   font-family: var(--sd-font);
   font-size: 13px;
-  overflow-x: hidden;
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
+  overflow: hidden;
 }
 
 /* Custom Scrollbar */
@@ -99,9 +99,18 @@ body {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  min-height: 100%;
+  /* Keep scrolling inside the fixed popup viewport, out of host autosizing. */
+  height: 100%;
+  contain: size;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
   padding: 12px;
   gap: 10px;
+}
+
+.container > * {
+  flex-shrink: 0;
 }
 
 /* Header */

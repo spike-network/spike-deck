@@ -61,7 +61,7 @@ for (const page of ["popup", "options", "tools"]) {
     "utf8",
   );
   assert.ok(html.includes('src="theme.js"'));
-  assert.ok(html.includes("data-spike-theme-control"));
+  assert.equal(html.includes("data-spike-theme-control"), page === "options");
   assert.ok(
     readFileSync(new URL(`../${page}.css`, import.meta.url), "utf8").includes(
       '@import url("design-tokens.css")',

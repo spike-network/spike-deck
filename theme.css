@@ -55,9 +55,6 @@ textarea {
 .popup-page .header-actions {
   flex-wrap: wrap;
 }
-.popup-page .theme-switcher {
-  justify-content: flex-end;
-}
 body {
   font-variant-numeric: tabular-nums;
 }
