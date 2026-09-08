@@ -3,7 +3,7 @@ import { SpikeApiClient } from "./lib/spike-client.js";
 import { activeTabTarget, summarizeCurrentSite } from "./lib/current-site.js";
 import { ensureHostPermission } from "./lib/permissions.js";
 import { proxyListenerSummary, proxyListenersFromStatus } from "./lib/proxy-listeners.js";
-import { formatByteCount, formatRate } from "./lib/format-rate.js";
+import { formatByteCount, formatRate, formatCompactByteCount } from "./lib/format-rate.js";
 import {
   hiddenGroupsModeLabel,
   nextHiddenGroupsMode,
@@ -1773,14 +1773,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!traffic) {
       trafficDown.textContent = "↓ —";
       trafficUp.textContent = "↑ —";
+      trafficDown.removeAttribute("title");
+      trafficUp.removeAttribute("title");
       trafficTotal.textContent = "";
       trafficTotal.removeAttribute("title");
       return;
     }
-    trafficDown.textContent = `↓ ${formatRate(traffic.download_bytes_per_second)}`;
-    trafficUp.textContent = `↑ ${formatRate(traffic.upload_bytes_per_second)}`;
-    trafficTotal.textContent = `${formatByteCount(traffic.download_bytes_total)} / ${formatByteCount(traffic.upload_bytes_total)}`;
-    trafficTotal.title = trafficTotal.textContent;
+    trafficDown.textContent = `↓${formatCompactByteCount(traffic.download_bytes_per_second)}/s`;
+    trafficUp.textContent = `↑${formatCompactByteCount(traffic.upload_bytes_per_second)}/s`;
+    trafficDown.title = `↓ ${formatRate(traffic.download_bytes_per_second)}`;
+    trafficUp.title = `↑ ${formatRate(traffic.upload_bytes_per_second)}`;
+    trafficTotal.textContent = `${formatCompactByteCount(traffic.download_bytes_total)}/${formatCompactByteCount(traffic.upload_bytes_total)}`;
+    trafficTotal.title = `↓ ${formatByteCount(traffic.download_bytes_total)} · ↑ ${formatByteCount(traffic.upload_bytes_total)}`;
   }
 
   function publishTrafficSample(traffic, error) {

@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
-import { badgeTraffic, formatBadgeRate, formatByteCount, formatRate, trafficTitle } from '../lib/format-rate.js';
+import { badgeTraffic, formatBadgeRate, formatByteCount, formatRate, trafficTitle, formatCompactByteCount } from '../lib/format-rate.js';
+
+assert.equal(formatCompactByteCount(555), '555B');
+assert.equal(formatCompactByteCount(1.2 * 1024), '1.2KB');
+assert.equal(formatCompactByteCount(164.9 * 1024 ** 2), '165MB');
+assert.equal(formatCompactByteCount(99.99 * 1024), '100KB');
+assert.equal(formatCompactByteCount(1.2 * 1024 ** 3), '1.2GB');
+for (const value of [0, -1, NaN, Infinity, 999.5, 1023, 1024, 99.94 * 1024, 99.99 * 1024, 999.5 * 1024, 1024 ** 4, Number.MAX_VALUE]) {
+  assert.ok(formatCompactByteCount(value).length <= 6);
+}
 
 assert.equal(formatByteCount(0), '0 B');
 assert.equal(formatByteCount(512), '512 B');

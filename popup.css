@@ -829,23 +829,23 @@ input:checked + .slider::before {
 }
 
 .traffic-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 9ch 9ch 13ch;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
   flex: 1;
-  justify-content: flex-end;
-  flex-wrap: nowrap;
-  overflow: hidden;
   font-family: var(--sd-mono);
-  font-size: 13px;
+  font-size: 12px;
+  justify-content: end;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .traffic-down,
 .traffic-up {
-  flex-shrink: 0;
+  min-width: 0;
+  text-align: right;
   white-space: nowrap;
 }
 
@@ -860,9 +860,17 @@ input:checked + .slider::before {
 .traffic-total {
   min-width: 0;
   color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: right;
   white-space: nowrap;
+}
+
+.status-bar-main .switch-label {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.traffic-total:empty {
+  display: none;
 }
 
 .badge {
