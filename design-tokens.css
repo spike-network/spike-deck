@@ -1,0 +1,62 @@
+/* Generated from Spike ui/design/tokens.json v1; do not edit. */
+:root {
+  --sd-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sd-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sd-text-body: 14px;
+  --sd-text-small: 13px;
+  --sd-text-title: 24px;
+  --sd-text-section: 16px;
+  --sd-control-height: 32px;
+  --sd-touch-height: 44px;
+  --sd-radius: 6px;
+  --sd-space-1: 4px;
+  --sd-space-2: 8px;
+  --sd-space-3: 12px;
+  --sd-space-4: 16px;
+  --sd-space-6: 24px;
+  --sd-canvas: #f3f5f6;
+  --sd-surface: #ffffff;
+  --sd-surface-alt: #f5f7f8;
+  --sd-hover: #e9edef;
+  --sd-text: #202427;
+  --sd-muted: #58616a;
+  --sd-line: #dce1e5;
+  --sd-control-line: #a6afb7;
+  --sd-accent: #08786f;
+  --sd-accent-hover: #06635c;
+  --sd-selected: #e8f4f1;
+  --sd-on-accent: #ffffff;
+  --sd-success: #237447;
+  --sd-success-soft: #eaf5ee;
+  --sd-warning: #85500e;
+  --sd-warning-soft: #fff3dd;
+  --sd-danger: #b42332;
+  --sd-danger-soft: #fceced;
+  --sd-info: #326b9b;
+  --sd-info-soft: #eaf2fa;
+  --sd-overlay: rgba(0, 0, 0, 0.4);
+}
+:root[data-spike-theme="dark"],
+:root.spike-theme-dark {
+  --sd-canvas: #191c1f;
+  --sd-surface: #202326;
+  --sd-surface-alt: #292d31;
+  --sd-hover: #343a40;
+  --sd-text: #e5e9ec;
+  --sd-muted: #aab3bc;
+  --sd-line: #41474d;
+  --sd-control-line: #68727c;
+  --sd-accent: #65d1c2;
+  --sd-accent-hover: #8adfd3;
+  --sd-selected: #263f3c;
+  --sd-on-accent: #112d29;
+  --sd-success: #87d6a5;
+  --sd-success-soft: #243c2e;
+  --sd-warning: #e9b461;
+  --sd-warning-soft: #413321;
+  --sd-danger: #ff9ba5;
+  --sd-danger-soft: #492e34;
+  --sd-info: #91c2ec;
+  --sd-info-soft: #25384b;
+  --sd-overlay: rgba(0, 0, 0, 0.65);
+}

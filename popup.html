@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SpikeDeck - Spike Proxy Manager</title>
   <script src="popup-max-height.js"></script>
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="popup.css">
   <link rel="stylesheet" href="interaction.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body class="popup-page">
   <div class="container">
@@ -70,6 +72,11 @@
         </button>
       </div>
     </header>
+    <label class="theme-switcher">外观
+      <select data-spike-theme-control aria-label="外观">
+        <option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option>
+      </select>
+    </label>
 
     <section id="modules-panel" class="providers-panel" hidden aria-labelledby="modules-panel-title">
       <div class="providers-panel-header">

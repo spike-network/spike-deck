@@ -35,9 +35,9 @@ html.i18n-pending {
 .popup-page .runtime-task-title {
   margin-bottom: 6px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -58,7 +58,7 @@ html.i18n-pending {
 .popup-page .runtime-task-item,
 .popup-page .interaction-banner {
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .popup-page .btn-task-action {
@@ -79,7 +79,7 @@ html.i18n-pending {
 .popup-page .filter-summary {
   padding: 4px 2px 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 13px;
   text-align: right;
 }
 
@@ -102,7 +102,7 @@ html.i18n-pending {
   display: block;
   margin: 7px 0 3px;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 13px;
   text-align: right;
 }
 

@@ -6,10 +6,17 @@
     <title>SpikeDeck 设置 - 实例管理</title>
     <link rel="stylesheet" href="options.css" />
     <link rel="stylesheet" href="interaction.css" />
+    <link rel="stylesheet" href="theme.css" />
+    <script src="theme.js"></script>
   </head>
   <body class="options-page">
     <div class="options-container">
       <header class="options-header">
+        <label class="theme-switcher">外观
+          <select data-spike-theme-control aria-label="外观">
+            <option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option>
+          </select>
+        </label>
         <div class="brand">
           <img src="icons/icon48.png" alt="Logo" class="logo" />
           <div>

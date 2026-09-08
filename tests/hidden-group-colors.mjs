@@ -10,7 +10,7 @@ assert.match(
 );
 assert.match(
   css,
-  /\.hidden-kind-badge\s*\{[\s\S]*?background:\s*rgba\(255, 255, 255, 0\.05\);[\s\S]*?color:\s*var\(--text-dim\);/,
+  /\.hidden-kind-badge\s*\{[\s\S]*?background:\s*var\(--sd-surface-alt\);[\s\S]*?color:\s*var\(--text-dim\);/,
 );
 
 console.log("hidden group color tests passed");

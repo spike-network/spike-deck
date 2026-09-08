@@ -13,6 +13,7 @@ PACK_FILES := \
 	offscreen.html offscreen.js \
 	options.html options.css options.js \
 	tools.html tools.css tools.js interaction.css \
+	design-tokens.css theme.js theme.css \
 	lib \
 	icons \
 	_locales
