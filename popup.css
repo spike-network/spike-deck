@@ -53,9 +53,9 @@
 }
 
 html {
-  width: 410px;
-  min-width: 410px;
-  max-width: 410px;
+  width: 415px;
+  min-width: 415px;
+  max-width: 415px;
   height: var(--popup-max-height, 600px);
   max-height: var(--popup-max-height, 600px);
   overflow: hidden;
@@ -66,9 +66,9 @@ html.popup-sizing {
 }
 
 body {
-  width: 410px;
-  min-width: 410px;
-  max-width: 410px;
+  width: 415px;
+  min-width: 415px;
+  max-width: 415px;
   height: var(--popup-max-height, 600px);
   max-height: var(--popup-max-height, 600px);
   background-color: var(--bg-color);
@@ -540,7 +540,7 @@ body {
 
 .quick-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 4px;
 }
 

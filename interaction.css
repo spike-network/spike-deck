@@ -136,12 +136,6 @@ html.i18n-pending {
 }
 
 @media (max-width: 420px) {
-  html:has(.popup-page),
-  body.popup-page {
-    width: 100%;
-    min-width: 320px;
-  }
-
   .popup-page .container {
     padding: 10px;
   }
