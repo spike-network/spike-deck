@@ -343,6 +343,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnFilter = document.getElementById("btn-filter");
   const btnFilterClear = document.getElementById("btn-filter-clear");
   const btnCurrentSiteCheck = document.getElementById("btn-current-site-check");
+  const btnCurrentSiteToggle = document.getElementById("btn-current-site-toggle");
+  const currentSitePanel = document.getElementById("current-site-panel");
   const currentSiteHost = document.getElementById("current-site-host");
   const currentSiteResult = document.getElementById("current-site-result");
 
@@ -1349,6 +1351,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
       loadDashboard();
     }
+  });
+
+  btnCurrentSiteToggle.addEventListener("click", () => {
+    currentSitePanel.hidden = !currentSitePanel.hidden;
+    btnCurrentSiteToggle.setAttribute("aria-expanded", String(!currentSitePanel.hidden));
+    if (!currentSitePanel.hidden) btnCurrentSiteCheck.click();
   });
 
   btnCurrentSiteCheck.addEventListener("click", async () => {

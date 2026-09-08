@@ -26,34 +26,31 @@
       </div>
       
       <div class="header-actions">
-        <button id="btn-modules" class="icon-btn modules-btn" title="模块" aria-label="模块" aria-expanded="false" aria-controls="modules-panel">
+        <button id="btn-refresh" class="icon-btn" title="刷新列表">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
+            <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+            <polyline points="21 3 21 9 15 9"></polyline>
+          </svg>
+        </button>
+        <button id="btn-current-site-toggle" class="icon-btn" title="当前网站线路" aria-label="当前网站线路" aria-expanded="false" aria-controls="current-site-panel">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="m16.2 7.8-2.4 6-6 2.4 2.4-6 6-2.4z"></path>
           </svg>
         </button>
         <button id="btn-refresh-providers" class="icon-btn provider-refresh-btn" title="外部资源" aria-label="外部资源" aria-expanded="false" aria-controls="providers-panel">
-          <!-- Cloud + download: remote policy/ruleset sources (not a circular refresh) -->
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
             <path d="M12 12v9"></path>
             <path d="m8 17 4 4 4-4"></path>
           </svg>
         </button>
-        <button id="btn-refresh" class="icon-btn" title="刷新列表">
-          <!-- Circular arrow: reload the on-screen groups list -->
+        <button id="btn-modules" class="icon-btn modules-btn" title="模块" aria-label="模块" aria-expanded="false" aria-controls="modules-panel">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
-            <polyline points="21 3 21 9 15 9"></polyline>
-          </svg>
-        </button>
-        <button id="btn-embedded-ui" class="icon-btn" title="打开控制台" aria-label="打开控制台">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <line x1="10" y1="14" x2="21" y2="3"></line>
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
           </svg>
         </button>
         <a href="tools.html" target="_blank" class="icon-btn" title="运行工具" aria-label="运行工具">
@@ -64,6 +61,13 @@
             <path d="m14 10 6.5 6.5a2.1 2.1 0 0 1-3 3L11 13"></path>
           </svg>
         </a>
+        <button id="btn-embedded-ui" class="icon-btn" title="打开控制台" aria-label="打开控制台">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </button>
         <button id="btn-options" class="icon-btn" title="管理实例与设置">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
             <circle cx="12" cy="12" r="3"></circle>
@@ -191,7 +195,7 @@
       </div>
     </section>
 
-    <section id="current-site-panel" class="current-site-panel" aria-labelledby="current-site-title">
+    <section id="current-site-panel" class="current-site-panel" hidden aria-labelledby="current-site-title">
       <div class="current-site-head">
         <div class="current-site-heading">
           <span id="current-site-title">当前网站线路</span>

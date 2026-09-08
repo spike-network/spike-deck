@@ -1605,6 +1605,10 @@ input:checked + .slider::before {
   background: var(--panel-bg);
 }
 
+.current-site-panel[hidden] {
+  display: none;
+}
+
 .current-site-head,
 .current-site-heading {
   display: flex;

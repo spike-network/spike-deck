@@ -53,7 +53,20 @@ textarea {
   gap: 8px;
 }
 .popup-page .header-actions {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+.popup-page .header-actions .icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.popup-page .header-actions .icon-btn[aria-expanded="true"] {
+  color: var(--sd-accent);
+  border-color: var(--sd-accent);
 }
 body {
   font-variant-numeric: tabular-nums;
