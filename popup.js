@@ -847,6 +847,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "div",
         {
           className: `provider-row ${rowUpdating ? "busy" : ""}`,
+          title: sourceTitle,
           dataset: { providerId: provider.id },
         },
         el(
@@ -870,7 +871,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             "div",
             {
               className: "provider-source",
-              title: sourceTitle,
             },
             providerDisplayName(provider),
           ),

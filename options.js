@@ -87,6 +87,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   void refreshPopupShortcutState();
 
   const profileExportText = document.getElementById("profile-export-text");
+  const profileExportStatus = document.getElementById("profile-export-status");
   const btnLoadProfileExport = document.getElementById(
     "btn-load-profile-export",
   );
@@ -95,17 +96,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
 
   btnLoadProfileExport.addEventListener("click", async () => {
+    profileExportText.textContent = "";
+    profileExportText.hidden = true;
     const active = await StorageManager.getActiveInstance();
     if (!active) {
-      profileExportText.textContent = "未配置实例";
+      profileExportStatus.textContent = "未配置实例";
       return;
     }
-    profileExportText.textContent = "正在加载…";
+    profileExportStatus.textContent = "正在加载…";
     try {
       const current = await SpikeApiClient.getCurrentProfile(active);
-      profileExportText.textContent = current.profile || current.error || "空";
+      profileExportText.textContent = current.profile || "";
+      profileExportText.hidden = !current.profile;
+      profileExportStatus.textContent = current.profile
+        ? ""
+        : current.error || "空";
     } catch (error) {
-      profileExportText.textContent = error.message || "加载失败";
+      profileExportStatus.textContent = error.message || "加载失败";
     }
   });
 

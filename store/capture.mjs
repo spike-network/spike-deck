@@ -175,6 +175,30 @@ async function capture(browser, scene, theme, language, width, staging) {
       );
       assert.deepEqual(layout.clippedTraffic, [], "Traffic text clipped");
     }
+    if (check && language === "en") {
+      const untranslated = await page.evaluate(() => {
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+        );
+        const result = [];
+        let node;
+        while ((node = walker.nextNode())) {
+          const element = node.parentElement;
+          if (
+            !element ||
+            !element.getClientRects().length ||
+            element.closest(
+              'pre, code, script, style, textarea, [data-i18n-ignore], option[value="zh-CN"]',
+            )
+          )
+            continue;
+          if (/\p{Script=Han}/u.test(node.data)) result.push(node.data.trim());
+        }
+        return result;
+      });
+      assert.deepEqual(untranslated, [], "Untranslated fixture UI text");
+    }
     const raw = await page.screenshot({
       animations: "disabled",
       caret: "hide",

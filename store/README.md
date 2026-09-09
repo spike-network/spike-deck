@@ -27,6 +27,7 @@ All generated files are ignored and excluded from the extension package.
 image decoding, theme, horizontal page overflow, popup dimensions, toolbar wrapping, traffic
 clipping, and nonblank pixels. This is a layout smoke test, not baseline pixel comparison or
 installed-extension/background-worker end-to-end coverage.
+English fixtures also reject visible untranslated Chinese UI text, excluding raw content and the language selector.
 
 ## Isolation And Failures
 
