@@ -11,7 +11,11 @@ import {
 } from "./lib/hidden-groups.js";
 import { initializeI18n } from "./lib/i18n.js";
 import { installPopupInteractions } from "./lib/popup-interactions.js";
-import { groupMemberAction, splitSelectedSummary } from "./lib/group-selection.js";
+import {
+  groupMemberAction,
+  shouldCollapseGroupAfterSelection,
+  splitSelectedSummary,
+} from "./lib/group-selection.js";
 
 // Global latency cache for leaf nodes by member name
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
@@ -352,6 +356,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let hiddenGroupsMode = await StorageManager.getHiddenGroupsMode();
   let groupExpandMode = await StorageManager.getGroupExpandMode();
   let groupExpandStates = await StorageManager.getGroupExpandStates();
+  const collapseGroupAfterSelection = await StorageManager.shouldCollapseGroupAfterSelection();
   const activeGroupTests = new Map();
   let providersPanelNoticeTimer = null;
   /** @type {Array<{id: string, type: string, source: string, source_kind: string, group?: string, status: string, last_updated_unix?: number, update_interval_seconds: number}>} */
@@ -2356,9 +2361,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         applyLatencyBadge(latencyBadge, latencyInfo, { member });
 
         // On automatic groups, re-clicking the pinned member clears the override.
-        const activateMember = async () => {
+        const activateMember = async (event) => {
           const currentGroup = currentGroupsData.find((candidate) => candidate.name === group.name);
           const action = groupMemberAction(currentGroup, member);
+          if (action === "none") return;
+          if (shouldCollapseGroupAfterSelection(collapseGroupAfterSelection, event)) {
+            groupCard.classList.remove("expanded");
+            headerEl.setAttribute("aria-expanded", "false");
+            void persistGroupExpandState(group.name, false);
+          }
           if (action === "auto") {
             await resumeAutomaticSelection(group.name);
             return;

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   groupMemberAction,
   groupSelectionBasisLabel,
+  shouldCollapseGroupAfterSelection,
   splitSelectedSummary,
 } from "../lib/group-selection.js";
 
@@ -22,6 +23,10 @@ assert.equal(
   "select",
 );
 assert.equal(groupMemberAction({ kind: "select", selected: "A" }, "A"), "none");
+assert.equal(shouldCollapseGroupAfterSelection(true, { altKey: false }), true);
+assert.equal(shouldCollapseGroupAfterSelection(true, { altKey: true }), false);
+assert.equal(shouldCollapseGroupAfterSelection(false, { altKey: false }), false);
+assert.equal(shouldCollapseGroupAfterSelection(true), true);
 assert.deepEqual(splitSelectedSummary("🇭🇰 香港高级 IEPL 专线 5"), {
   leading: "🇭🇰 香港高级 IEPL",
   trailing: "专线 5",
@@ -61,5 +66,7 @@ assert.match(popup, /className: "group-name",\s+title: groupType,/);
 assert.doesNotMatch(popup, /attachGroupTypeTooltip|group-type-tooltip/);
 assert.match(popup, /selectedSummaryChildren\(currentSelected\)/);
 assert.match(popup, /selectedSummary\.replaceChildren\(\.\.\.selectedSummaryChildren\(memberName\)\)/);
+assert.match(popup, /shouldCollapseGroupAfterSelection\(collapseGroupAfterSelection, event\)/);
+assert.match(popup, /persistGroupExpandState\(group\.name, false\)/);
 
 console.log("group selection tests passed");

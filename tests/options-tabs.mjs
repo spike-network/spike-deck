@@ -77,6 +77,7 @@ for (const id of [
   "pref-traffic-interval",
   "pref-expand-mode",
   "pref-hidden-mode",
+  "pref-collapse-after-selection",
 ]) {
   assert.ok(globalContent.includes(`id="${id}"`));
   assert.ok(!instanceContent.includes(`id="${id}"`));

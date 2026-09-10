@@ -41,6 +41,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const prefPopupShortcutCheckbox = document.getElementById(
     "pref-popup-shortcut",
   );
+  const prefCollapseAfterSelectionCheckbox = document.getElementById(
+    "pref-collapse-after-selection",
+  );
   const prefHealthIntervalInput = document.getElementById(
     "pref-health-interval",
   );
@@ -85,6 +88,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   prefPopupShortcutCheckbox.checked =
     await StorageManager.isPopupShortcutEnabled();
   void refreshPopupShortcutState();
+
+  prefCollapseAfterSelectionCheckbox.checked =
+    await StorageManager.shouldCollapseGroupAfterSelection();
 
   const profileExportText = document.getElementById("profile-export-text");
   const profileExportStatus = document.getElementById("profile-export-status");
@@ -147,6 +153,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   prefPopupShortcutCheckbox.addEventListener("change", async (e) => {
     await StorageManager.setPopupShortcutEnabled(e.target.checked);
     await refreshPopupShortcutState();
+  });
+
+  prefCollapseAfterSelectionCheckbox.addEventListener("change", async (e) => {
+    await StorageManager.setCollapseGroupAfterSelection(e.target.checked);
   });
 
   async function refreshPopupShortcutState() {
