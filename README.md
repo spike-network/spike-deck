@@ -107,6 +107,12 @@ npm --prefix store run check:dashboard-lifetime
 npm --prefix store run check:proxy-control
 ```
 
+外部资源更新的跨页面持久状态测试使用同样隔离的完整扩展环境；验证多实例并发、同实例重复请求合并、关闭面板不误删新任务，以及重启后的记录恢复：
+
+```bash
+npm --prefix store run check:provider-state
+```
+
 ```bash
 make package          # dist/spikedeck-<version>.zip
 make store-release    # 打包 + 上传 + 提交审核

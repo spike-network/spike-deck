@@ -632,7 +632,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!open) {
       clearProvidersPanelNotice();
       if (activeInstance && providerRefreshTask && providerRefreshTask.status !== "running") {
-        void StorageManager.setProviderRefreshTask(activeInstance.id, null);
+        void chrome.runtime.sendMessage({
+          type: "DISMISS_PROVIDER_REFRESH_TASK",
+          instanceId: activeInstance.id,
+          taskId: providerRefreshTask.id,
+        }).catch((error) => console.warn("Unable to dismiss provider task:", error));
         providerRefreshTask = null;
         handledProviderTaskState = "";
       }
