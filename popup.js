@@ -139,6 +139,90 @@ const toastHost = document.body.appendChild(
   el("div", { className: "toast-host", role: "status", "aria-live": "polite" }),
 );
 
+const GROUP_TYPE_TOOLTIP_SHOW_MS = 350;
+const GROUP_TYPE_TOOLTIP_HIDE_MS = 100;
+const groupTypeTooltip = document.body.appendChild(
+  el("div", {
+    id: "group-type-tooltip",
+    className: "ui-tooltip",
+    role: "tooltip",
+    "aria-hidden": "true",
+  }),
+);
+let tooltipShowTimer = null;
+let tooltipHideTimer = null;
+let tooltipTrigger = null;
+let keyboardInteraction = false;
+
+document.addEventListener(
+  "keydown",
+  () => {
+    keyboardInteraction = true;
+  },
+  true,
+);
+document.addEventListener(
+  "pointerdown",
+  () => {
+    keyboardInteraction = false;
+  },
+  true,
+);
+
+function hideGroupTypeTooltip(delay = 0) {
+  clearTimeout(tooltipShowTimer);
+  clearTimeout(tooltipHideTimer);
+  tooltipHideTimer = setTimeout(() => {
+    groupTypeTooltip.classList.remove("visible");
+    groupTypeTooltip.setAttribute("aria-hidden", "true");
+    tooltipTrigger?.removeAttribute("aria-describedby");
+    tooltipTrigger = null;
+  }, delay);
+}
+
+function showGroupTypeTooltip(anchor, trigger, label, delay) {
+  clearTimeout(tooltipShowTimer);
+  clearTimeout(tooltipHideTimer);
+  tooltipShowTimer = setTimeout(() => {
+    if (!anchor.isConnected || !trigger.isConnected) return;
+    tooltipTrigger = trigger;
+    groupTypeTooltip.textContent = label;
+    groupTypeTooltip.classList.add("visible");
+    groupTypeTooltip.setAttribute("aria-hidden", "false");
+    trigger.setAttribute("aria-describedby", groupTypeTooltip.id);
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const tooltipRect = groupTypeTooltip.getBoundingClientRect();
+    const left = Math.min(
+      window.innerWidth - tooltipRect.width - 8,
+      Math.max(8, anchorRect.left + (anchorRect.width - tooltipRect.width) / 2),
+    );
+    const below = anchorRect.bottom + 6;
+    const top =
+      below + tooltipRect.height <= window.innerHeight - 8
+        ? below
+        : Math.max(8, anchorRect.top - tooltipRect.height - 6);
+    groupTypeTooltip.style.left = `${left}px`;
+    groupTypeTooltip.style.top = `${top}px`;
+  }, delay);
+}
+
+function attachGroupTypeTooltip(groupName, header, label) {
+  groupName.addEventListener("mouseenter", () =>
+    showGroupTypeTooltip(groupName, header, label, GROUP_TYPE_TOOLTIP_SHOW_MS),
+  );
+  groupName.addEventListener("mouseleave", () =>
+    hideGroupTypeTooltip(GROUP_TYPE_TOOLTIP_HIDE_MS),
+  );
+  header.addEventListener("focus", () => {
+    if (keyboardInteraction) showGroupTypeTooltip(groupName, header, label, 0);
+  });
+  header.addEventListener("blur", () => hideGroupTypeTooltip(GROUP_TYPE_TOOLTIP_HIDE_MS));
+}
+
+window.addEventListener("scroll", () => hideGroupTypeTooltip(), true);
+window.addEventListener("resize", () => hideGroupTypeTooltip());
+
 function showToast(message, kind = "", timeoutMs = 2600) {
   const toast = el("div", { className: `toast ${kind}`.trim() }, message);
   toastHost.appendChild(toast);
@@ -2143,6 +2227,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Render Policy Groups
   function renderGroups(groups) {
+    hideGroupTypeTooltip();
     const normalizedFilter = groupFilterText.toLowerCase();
     const visibleGroups = visiblePolicyGroups(groups, hiddenGroupsMode);
     const filteredGroups = normalizedFilter
@@ -2255,6 +2340,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           )
         : null;
 
+      const groupType = formatMemberType(group.kind || "select");
+      const groupNameEl = el(
+        "span",
+        {
+          className: "group-name",
+          "aria-label": `${group.name}, ${groupType}`,
+        },
+        group.name,
+      );
+
       const headerEl = el(
         "div",
         { className: "group-header" },
@@ -2262,8 +2357,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           "div",
           { className: "group-title-wrapper" },
           svgIcon,
-          el("span", { className: "group-name" }, group.name),
-          el("span", { className: "group-kind-badge" }, formatMemberType(group.kind || "select")),
+          groupNameEl,
           overrideBadge,
           hiddenBadge,
         ),
@@ -2379,6 +2473,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       headerEl.setAttribute("tabindex", "0");
       headerEl.setAttribute("role", "button");
       headerEl.setAttribute("aria-expanded", String(isExpand));
+      attachGroupTypeTooltip(groupNameEl, headerEl, groupType);
 
       const toggleExpand = () => {
         groupCard.classList.toggle("expanded");

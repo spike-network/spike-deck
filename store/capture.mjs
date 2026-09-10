@@ -24,6 +24,12 @@ const origin = "http://deck.example.test";
 const scenes = [
   { name: "groups", page: "popup", ready: ".group-card" },
   {
+    name: "groups-tooltip",
+    page: "popup",
+    hover: ".group-name",
+    ready: ".ui-tooltip.visible",
+  },
+  {
     name: "mode",
     page: "popup",
     click: "#btn-quick-outbound",
@@ -131,6 +137,7 @@ async function capture(browser, scene, theme, language, width, staging) {
       );
     }
     if (scene.click) await page.locator(scene.click).click();
+    if (scene.hover) await page.locator(scene.hover).first().hover();
     await page.locator(scene.ready).first().waitFor();
     if (scene.name === "groups")
       await page.locator(".group-header").first().click();

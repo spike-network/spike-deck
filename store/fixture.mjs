@@ -21,7 +21,8 @@ export function fixture(stress = false) {
     members: names,
     member_info: members,
   }));
-  groups[0].override_member = names[0];
+  groups[0].selected = stress ? names[2] : names[0];
+  groups[0].override_member = stress ? names[2] : names[0];
   groups[0].selection_basis = "manual_override";
   return {
     status: {

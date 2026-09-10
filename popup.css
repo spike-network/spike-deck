@@ -1043,6 +1043,34 @@ input:checked + .slider::before {
   overflow-wrap: anywhere;
 }
 
+.ui-tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 110;
+  max-width: calc(100vw - 16px);
+  padding: 4px 7px;
+  border: 1px solid var(--sd-line);
+  border-radius: 4px;
+  background: var(--sd-surface-alt);
+  color: var(--text-main);
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.1s ease,
+    visibility 0.1s ease;
+  white-space: nowrap;
+}
+
+.ui-tooltip.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
 .toast.success {
   border-left-color: var(--status-online);
 }
@@ -1205,9 +1233,10 @@ input:checked + .slider::before {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1 1 45%;
   min-width: 0;
-  max-width: 62%;
-  flex-wrap: wrap;
+  max-width: 52%;
+  flex-wrap: nowrap;
 }
 
 .expand-icon {
@@ -1223,31 +1252,24 @@ input:checked + .slider::before {
 }
 
 .group-name {
+  flex: 1 1 auto;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--sd-font);
   font-weight: 590;
   font-size: 13px;
   letter-spacing: 0;
 }
 
-.group-kind-badge {
-  font-size: 13px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: var(--sd-surface-alt);
-  color: var(--text-dim);
-  letter-spacing: 0;
-  /* Keep product casing from formatMemberType (Select / URL-Test / …). */
-  text-transform: none;
-}
-
 .group-summary {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
+  flex: 1 1 55%;
   min-width: 0;
+  overflow: hidden;
   justify-content: flex-end;
 }
 
@@ -1256,11 +1278,13 @@ input:checked + .slider::before {
 }
 
 .current-selected {
+  flex: 1 1 auto;
   font-size: 13px;
   color: var(--accent-cyan);
   min-width: 0;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-align: right;
 }
 
