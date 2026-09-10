@@ -282,6 +282,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   await StorageManager.init();
   const instances = await StorageManager.getInstances();
   let activeInstance = await StorageManager.getActiveInstance();
+  let instanceGeneration = 0;
+  let profileSwitchOperation = null;
   const popupInteractions = installPopupInteractions({
     getInstanceId: () => activeInstance?.id || null,
   });
@@ -1302,6 +1304,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Instance selector change handler
   instanceSelect.addEventListener("change", async (e) => {
+    // Invalidate a pending profile check before permission or storage awaits.
+    instanceGeneration += 1;
+    profileSwitchOperation = null;
+    btnProfileSwitch.disabled = false;
     setQuickPanel(null);
     const selectedId = e.target.value;
     const targetInst = instances.find((i) => i.id === selectedId);
@@ -1991,21 +1997,36 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function switchActiveProfile() {
     const name = profileSelect.value;
-    if (!name || name === currentProfileStem) return;
+    if (!activeInstance || profileSwitchOperation || !name || name === currentProfileStem) return;
+    const instance = activeInstance;
+    const generation = instanceGeneration;
+    const operation = {};
+    profileSwitchOperation = operation;
+    const isCurrent = () =>
+      profileSwitchOperation === operation &&
+      instanceGeneration === generation &&
+      activeInstance === instance;
     btnProfileSwitch.disabled = true;
     try {
-      const checked = await SpikeApiClient.checkProfile(activeInstance, name);
+      const checked = await SpikeApiClient.checkProfile(instance, name);
+      if (!isCurrent()) return;
       if (checked?.error) throw new Error(checked.error);
-      const switched = await SpikeApiClient.switchProfile(activeInstance, name);
+      const switched = await SpikeApiClient.switchProfile(instance, name);
+      if (!isCurrent()) return;
       if (switched?.error) throw new Error(switched.error);
       await loadDashboard();
+      if (!isCurrent()) return;
       setQuickPanel(null);
       showToast(`已切换到 ${name}`, "success");
     } catch (error) {
+      if (!isCurrent()) return;
       showToast(`切换 Profile 失败: ${error.message || "未知错误"}`, "error");
       profileSelect.value = currentProfileStem || "";
     } finally {
-      btnProfileSwitch.disabled = false;
+      if (isCurrent()) {
+        profileSwitchOperation = null;
+        btnProfileSwitch.disabled = false;
+      }
     }
   }
 
