@@ -40,6 +40,12 @@ assert.match(popup, /async function refreshGroupsSelectionState\(groupName = nul
 assert.match(popup, /paintSelection\(groupCard, group\)/);
 assert.match(popup, /await refreshGroupsSelectionState\(groupName\)/);
 assert.match(popup, /visibleGroupsStable/);
+assert.match(popup, /const previousVisible = renderedGroupNames\(\)/);
+assert.match(popup, /const nextVisible = displayedPolicyGroups\(currentGroupsData\)/);
+assert.doesNotMatch(
+  popup,
+  /const previousVisible = visiblePolicyGroups\(currentGroupsData, hiddenGroupsMode\)/,
+);
 assert.doesNotMatch(popup, /className: "selection-basis-badge"/);
 assert.match(popup, /className: "btn-resume-auto"/);
 assert.doesNotMatch(popup, /className: "override-kind-badge"/);

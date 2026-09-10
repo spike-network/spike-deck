@@ -2150,17 +2150,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     ];
   }
 
-  // Render Policy Groups
-  function renderGroups(groups) {
+  function displayedPolicyGroups(groups) {
     const normalizedFilter = groupFilterText.toLowerCase();
     const visibleGroups = visiblePolicyGroups(groups, hiddenGroupsMode);
-    const filteredGroups = normalizedFilter
+    return normalizedFilter
       ? visibleGroups.filter(
           (g) =>
             g.name.toLowerCase().includes(normalizedFilter) ||
             (g.members || []).some((member) => member.toLowerCase().includes(normalizedFilter)),
         )
       : visibleGroups;
+  }
+
+  function renderedGroupNames() {
+    return Array.from(groupsContainer.children)
+      .filter((child) => child.classList.contains("group-card"))
+      .map((card) => card.dataset.group);
+  }
+
+  // Render Policy Groups
+  function renderGroups(groups) {
+    const normalizedFilter = groupFilterText.toLowerCase();
+    const filteredGroups = displayedPolicyGroups(groups);
 
     if (filteredGroups.length === 0) {
       groupsContainer.replaceChildren(
@@ -2409,13 +2420,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   /** Re-fetch groups and patch one card when the visible group set is stable. */
   async function refreshGroupsSelectionState(groupName = null) {
-    const previousVisible = visiblePolicyGroups(currentGroupsData, hiddenGroupsMode).map(
-      (group) => group.name,
-    );
+    const previousVisible = renderedGroupNames();
     const groupsData = await SpikeApiClient.getGroups(activeInstance);
     currentGroupsData = groupsData.groups || [];
     ingestPersistedMemberInfo(currentGroupsData);
-    const nextVisible = visiblePolicyGroups(currentGroupsData, hiddenGroupsMode).map(
+    const nextVisible = displayedPolicyGroups(currentGroupsData).map(
       (group) => group.name,
     );
     const visibleGroupsStable =
