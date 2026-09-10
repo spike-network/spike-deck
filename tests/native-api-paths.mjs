@@ -84,6 +84,12 @@ await SpikeApiClient.measureDnsDelay(instance);
 
 const cancelRequest = requests.find(({ url }) => url.endsWith('/spike/group-tests/41'));
 assert.equal(cancelRequest.options.method, 'DELETE');
+const groupRequests = requests.filter(({ url }) => url.endsWith('/spike/groups/Proxy%20%2F%20Auto/select'));
+assert.deepEqual(JSON.parse(groupRequests[0].options.body), {
+  member: 'Direct',
+  retest_active: false
+});
+assert.deepEqual(JSON.parse(groupRequests[1].options.body), { retest_active: false });
 
 assert.deepEqual(
   requests.map((request) => request.url),

@@ -11,6 +11,7 @@ import {
 } from "./lib/hidden-groups.js";
 import { initializeI18n } from "./lib/i18n.js";
 import { installPopupInteractions } from "./lib/popup-interactions.js";
+import { groupMemberAction } from "./lib/group-selection.js";
 
 // Global latency cache for leaf nodes by member name
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
@@ -2208,10 +2209,38 @@ document.addEventListener("DOMContentLoaded", async () => {
       const selectedSummaryEl = el(
         "span",
         {
-          className: "current-selected",
+          className: `current-selected${isOverridden ? " pinned" : ""}`,
           title: currentSelected,
         },
         currentSelected,
+      );
+
+      const overrideBadge = el(
+        "span",
+        {
+          className: "override-kind-badge",
+          title: "已手动固定节点",
+          hidden: !isOverridden,
+        },
+        el("span", { className: "pin-icon", "aria-hidden": "true" }),
+        el("span", {}, "已固定"),
+      );
+
+      const resumeAutoButton = el(
+        "button",
+        {
+          className: "btn-resume-auto",
+          title: "恢复自动选择",
+          "aria-label": "恢复自动选择",
+          hidden: !isOverridden,
+          onClick: async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            await resumeAutomaticSelection(group.name);
+          },
+          onKeyDown: (event) => event.stopPropagation(),
+        },
+        "↺",
       );
 
       const hiddenBadge = group.hidden
@@ -2235,9 +2264,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           svgIcon,
           el("span", { className: "group-name" }, group.name),
           el("span", { className: "group-kind-badge" }, formatMemberType(group.kind || "select")),
+          overrideBadge,
           hiddenBadge,
         ),
-        el("div", { className: "group-summary" }, selectedSummaryEl, testBtn),
+        el(
+          "div",
+          { className: "group-summary" },
+          selectedSummaryEl,
+          resumeAutoButton,
+          testBtn,
+        ),
       );
 
       // Members List
@@ -2263,13 +2299,22 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         const isSelected = member === currentSelected;
         const isPinnedMember = isOverridden && member === group.override_member;
+        const memberAction = groupMemberAction(group, member);
         const memberInfo = memberInfoMap.get(member);
         const subGroupTarget = currentGroupsData.find((g) => g.name === member);
 
         // Resolve latency for leaf node or sub-group
         const latencyInfo = resolveMemberLatency(group.name, member);
 
-        const checkMark = el("span", { className: "check-mark" }, isSelected ? "✓" : "");
+        const checkMark = el(
+          "span",
+          { className: `check-mark${isPinnedMember ? " pinned" : ""}` },
+          isPinnedMember
+            ? el("span", { className: "pin-icon", "aria-hidden": "true" })
+            : isSelected
+              ? "✓"
+              : "",
+        );
         const memberNameEl = el("span", { className: "member-name" }, member);
 
         // Type tag badge (product casing; nested groups use group kind)
@@ -2293,11 +2338,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         // On automatic groups, re-clicking the pinned member clears the override.
         const activateMember = async () => {
           const currentGroup = currentGroupsData.find((candidate) => candidate.name === group.name);
-          if (currentGroup?.override_member === member) {
+          const action = groupMemberAction(currentGroup, member);
+          if (action === "auto") {
             await resumeAutomaticSelection(group.name);
             return;
           }
-          await selectMember(group.name, member);
+          if (action === "select") await selectMember(group.name, member);
         };
 
         const memberItem = el(
@@ -2306,8 +2352,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             className: `member-item ${isSelected ? "selected" : ""}${isPinnedMember ? " pinned" : ""}`,
             dataset: { group: group.name, member: member },
             title: isPinnedMember ? "再次点击可恢复自动选择" : undefined,
-            tabindex: "0",
-            role: "button",
+            "aria-label": isPinnedMember ? "恢复自动选择" : `选择 ${member}`,
+            "aria-pressed": isSelected || isPinnedMember,
+            tabindex: memberAction !== "none" ? "0" : undefined,
+            role: memberAction !== "none" ? "button" : undefined,
             onClick: activateMember,
           },
           el("div", { className: "member-left" }, checkMark, memberNameEl, typeTag),
@@ -2340,7 +2388,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
 
       headerEl.addEventListener("click", (e) => {
-        if (e.target.closest(".btn-test-group")) return;
+        if (e.target.closest(".btn-test-group, .btn-resume-auto")) return;
         toggleExpand();
       });
 
@@ -2385,17 +2433,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     groupCard.querySelectorAll(".member-item").forEach((item) => {
       const isTarget = item.dataset.member === memberName;
       const isPinned = item.dataset.member === group.override_member;
+      const memberAction = groupMemberAction(group, item.dataset.member);
       item.classList.toggle("selected", isTarget);
       item.classList.toggle("pinned", isPinned);
       item.title = isPinned ? "再次点击可恢复自动选择" : "";
+      item.setAttribute("aria-label", isPinned ? "恢复自动选择" : `选择 ${item.dataset.member}`);
+      if (memberAction === "none") {
+        item.removeAttribute("role");
+        item.removeAttribute("tabindex");
+        item.removeAttribute("aria-pressed");
+      } else {
+        item.setAttribute("role", "button");
+        item.setAttribute("tabindex", "0");
+        item.setAttribute("aria-pressed", String(isTarget || isPinned));
+      }
       const check = item.querySelector(".check-mark");
-      if (check) check.textContent = isTarget ? "✓" : "";
+      if (check) {
+        check.classList.toggle("pinned", isPinned);
+        check.replaceChildren(
+          isPinned
+            ? el("span", { className: "pin-icon", "aria-hidden": "true" })
+            : document.createTextNode(isTarget ? "✓" : ""),
+        );
+      }
     });
     const selectedSummary = groupCard.querySelector(".current-selected");
     if (selectedSummary) {
       selectedSummary.textContent = memberName;
       selectedSummary.title = memberName;
+      selectedSummary.classList.toggle("pinned", isOverridden);
     }
+    const overrideBadge = groupCard.querySelector(".override-kind-badge");
+    if (overrideBadge) overrideBadge.hidden = !isOverridden;
+    const resumeButton = groupCard.querySelector(".btn-resume-auto");
+    if (resumeButton) resumeButton.hidden = !isOverridden;
   }
 
   async function selectMember(groupName, memberName) {
@@ -2411,15 +2482,17 @@ document.addEventListener("DOMContentLoaded", async () => {
           override_member: isAutomaticGroupKind(group.kind) ? memberName : group.override_member,
         }
       : null;
+    groupCard?.classList.add("selection-busy");
     paintSelection(groupCard, optimisticGroup);
 
     try {
-      await SpikeApiClient.selectGroupMember(activeInstance, groupName, memberName);
+      const selection = await SpikeApiClient.selectGroupMember(activeInstance, groupName, memberName);
 
       if (group) {
-        group.selected = memberName;
+        group.selected = selection?.member || memberName;
         if (isAutomaticGroupKind(group.kind)) {
-          group.override_member = memberName;
+          group.override_member = selection?.member || memberName;
+          group.selection_basis = "manual_override";
         }
         paintSelection(groupCard, group);
       }
@@ -2439,27 +2512,37 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } finally {
       selectingGroups.delete(groupName);
+      groupCard?.classList.remove("selection-busy");
     }
   }
 
   /** Clear pin/override and resume url-test / fallback / smart automatic selection. */
   async function resumeAutomaticSelection(groupName) {
+    if (selectingGroups.has(groupName)) return;
+    selectingGroups.add(groupName);
+    const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
+    groupCard?.classList.add("selection-busy");
     try {
-      await SpikeApiClient.clearGroupSelection(activeInstance, groupName);
+      const selection = await SpikeApiClient.clearGroupSelection(activeInstance, groupName);
+      const group = currentGroupsData.find((candidate) => candidate.name === groupName);
+      if (group) {
+        group.override_member = null;
+        group.selected = selection?.member || group.selected;
+        group.selection_basis = null;
+        paintSelection(groupCard, group);
+      }
       try {
         await refreshGroupsSelectionState(groupName);
       } catch (err) {
-        // Still try to drop local override so the reverse affordance goes away.
-        const group = currentGroupsData.find((g) => g.name === groupName);
-        if (group) {
-          group.override_member = null;
-        }
-        renderGroups(currentGroupsData);
         updateAllLatencyBadgesDOM();
+        showToast("已恢复自动选择，但暂时无法刷新状态");
         console.warn(`Cleared override but failed to refresh groups: ${err.message}`);
       }
     } catch (err) {
       showToast(`恢复自动选择失败: ${err.message || err}`, "error");
+    } finally {
+      selectingGroups.delete(groupName);
+      groupCard?.classList.remove("selection-busy");
     }
   }
 
