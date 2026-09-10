@@ -2215,17 +2215,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         currentSelected,
       );
 
-      const overrideBadge = el(
-        "span",
-        {
-          className: "override-kind-badge",
-          title: "已手动固定节点",
-          "aria-label": "已手动固定节点",
-          hidden: !isOverridden,
-        },
-        el("span", { className: "pin-icon", "aria-hidden": "true" }),
-      );
-
       const resumeAutoButton = el(
         "button",
         {
@@ -2240,7 +2229,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           },
           onKeyDown: (event) => event.stopPropagation(),
         },
-        "↺",
+        el("span", { className: "pin-icon", "aria-hidden": "true" }),
       );
 
       const hiddenBadge = group.hidden
@@ -2270,7 +2259,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         { className: "group-title-wrapper" },
         svgIcon,
         groupNameEl,
-        overrideBadge,
         hiddenBadge,
       );
 
@@ -2474,8 +2462,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       selectedSummary.title = memberName;
       selectedSummary.classList.toggle("pinned", isOverridden);
     }
-    const overrideBadge = groupCard.querySelector(".override-kind-badge");
-    if (overrideBadge) overrideBadge.hidden = !isOverridden;
     const resumeButton = groupCard.querySelector(".btn-resume-auto");
     if (resumeButton) resumeButton.hidden = !isOverridden;
   }

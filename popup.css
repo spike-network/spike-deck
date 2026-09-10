@@ -1139,25 +1139,6 @@ input:checked + .slider::before {
   opacity: 0.8;
 }
 
-.override-kind-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 4px;
-  border-radius: 3px;
-  background: var(--sd-warning-soft);
-  color: var(--pin);
-  flex-shrink: 0;
-  font-size: 15px;
-  line-height: 1;
-}
-
-.override-kind-badge .pin-icon {
-  display: block;
-  width: 15px;
-  height: 15px;
-}
-
 .pin-icon {
   display: inline-block;
   width: 1em;
@@ -1167,7 +1148,6 @@ input:checked + .slider::before {
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M12 17v5M5 17h14M17 8V5H7v3a5 5 0 0 0 10 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
-.override-kind-badge[hidden],
 .btn-resume-auto[hidden] {
   display: none;
 }
@@ -1224,7 +1204,7 @@ input:checked + .slider::before {
 }
 
 .group-name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1278,15 +1258,23 @@ input:checked + .slider::before {
 }
 
 .btn-resume-auto {
-  background: transparent;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
   border: none;
+  background: var(--sd-warning-soft);
   color: var(--pin);
   cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: 3px;
   display: flex;
   align-items: center;
+  justify-content: center;
   transition: color 0.15s, background 0.15s;
+}
+
+.btn-resume-auto .pin-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .btn-resume-auto:hover {

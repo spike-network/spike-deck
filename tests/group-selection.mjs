@@ -26,7 +26,11 @@ assert.match(popup, /await refreshGroupsSelectionState\(groupName\)/);
 assert.match(popup, /visibleGroupsStable/);
 assert.doesNotMatch(popup, /className: "selection-basis-badge"/);
 assert.match(popup, /className: "btn-resume-auto"/);
-assert.match(popup, /className: "override-kind-badge"/);
+assert.doesNotMatch(popup, /className: "override-kind-badge"/);
+assert.match(
+  popup,
+  /className: "btn-resume-auto"[\s\S]*?className: "pin-icon"/,
+);
 assert.match(popup, /groupMemberAction\(currentGroup, member\)/);
 assert.match(popup, /className: "pin-icon"/);
 assert.doesNotMatch(popup, /el\("span", \{\}, "已固定"\)/);
