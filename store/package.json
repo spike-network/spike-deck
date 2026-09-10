@@ -6,7 +6,8 @@
     "capture": "node capture.mjs",
     "check": "node capture.mjs --check",
     "check:profile-switch": "node profile-switch-check.mjs",
-    "check:dashboard-lifetime": "node dashboard-lifetime-check.mjs"
+    "check:dashboard-lifetime": "node dashboard-lifetime-check.mjs",
+    "check:proxy-control": "node proxy-control-check.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0",

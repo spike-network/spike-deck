@@ -1,9 +1,6 @@
 import { StorageManager } from './lib/storage.js';
 import { SpikeApiClient } from './lib/spike-client.js';
-import {
-  preferredProxyEndpoint,
-  proxyListenersFromStatus
-} from './lib/proxy-listeners.js';
+import { getProxyControlState, invalidateProxyIntent, reconcileProxyIntent } from './lib/proxy-control.js';
 import { badgeTraffic, trafficTitle } from './lib/format-rate.js';
 import { initializeI18n } from './lib/i18n.js';
 
@@ -18,14 +15,18 @@ const GROUP_TEST_POLL_INTERVAL_MS = 700;
 const GROUP_TEST_ALARM_PREFIX = 'group-test-reconcile:';
 const OPEN_POPUP_COMMAND = 'open-popup';
 const TRAFFIC_RATE_ALARM = 'traffic-rate';
-const STATUS_PROBE_TIMEOUT_MS = 2500;
 const HEALTH_OFFSCREEN_PATH = 'offscreen.html';
 const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
 const groupTestPollTimers = new Map();
 const groupTestOperations = new Map();
 let trafficWatchPorts = 0;
-let healthReconcileInFlight = false;
 let isWindowFocused = true;
+
+chrome.storage.onChanged?.addListener((changes, area) => {
+  if (area !== 'local' || !['enableProxyMode', 'activeInstanceId', 'instances'].some((key) => key in changes)) return;
+  invalidateProxyIntent();
+  void reconcileProxyWithHealth().catch((error) => console.warn('Proxy intent reconciliation failed:', error));
+});
 
 async function updateWindowFocusState() {
   if (!chrome.windows?.getLastFocused) return;
@@ -773,80 +774,10 @@ function safeProviderRefreshError(error) {
 }
 
 async function updateProxySettings() {
-  try {
-    const isProxyEnabled = await StorageManager.isProxyModeEnabled();
-    const activeInstance = await StorageManager.getActiveInstance();
-
-    if (!isProxyEnabled) {
-      // Remove this extension's value instead of replacing it with `system`.
-      // That releases Chrome's proxy API for SwitchyOmega and other managers.
-      await StorageManager.setProxyReleasedForUnhealthy(false);
-      await releaseProxyControl();
-      chrome.action.setBadgeText({ text: '' });
-      return { mode: 'released', ...(await getProxyControlState()) };
-    }
-
-    if (!activeInstance) {
-      throw new Error('No active Spike instance');
-    }
-
-    const status = await SpikeApiClient.getStatus(activeInstance);
-    const endpoint = preferredProxyEndpoint(proxyListenersFromStatus(status, activeInstance));
-    if (!endpoint) {
-      throw new Error('Spike /spike/status did not expose a usable HTTP or SOCKS listener');
-    }
-
-    const proxyConfig = {
-      mode: 'fixed_servers',
-      rules: {
-        singleProxy: {
-          scheme: endpoint.scheme,
-          host: endpoint.host,
-          port: endpoint.port
-        },
-        bypassList: ['127.0.0.1', 'localhost', '::1']
-      }
-    };
-
-    await chrome.proxy.settings.set({
-      value: proxyConfig,
-      scope: 'regular'
-    });
-    const control = await getProxyControlState();
-    if (control.levelOfControl !== 'controlled_by_this_extension') {
-      throw new Error('Chrome proxy settings are controlled by another extension or policy');
-    }
-
-    await StorageManager.setProxyReleasedForUnhealthy(false);
-    await openHealthOffscreen();
-
-    // Display indicator badge on action icon
-    chrome.action.setBadgeBackgroundColor({ color: '#6366F1' });
-    chrome.action.setBadgeText({ text: 'ON' });
-    return {
-      mode: 'fixed_servers',
-      scheme: endpoint.scheme,
-      host: endpoint.host,
-      port: endpoint.port,
-      kind: endpoint.kind,
-      ...control
-    };
-  } catch (err) {
-    console.error('Failed to set Chrome proxy:', err);
-    chrome.action.setBadgeBackgroundColor({ color: '#EF4444' });
-    chrome.action.setBadgeText({ text: 'ERR' });
-    // Do not leave Chrome on a stale fixed proxy, and release ownership so a
-    // different proxy extension can take over.
-    try {
-      if (await StorageManager.isProxyModeEnabled()) {
-        await StorageManager.setProxyReleasedForUnhealthy(true);
-      }
-      await releaseProxyControl();
-    } catch (resetErr) {
-      console.error('Failed to reset Chrome proxy after error:', resetErr);
-    }
-    throw err;
-  }
+  const result = await reconcileProxyIntent({ timeoutMs: 10000 });
+  if (result.error) throw new Error(result.error);
+  if (result.healthy) void ensureOffscreenDocument().catch((error) => console.warn('Health offscreen unavailable:', error));
+  return result;
 }
 
 async function hasHealthOffscreen() {
@@ -889,10 +820,6 @@ async function ensureOffscreenDocument() {
   }
 }
 
-async function openHealthOffscreen() {
-  await ensureOffscreenDocument();
-}
-
 async function onTrafficSampleHealth(message) {
   if (!(await StorageManager.isProxyModeEnabled())) return;
   if (message?.error) {
@@ -904,62 +831,13 @@ async function onTrafficSampleHealth(message) {
   }
 }
 
-async function probeActiveInstanceHealth() {
-  const instance = await StorageManager.getActiveInstance();
-  if (!instance) return { ok: false, error: 'no instance' };
-  try {
-    await SpikeApiClient.getStatus(instance, { timeoutMs: STATUS_PROBE_TIMEOUT_MS });
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: error?.message || 'unreachable' };
-  }
-}
-
-async function yieldProxyForUnhealthy() {
-  await StorageManager.setProxyReleasedForUnhealthy(true);
-  await releaseProxyControl();
-  chrome.action.setBadgeBackgroundColor({ color: '#EF4444' });
-  chrome.action.setBadgeText({ text: 'ERR' });
-  chrome.action.setTitle?.({ title: 'SpikeDeck · Spike unreachable, proxy released' });
-  try {
-    await chrome.runtime.sendMessage({
-      type: 'PROXY_HEALTH_CHANGED',
-      releasedForUnhealthy: true
-    });
-  } catch {
-    // No popup/options page listening.
-  }
-}
-
 async function reconcileProxyWithHealth() {
-  if (healthReconcileInFlight) return { action: 'busy', healthy: null };
-  healthReconcileInFlight = true;
-  try {
-    const wantProxy = await StorageManager.isProxyModeEnabled();
-    if (!wantProxy) {
-      await StorageManager.setProxyReleasedForUnhealthy(false);
-      return { action: 'idle', healthy: null };
-    }
-
-    await ensureOffscreenDocument();
-
-    const health = await probeActiveInstanceHealth();
-    if (!health.ok) {
-      await yieldProxyForUnhealthy();
-      return { action: 'released', healthy: false, error: health.error };
-    }
-
-    const released = await StorageManager.isProxyReleasedForUnhealthy();
-    const control = await getProxyControlState();
-    if (!released && control.controlledBySpikeDeck) {
-      return { action: 'holding', healthy: true };
-    }
-
-    const applied = await updateProxySettings();
-    return { action: 'restored', healthy: true, ...applied };
-  } finally {
-    healthReconcileInFlight = false;
+  const result = await reconcileProxyIntent();
+  if (result.healthy) void ensureOffscreenDocument().catch((error) => console.warn('Health offscreen unavailable:', error));
+  if (result.action === 'released') {
+    chrome.runtime.sendMessage({ type: 'PROXY_HEALTH_CHANGED', releasedForUnhealthy: true }).catch(() => {});
   }
+  return result;
 }
 
 async function ensureTrafficRateAlarm() {
@@ -1033,19 +911,6 @@ async function restoreProxyBadgeIfNeeded(keepErrorTitle) {
     // Fall through and clear.
   }
   chrome.action.setBadgeText({ text: '' });
-}
-
-async function releaseProxyControl() {
-  await chrome.proxy.settings.clear({ scope: 'regular' });
-}
-
-async function getProxyControlState() {
-  const setting = await chrome.proxy.settings.get({ incognito: false });
-  return {
-    levelOfControl: setting.levelOfControl,
-    controlledBySpikeDeck: setting.levelOfControl === 'controlled_by_this_extension',
-    releasedForUnhealthy: await StorageManager.isProxyReleasedForUnhealthy()
-  };
 }
 
 export {

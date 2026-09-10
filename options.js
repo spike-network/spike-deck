@@ -194,7 +194,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   prefControlProxyCheckbox.addEventListener("change", async (e) => {
     const enabled = e.target.checked;
-    const previous = !enabled;
     prefControlProxyCheckbox.disabled = true;
     proxyPreferenceState.className = "proxy-preference-state";
     proxyPreferenceState.textContent = enabled
@@ -208,10 +207,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!response || !response.ok) {
         throw new Error(response?.error || "无法更新浏览器代理设置");
       }
-      renderProxyPreferenceState(response, enabled);
+      prefControlProxyCheckbox.checked = await StorageManager.isProxyModeEnabled();
+      if (response.superseded) await refreshProxyPreferenceState();
+      else renderProxyPreferenceState(response, prefControlProxyCheckbox.checked);
     } catch (err) {
-      await StorageManager.setProxyModeEnabled(previous);
-      prefControlProxyCheckbox.checked = previous;
+      prefControlProxyCheckbox.checked = await StorageManager.isProxyModeEnabled();
       proxyPreferenceState.className = "proxy-preference-state error";
       proxyPreferenceState.textContent = `代理设置更新失败: ${err.message}`;
     } finally {

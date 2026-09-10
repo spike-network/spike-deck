@@ -36,6 +36,7 @@
    - Popup 展示发现的 Mixed / HTTP / SOCKS5 可达地址。
    - 关闭托管时清除 SpikeDeck 写入的代理设置并释放控制权，不影响 SwitchyOmega 等其他代理扩展。
    - 接管开启时约每 3 秒探测当前实例（Popup 打开时随流量刷新约 1 秒一次）。Spike 不可达时交回代理控制，用户开关仍保持开启，实例恢复后自动重新接管。
+   - 接管开关与实例选择以最新操作为准；旧探测的迟到响应不会覆盖新实例或重新开启已关闭的代理。后台串行设置和释放代理，并核对 Chrome 实际使用的监听地址；首次开启失败也保留开启意愿，以便健康检查恢复接管。
 
 5. **外部资源管理**
    - Popup 顶栏打开外部资源面板，列出全部 `policy-path`、`RULE-SET` 与 `DOMAIN-SET` 及其状态；过期但仍可用的资源显示「已过期」，与真正缺失区分。
@@ -98,6 +99,12 @@ Profile 切换和主面板加载竞态可用独立 Chromium 上下文验证，�
 make screenshots-setup
 npm --prefix store run check:profile-switch
 npm --prefix store run check:dashboard-lifetime
+```
+
+浏览器代理竞态另有完整扩展测试：只在临时 Chromium 用户目录中修改真实代理设置，使用本地模拟实例和不向外转发的代理，不接触日常浏览器配置。覆盖迟到探测、设置与释放顺序、实际出口、端点修复及 Popup/Options 失败恢复：
+
+```bash
+npm --prefix store run check:proxy-control
 ```
 
 ```bash

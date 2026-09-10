@@ -1281,7 +1281,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     const enabled = e.target.checked;
-    const previous = !enabled;
     toggleProxy.disabled = true;
     proxyToggleWrapper.classList.add("busy");
     try {
@@ -1292,10 +1291,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!response || !response.ok) {
         throw new Error(response?.error || "无法更新浏览器代理设置");
       }
-      renderProxyControlState(response, enabled);
+      toggleProxy.checked = await StorageManager.isProxyModeEnabled();
+      if (response.superseded) await refreshProxyControlState();
+      else renderProxyControlState(response, toggleProxy.checked);
     } catch (err) {
-      await StorageManager.setProxyModeEnabled(previous);
-      toggleProxy.checked = previous;
+      toggleProxy.checked = await StorageManager.isProxyModeEnabled();
       setProxyControlDot("blocked", `代理控制失败: ${err.message}`);
     } finally {
       toggleProxy.disabled = false;

@@ -34,12 +34,14 @@ globalThis.chrome = {
       async clear() {
         proxy.cleared += 1;
         proxy.levelOfControl = 'controllable_by_this_extension';
+        proxy.value = { mode: 'system' };
       },
       async get() {
-        return { levelOfControl: proxy.levelOfControl };
+        return { levelOfControl: proxy.levelOfControl, value: proxy.value };
       },
-      async set() {
+      async set({ value }) {
         proxy.set += 1;
+        proxy.value = structuredClone(value);
         proxy.levelOfControl = 'controlled_by_this_extension';
       }
     }
