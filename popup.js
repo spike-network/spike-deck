@@ -152,6 +152,8 @@ const groupTypeTooltip = document.body.appendChild(
 let tooltipShowTimer = null;
 let tooltipHideTimer = null;
 let tooltipTrigger = null;
+let tooltipPendingAnchor = null;
+let tooltipVisibleAnchor = null;
 let keyboardInteraction = false;
 
 document.addEventListener(
@@ -172,20 +174,26 @@ document.addEventListener(
 function hideGroupTypeTooltip(delay = 0) {
   clearTimeout(tooltipShowTimer);
   clearTimeout(tooltipHideTimer);
+  tooltipPendingAnchor = null;
   tooltipHideTimer = setTimeout(() => {
     groupTypeTooltip.classList.remove("visible");
     groupTypeTooltip.setAttribute("aria-hidden", "true");
     tooltipTrigger?.removeAttribute("aria-describedby");
     tooltipTrigger = null;
+    tooltipVisibleAnchor = null;
   }, delay);
 }
 
 function showGroupTypeTooltip(anchor, trigger, label, delay) {
-  clearTimeout(tooltipShowTimer);
   clearTimeout(tooltipHideTimer);
+  if (tooltipVisibleAnchor === anchor || tooltipPendingAnchor === anchor) return;
+  clearTimeout(tooltipShowTimer);
+  tooltipPendingAnchor = anchor;
   tooltipShowTimer = setTimeout(() => {
+    tooltipPendingAnchor = null;
     if (!anchor.isConnected || !trigger.isConnected) return;
     tooltipTrigger = trigger;
+    tooltipVisibleAnchor = anchor;
     groupTypeTooltip.textContent = label;
     groupTypeTooltip.classList.add("visible");
     groupTypeTooltip.setAttribute("aria-hidden", "false");
@@ -207,11 +215,13 @@ function showGroupTypeTooltip(anchor, trigger, label, delay) {
   }, delay);
 }
 
-function attachGroupTypeTooltip(groupName, header, label) {
-  groupName.addEventListener("mouseenter", () =>
-    showGroupTypeTooltip(groupName, header, label, GROUP_TYPE_TOOLTIP_SHOW_MS),
-  );
-  groupName.addEventListener("mouseleave", () =>
+function attachGroupTypeTooltip(hoverTarget, groupName, header, label) {
+  const queueTooltip = () =>
+    showGroupTypeTooltip(groupName, header, label, GROUP_TYPE_TOOLTIP_SHOW_MS);
+  hoverTarget.addEventListener("pointerenter", queueTooltip);
+  // Covers an element rendered underneath an already stationary pointer.
+  hoverTarget.addEventListener("pointermove", queueTooltip);
+  hoverTarget.addEventListener("pointerleave", () =>
     hideGroupTypeTooltip(GROUP_TYPE_TOOLTIP_HIDE_MS),
   );
   header.addEventListener("focus", () => {
@@ -2349,18 +2359,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         group.name,
       );
+      const groupTitleEl = el(
+        "div",
+        { className: "group-title-wrapper" },
+        svgIcon,
+        groupNameEl,
+        overrideBadge,
+        hiddenBadge,
+      );
 
       const headerEl = el(
         "div",
         { className: "group-header" },
-        el(
-          "div",
-          { className: "group-title-wrapper" },
-          svgIcon,
-          groupNameEl,
-          overrideBadge,
-          hiddenBadge,
-        ),
+        groupTitleEl,
         el(
           "div",
           { className: "group-summary" },
@@ -2473,7 +2484,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       headerEl.setAttribute("tabindex", "0");
       headerEl.setAttribute("role", "button");
       headerEl.setAttribute("aria-expanded", String(isExpand));
-      attachGroupTypeTooltip(groupNameEl, headerEl, groupType);
+      attachGroupTypeTooltip(groupTitleEl, groupNameEl, headerEl, groupType);
 
       const toggleExpand = () => {
         groupCard.classList.toggle("expanded");
