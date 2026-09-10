@@ -86,6 +86,10 @@
         <button type="button" id="btn-modules-close" class="btn-provider-action" title="关闭">关闭</button>
       </div>
       <div id="modules-panel-notice" class="providers-panel-notice" role="status" aria-live="polite" hidden></div>
+      <div class="providers-panel-actions" id="module-task-actions" hidden>
+        <button type="button" id="btn-module-task-check" class="btn-provider-action">重新检查</button>
+        <button type="button" id="btn-module-task-dismiss" class="btn-provider-action" hidden>清除未知结果</button>
+      </div>
       <form id="module-install-form" class="module-install-form">
         <input id="module-name-input" type="text" placeholder="名称" required>
         <input id="module-url-input" type="url" placeholder="https://modules.example.test/a.sgmodule" required>

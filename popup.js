@@ -377,6 +377,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentProfileStem = "";
   let currentModules = [];
   let moduleBusy = false;
+  let moduleTask = null;
+  let moduleCanDismiss = false;
+  let moduleSequence = 0;
+  let moduleEpoch = 0;
+  let moduleSync = null;
+  let moduleListRead = 0;
+  let modulePollTimer = null;
+  let moduleRetryDelay = 1000;
+  let moduleInstallPending = null;
+  const moduleTaskActions = document.getElementById("module-task-actions");
+  const moduleTaskCheck = document.getElementById("btn-module-task-check");
+  const moduleTaskDismiss = document.getElementById("btn-module-task-dismiss");
   const runtimeExpansion = new Map();
   let groupFilterText = "";
   let filterRenderTimer = null;
@@ -1358,6 +1370,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       offlineRetryTimer = null;
     }
     activeInstance = targetInst;
+    resetModuleTracking();
     providersBusyKey = "";
     providerRefreshTask = null;
     providerRefreshFailures = {};
@@ -1484,7 +1497,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     btnRefreshProviders.classList.remove("active");
     btnRefreshProviders.setAttribute("aria-expanded", "false");
     appContainer?.classList.toggle("dock-view", open);
-    if (open) void loadModulesList();
+    if (open) {
+      moduleBusy = true;
+      updateModuleControls();
+      void Promise.all([loadModulesList(), syncModuleUpdate()]);
+    }
   }
 
   btnModules.addEventListener("click", () => {
@@ -1497,14 +1514,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   moduleInstallForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const succeeded = await runModuleUpdate({
+    await runModuleUpdate({
       name: moduleNameInput.value.trim(),
       url: moduleUrlInput.value.trim(),
     });
-    if (succeeded) {
-      moduleNameInput.value = "";
-      moduleUrlInput.value = "";
-    }
   });
 
   btnQuickInstance.addEventListener("click", () => setQuickPanel("instance"));
@@ -1525,7 +1538,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     if (message.instanceId !== activeInstance?.id) return;
     if (message.type === "MODULE_UPDATE_CHANGED") {
-      applyModuleTask(message.task);
+      // Notifications invalidate the projection; never apply an old task payload directly.
+      void syncModuleUpdate();
     }
   });
 
@@ -2117,7 +2131,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function loadModulesList() {
-    if (!activeInstance) {
+    const scope = captureInstanceRequest();
+    const read = ++moduleListRead;
+    if (!scope) {
       currentModules = [];
       modulesPanelCount.textContent = "";
       modulesList.replaceChildren(el("div", { className: "providers-empty" }, "未配置 Spike 实例"));
@@ -2125,12 +2141,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     modulesList.replaceChildren(el("div", { className: "providers-empty" }, "正在加载模块…"));
     try {
-      const data = await SpikeApiClient.getModules(activeInstance);
+      const data = await SpikeApiClient.getModules(scope.instance);
+      if (!scope.isCurrent() || read !== moduleListRead) return;
       currentModules = Array.isArray(data.modules) ? data.modules : [];
       modulesPanelCount.textContent = `${currentModules.length}`;
       renderModulesList();
-      if (data.error) showModulesNotice(data.error, "error");
+      if (data.error && !moduleBusy) showModulesNotice(data.error, "error");
     } catch (error) {
+      if (!scope.isCurrent() || read !== moduleListRead) return;
       currentModules = [];
       modulesList.replaceChildren(
         el("div", { className: "providers-empty error" }, error.message || "加载失败"),
@@ -2158,7 +2176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
         const toggle = el(
           "button",
-          { className: "btn-provider-action", type: "button" },
+          { className: "btn-provider-action", type: "button", disabled: moduleBusy },
           module.enabled ? "停用" : "启用",
         );
         toggle.addEventListener("click", () => {
@@ -2166,7 +2184,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
         const uninstall = el(
           "button",
-          { className: "btn-provider-action", type: "button" },
+          { className: "btn-provider-action", type: "button", disabled: moduleBusy },
           "卸载",
         );
         uninstall.addEventListener("click", () => {
@@ -2194,44 +2212,167 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function runModuleUpdate(body) {
-    if (moduleBusy) return false;
+    const scope = captureInstanceRequest();
+    if (!scope || moduleBusy) return false;
+    const epoch = ++moduleEpoch;
     moduleBusy = true;
+    updateModuleControls();
     showModulesNotice("正在更新模块…", "");
     try {
       const response = await chrome.runtime.sendMessage({
         type: "START_MODULE_UPDATE",
-        instanceId: activeInstance.id,
+        instanceId: scope.instance.id,
         body,
       });
+      if (!scope.isCurrent() || epoch !== moduleEpoch) return false;
       if (!response?.ok) throw new Error(response?.error || "模块更新失败");
-      applyModuleTask(response.task);
-      return true;
+      if (body.url && response.task) moduleInstallPending = { ...body, id: response.task.id, taskNamespace: response.task.taskNamespace };
+      applyModuleState({ task: response.task });
+      return response.task?.status === "succeeded";
     } catch (error) {
+      if (!scope.isCurrent() || epoch !== moduleEpoch) return false;
       showModulesNotice(error.message || "模块更新失败", "error");
       return false;
     } finally {
-      moduleBusy = false;
+      if (scope.isCurrent() && epoch === moduleEpoch) void syncModuleUpdate();
     }
   }
 
-  function applyModuleTask(task) {
-    if (!task) return;
-    if (task.status === "running") {
+  function updateModuleControls() {
+    moduleInstallForm.querySelector('button[type="submit"]').disabled = moduleBusy;
+    modulesList.querySelectorAll("button").forEach((button) => { button.disabled = moduleBusy; });
+    btnModules.classList.toggle("testing", moduleBusy);
+    moduleTaskDismiss.hidden = !moduleCanDismiss;
+  }
+
+  function resetModuleTracking() {
+    moduleEpoch += 1;
+    moduleListRead += 1;
+    moduleTask = null;
+    moduleSequence = 0;
+    moduleCanDismiss = false;
+    moduleBusy = true;
+    moduleInstallPending = null;
+    currentModules = [];
+    modulesPanelCount.textContent = "";
+    modulesPanelNotice.hidden = true;
+    moduleTaskActions.hidden = true;
+    delete moduleTaskDismiss.dataset.armed;
+    moduleTaskDismiss.textContent = "清除未知结果";
+    if (modulePollTimer !== null) clearTimeout(modulePollTimer);
+    modulePollTimer = null;
+    moduleRetryDelay = 1000;
+    renderModulesList();
+    updateModuleControls();
+    void syncModuleUpdate();
+  }
+
+  function scheduleModulePoll(delay = 1000) {
+    if (modulePollTimer !== null) return;
+    const scope = captureInstanceRequest();
+    modulePollTimer = setTimeout(() => {
+      modulePollTimer = null;
+      if (scope?.isCurrent()) void syncModuleUpdate();
+    }, delay);
+  }
+
+  function syncModuleUpdate() {
+    const scope = captureInstanceRequest();
+    if (!scope) { moduleBusy = false; updateModuleControls(); return Promise.resolve(); }
+    const epoch = moduleEpoch;
+    if (moduleSync?.pending && moduleSync.epoch === epoch && moduleSync.scope.isCurrent()) return moduleSync.promise;
+    const load = { scope, epoch, pending: true };
+    moduleSync = load;
+    load.promise = (async () => {
+      try {
+        const response = await chrome.runtime.sendMessage({ type: "GET_MODULE_UPDATE", instanceId: scope.instance.id });
+        if (!scope.isCurrent() || epoch !== moduleEpoch || moduleSync !== load) return;
+        if (!response?.ok) throw new Error(response?.error || "暂时无法查询模块任务，正在重试");
+        applyModuleState(response);
+        if (response.error) throw new Error(response.error);
+        moduleRetryDelay = 1000;
+      } catch {
+        if (!scope.isCurrent() || epoch !== moduleEpoch || moduleSync !== load) return;
+        moduleBusy = true;
+        moduleCanDismiss = false;
+        moduleTaskActions.hidden = false;
+        showModulesNotice("暂时无法查询模块任务，正在重试", "error");
+        updateModuleControls();
+        scheduleModulePoll(moduleRetryDelay);
+        moduleRetryDelay = Math.min(moduleRetryDelay * 2, 30000);
+      } finally { load.pending = false; }
+    })();
+    return load.promise;
+  }
+
+  function applyModuleState(state) {
+    const task = state.task;
+    if (task && (task.instanceId !== activeInstance?.id || Number(task.sequence) < moduleSequence)) return;
+    const previous = moduleTask;
+    moduleTask = task || null;
+    if (task) moduleSequence = Number(task.sequence) || 0;
+    moduleCanDismiss = Boolean(state.canDismiss);
+    moduleBusy = Boolean(state.error) || ["submitting", "running", "unknown"].includes(task?.status);
+    moduleTaskActions.hidden = !moduleBusy;
+    if (previous?.id !== task?.id || previous?.sequence !== task?.sequence || task?.status !== "unknown") {
+      delete moduleTaskDismiss.dataset.armed;
+      moduleTaskDismiss.textContent = "清除未知结果";
+    }
+    updateModuleControls();
+    if (!task) { modulesPanelNotice.hidden = true; return; }
+    if (["submitting", "running"].includes(task.status)) {
       showModulesNotice("正在更新模块…", "");
+      if (!state.error) scheduleModulePoll();
       return;
     }
-    if (task.error) {
+    if (task.status === "unknown") {
+      showModulesNotice(task.error || "无法确认模块更新结果；请重新检查当前状态，勿重复提交", "error");
+      if (previous?.id !== task.id || previous?.status !== task.status) void loadModulesList();
+      if (!state.error) scheduleModulePoll(5000);
+      return;
+    }
+    if (task.status !== "succeeded") {
       showModulesNotice(task.error, "error");
     } else {
       showModulesNotice("模块已更新", "");
+      if (moduleInstallPending?.id === task.id && moduleInstallPending.taskNamespace === task.taskNamespace) {
+        if (moduleNameInput.value.trim() === moduleInstallPending.name && moduleUrlInput.value.trim() === moduleInstallPending.url) {
+          moduleNameInput.value = "";
+          moduleUrlInput.value = "";
+        }
+        moduleInstallPending = null;
+      }
     }
-    if (task.result?.modules) {
-      currentModules = task.result.modules;
-      renderModulesList();
-    } else {
+    if (previous?.id !== task.id || previous?.status !== task.status) {
       void loadModulesList();
+      if (task.status === "succeeded") void loadDashboard({ force: true });
     }
   }
+
+  moduleTaskCheck.addEventListener("click", () => { void Promise.all([syncModuleUpdate(), loadModulesList()]); });
+  moduleTaskDismiss.addEventListener("click", async () => {
+    const scope = captureInstanceRequest();
+    const task = moduleTask;
+    if (!scope || !moduleCanDismiss || task?.status !== "unknown") return;
+    if (moduleTaskDismiss.dataset.armed !== task.id) {
+      moduleTaskDismiss.dataset.armed = task.id;
+      moduleTaskDismiss.textContent = "确认清除";
+      showModulesNotice("清除仅解除操作锁定，不会重放请求，也不代表上次更新成功。", "error");
+      return;
+    }
+    const epoch = ++moduleEpoch;
+    moduleCanDismiss = false;
+    updateModuleControls();
+    try {
+      const response = await chrome.runtime.sendMessage({ type: "DISMISS_UNKNOWN_MODULE_UPDATE", instanceId: scope.instance.id, taskId: task.id, taskSequence: task.sequence });
+      if (!scope.isCurrent() || epoch !== moduleEpoch) return;
+      if (!response?.ok) throw new Error(response?.error || "模块任务状态已改变，请重新检查");
+    } catch (error) {
+      if (scope.isCurrent() && epoch === moduleEpoch) showModulesNotice(error.message, "error");
+    } finally {
+      if (scope.isCurrent() && epoch === moduleEpoch) void syncModuleUpdate();
+    }
+  });
 
   function resolveMemberLatency(groupName, memberName) {
     return leafProbeResults.get(probeResultKey(groupName, memberName)) || null;
@@ -2855,6 +2996,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Initial load
+  void syncModuleUpdate();
   void syncProviderRefreshTask();
   loadDashboard();
   void refreshTraffic();
@@ -2862,6 +3004,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     void refreshTraffic();
   }, 1000);
   window.addEventListener("pagehide", () => {
+    moduleEpoch += 1;
+    moduleListRead += 1;
+    if (modulePollTimer !== null) clearTimeout(modulePollTimer);
     if (trafficTimer !== null) clearInterval(trafficTimer);
     try {
       trafficPort.disconnect();

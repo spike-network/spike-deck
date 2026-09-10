@@ -1,4 +1,5 @@
 import { StorageManager } from './lib/storage.js';
+import { dismissUnknownModuleUpdate, getModuleUpdateState, startModuleUpdate } from './lib/module-update.js';
 import { SpikeApiClient } from './lib/spike-client.js';
 import { getProxyControlState, invalidateProxyIntent, reconcileProxyIntent } from './lib/proxy-control.js';
 import { badgeTraffic, trafficTitle } from './lib/format-rate.js';
@@ -12,7 +13,6 @@ const PROVIDER_REFRESH_RECONCILE_AFTER_SECONDS = 240;
 const providerRefreshOperations = new Map();
 const providerRefreshStarts = new Map();
 const providerRefreshPolls = new Map();
-const moduleOperations = new Map();
 const GROUP_TEST_POLL_INTERVAL_MS = 700;
 const GROUP_TEST_ALARM_PREFIX = 'group-test-reconcile:';
 const OPEN_POPUP_COMMAND = 'open-popup';
@@ -215,8 +215,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === 'GET_MODULE_UPDATE') {
-    sendResponse({ ok: true, task: moduleOperations.get(message.instanceId) || null });
-    return false;
+    getModuleUpdateState(message.instanceId).then((state) => sendResponse({ ok: true, ...state }))
+      .catch(() => sendResponse({ ok: false, error: '暂时无法查询模块任务，正在重试' }));
+    return true;
+  }
+  if (message.type === 'DISMISS_UNKNOWN_MODULE_UPDATE') {
+    dismissUnknownModuleUpdate(message.instanceId, message.taskId, message.taskSequence).then((state) => sendResponse({ ok: true, ...state }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
   }
   if (message.type === 'TRAFFIC_SAMPLE') {
     applyTrafficBadge(message.traffic, message.error);
@@ -237,29 +243,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 });
-
-async function startModuleUpdate(instanceId, body) {
-  const instance = await findInstance(instanceId);
-  const task = { instanceId, status: 'running', body: body || {}, error: null, result: null };
-  moduleOperations.set(instanceId, task);
-  broadcastRuntimeTask('MODULE_UPDATE_CHANGED', instanceId, task);
-  try {
-    const result = await SpikeApiClient.updateModules(instance, body || {});
-    const next = { ...task, status: 'completed', result, error: result?.error || null };
-    moduleOperations.set(instanceId, next);
-    broadcastRuntimeTask('MODULE_UPDATE_CHANGED', instanceId, next);
-    return next;
-  } catch (error) {
-    const next = { ...task, status: 'failed', error: error.message || String(error) };
-    moduleOperations.set(instanceId, next);
-    broadcastRuntimeTask('MODULE_UPDATE_CHANGED', instanceId, next);
-    throw error;
-  }
-}
-
-function broadcastRuntimeTask(type, instanceId, task) {
-  chrome.runtime.sendMessage({ type, instanceId, task }).catch(() => {});
-}
 
 async function findInstance(instanceId) {
   const instances = await StorageManager.getInstances();

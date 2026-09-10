@@ -113,6 +113,14 @@ npm --prefix store run check:proxy-control
 npm --prefix store run check:provider-state
 ```
 
+模块更新使用 Core 的 `module_update_tasks: 1` 能力时，操作由 Core 持有；Popup 关闭或后台重建后按已保存的 namespace 和操作 ID 恢复。同实例更新期间拒绝重复提交，也能发现其他客户端通过该任务接口提交的更新。旧版 Core 保留同步接口兼容，但后台中断后的结果不会根据模块列表推断成功。
+
+任务查询临时失败会保留引用并重试。Core 重启、任务不再保留或旧版同步请求结果无法确认时显示未知状态；“重新检查”只查询，确认“清除未知结果”只解除客户端操作锁定，不重放请求，也不宣称上次操作成功。下一次修改必须由用户重新发起。持久任务记录不包含安装 URL、请求正文或实例凭据。
+
+```bash
+npm --prefix store run check:module-state
+```
+
 ```bash
 make package          # dist/spikedeck-<version>.zip
 make store-release    # 打包 + 上传 + 提交审核

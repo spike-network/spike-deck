@@ -116,7 +116,7 @@ export function installChromeMock({ theme, language, now }) {
       }),
       async sendMessage({ type }) {
         if (type === "GET_GROUP_TEST_STATE") return { ok: true, tasks: [] };
-        if (type === "GET_PROVIDER_REFRESH_TASK")
+        if (type === "GET_PROVIDER_REFRESH_TASK" || type === "GET_MODULE_UPDATE")
           return { ok: true, task: null };
         if (type === "GET_PROXY_SETTING_STATE")
           return {
