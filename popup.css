@@ -1124,7 +1124,9 @@ input:checked + .slider::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 4px;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
   border-radius: 3px;
   background: var(--sd-surface-alt);
   color: var(--text-dim);
@@ -1146,13 +1148,14 @@ input:checked + .slider::before {
   background: var(--sd-warning-soft);
   color: var(--pin);
   flex-shrink: 0;
-  gap: 3px;
-  font-size: 12px;
+  font-size: 15px;
   line-height: 1;
 }
 
 .override-kind-badge .pin-icon {
   display: block;
+  width: 15px;
+  height: 15px;
 }
 
 .pin-icon {

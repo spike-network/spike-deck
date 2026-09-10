@@ -2220,10 +2220,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         {
           className: "override-kind-badge",
           title: "已手动固定节点",
+          "aria-label": "已手动固定节点",
           hidden: !isOverridden,
         },
         el("span", { className: "pin-icon", "aria-hidden": "true" }),
-        el("span", {}, "已固定"),
       );
 
       const resumeAutoButton = el(

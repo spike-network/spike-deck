@@ -29,5 +29,6 @@ assert.match(popup, /className: "btn-resume-auto"/);
 assert.match(popup, /className: "override-kind-badge"/);
 assert.match(popup, /groupMemberAction\(currentGroup, member\)/);
 assert.match(popup, /className: "pin-icon"/);
+assert.doesNotMatch(popup, /el\("span", \{\}, "已固定"\)/);
 
 console.log("group selection tests passed");
