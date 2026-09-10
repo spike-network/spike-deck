@@ -23,7 +23,7 @@
     - Popup 会恢复上次面板、滚动位置和焦点（不恢复筛选词），并集中显示运行中的资源与模块任务。
     - 节点切换会提示“仅影响新连接”，短时间内可撤销；非规则模式持续显示安全提示并可一键恢复。
    - Popup 可切换运行模式：规则模式、全部直连、全局代理（调用 `GET` / `PUT /spike/outbound`，全局模式选择一个策略）。
-   - 对已固定（override/pin）的 `url-test` / `fallback` / `smart` 组，再次点击已固定节点即可**恢复自动选择**（`DELETE /spike/groups/{name}/select`）。
+   - 对已固定（override/pin）的 `url-test` / `fallback` / `smart` 组，点击组头图钉或再次点击已固定节点即可**恢复自动选择**（`DELETE /spike/groups/{name}/select`）。
 
 3. **延迟测试 (Speedtest / Ping)**
    - **单组/单节点测速**：随时刷新单个策略组或其中一个节点的 RTT 延迟；结果按策略组隔离，同名节点不会互相覆盖。
