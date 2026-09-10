@@ -11,7 +11,7 @@ import {
 } from "./lib/hidden-groups.js";
 import { initializeI18n } from "./lib/i18n.js";
 import { installPopupInteractions } from "./lib/popup-interactions.js";
-import { groupMemberAction } from "./lib/group-selection.js";
+import { groupMemberAction, splitSelectedSummary } from "./lib/group-selection.js";
 
 // Global latency cache for leaf nodes by member name
 // key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
@@ -2141,6 +2141,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     return leafProbeResults.get(probeResultKey(groupName, memberName)) || null;
   }
 
+  function selectedSummaryChildren(memberName) {
+    const { leading, trailing } = splitSelectedSummary(memberName);
+    if (!trailing) return [leading];
+    return [
+      el("span", { className: "current-selected-leading" }, leading),
+      el("span", { className: "current-selected-trailing" }, trailing),
+    ];
+  }
+
   // Render Policy Groups
   function renderGroups(groups) {
     const normalizedFilter = groupFilterText.toLowerCase();
@@ -2211,8 +2220,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         {
           className: `current-selected${isOverridden ? " pinned" : ""}`,
           title: currentSelected,
+          "aria-label": currentSelected,
         },
-        currentSelected,
+        ...selectedSummaryChildren(currentSelected),
       );
 
       const resumeAutoButton = el(
@@ -2458,8 +2468,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     const selectedSummary = groupCard.querySelector(".current-selected");
     if (selectedSummary) {
-      selectedSummary.textContent = memberName;
+      selectedSummary.replaceChildren(...selectedSummaryChildren(memberName));
       selectedSummary.title = memberName;
+      selectedSummary.setAttribute("aria-label", memberName);
       selectedSummary.classList.toggle("pinned", isOverridden);
     }
     const resumeButton = groupCard.querySelector(".btn-resume-auto");

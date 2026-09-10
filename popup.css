@@ -1230,14 +1230,28 @@ input:checked + .slider::before {
 }
 
 .current-selected {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.25em;
   flex: 1 1 auto;
   font-size: 13px;
   color: var(--accent-cyan);
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
+}
+
+.current-selected-leading {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.current-selected-trailing {
+  flex-shrink: 0;
 }
 
 .current-selected.pinned {
