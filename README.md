@@ -84,7 +84,7 @@
 - **快捷打开**：在 Chrome 中按 `Ctrl+Shift+K`（macOS 为 `Command+Shift+K`）直接打开 Popup；可在 Options 中停用，并可在 `chrome://extensions/shortcuts` 中重新绑定。
 - **外部资源**：点击 Popup 顶栏的云下载按钮打开资源列表；可「全部更新」或对单条点「更新」，面板会展示每项结果。
 - **刷新列表**：点击圆形箭头按钮，重新载入当前实例的策略组与状态。
-- **实例切换**：点击「实例」入口，在子面板挑选激活的 Spike 实例。
+- **实例切换**：点击「实例」入口，在子面板挑选激活的 Spike 实例。新实例的主面板加载不等待旧实例请求结束；旧加载结果不更新新实例的状态、Profile 列表或策略组缓存。离线重开时只恢复对应实例的缓存策略组。
 - **切换 Profile**：点击「Profile」入口，选择配置后点「切换」；子面板同时展示路径、组/节点/规则数量、DNS 延迟与代理监听。检查与切换绑定到发起时的实例；检查期间改选实例会取消尚未发送的切换，已发送的请求仍只作用于原实例，其迟到结果不会更新新实例的 Profile 操作提示或按钮状态。
 - **浏览器代理控制**：在状态条开关 **“接管代理”**，快捷切换是否让 Chrome 流量走 Spike。
 
@@ -92,11 +92,12 @@
 
 ## 📦 打包与商店发布
 
-Profile 切换竞态可用独立 Chromium 上下文验证，不访问真实实例或修改浏览器代理：
+Profile 切换和主面板加载竞态可用独立 Chromium 上下文验证，不访问真实实例或修改浏览器代理：
 
 ```bash
 make screenshots-setup
 npm --prefix store run check:profile-switch
+npm --prefix store run check:dashboard-lifetime
 ```
 
 ```bash

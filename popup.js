@@ -283,6 +283,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const instances = await StorageManager.getInstances();
   let activeInstance = await StorageManager.getActiveInstance();
   let instanceGeneration = 0;
+  let instanceSelectionWrite = Promise.resolve();
   let profileSwitchOperation = null;
   const popupInteractions = installPopupInteractions({
     getInstanceId: () => activeInstance?.id || null,
@@ -379,7 +380,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const runtimeExpansion = new Map();
   let groupFilterText = "";
   let filterRenderTimer = null;
-  let dashboardLoading = false;
+  let dashboardLoad = null;
   let offlineRetryTimer = null;
   const selectingGroups = new Set();
   updateHiddenToggleUI();
@@ -1305,21 +1306,41 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Instance selector change handler
   instanceSelect.addEventListener("change", async (e) => {
     // Invalidate a pending profile check before permission or storage awaits.
-    instanceGeneration += 1;
+    const generation = ++instanceGeneration;
     profileSwitchOperation = null;
     btnProfileSwitch.disabled = false;
     setQuickPanel(null);
     const selectedId = e.target.value;
     const targetInst = instances.find((i) => i.id === selectedId);
-    if (targetInst) {
+    if (!targetInst) {
+      renderInstanceSelector();
+      void loadDashboard();
+      return;
+    }
+    try {
       const granted = await ensureHostPermission(targetInst.baseUrl);
+      if (generation !== instanceGeneration) return;
       if (!granted) {
         renderInstanceSelector();
         showToast("❌ 未获得该实例的主机访问权限", "error");
+        void loadDashboard();
         return;
       }
+      const write = instanceSelectionWrite.then(() => {
+        if (generation === instanceGeneration) {
+          return StorageManager.setActiveInstanceId(selectedId);
+        }
+      });
+      instanceSelectionWrite = write.catch(() => {});
+      await write;
+      if (generation !== instanceGeneration) return;
+    } catch (error) {
+      if (generation !== instanceGeneration) return;
+      renderInstanceSelector();
+      showToast(error.message || "未知错误", "error");
+      void loadDashboard();
+      return;
     }
-    await StorageManager.setActiveInstanceId(selectedId);
     resetGroupTestTracking();
     leafProbeResults.clear();
     runtimeExpansion.clear();
@@ -1332,7 +1353,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       clearTimeout(offlineRetryTimer);
       offlineRetryTimer = null;
     }
-    activeInstance = await StorageManager.getActiveInstance();
+    activeInstance = targetInst;
     providersBusyKey = "";
     providerRefreshTask = null;
     providerRefreshFailures = {};
@@ -1345,16 +1366,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     providersRefreshing = false;
     currentOutbound = null;
     currentOutboundPolicies = [];
+    currentGroupsData = [];
+    currentProfileStem = "";
+    profileName.textContent = "-";
+    profileName.title = "";
+    badgeGroups.textContent = "组: -";
+    badgeNodes.textContent = "节点: -";
+    badgeRules.textContent = "规则: -";
+    profileSelect.replaceChildren();
+    managedBadge.hidden = true;
+    renderTraffic(null);
+    badgeDnsDelay.textContent = "DNS: —";
+    badgeDnsDelay.title = "";
+    proxyListeners.replaceChildren(el("span", { className: "proxy-listener-empty" }, "-"));
     btnRefreshProviders.classList.remove("testing");
     renderOutboundMode(null, [], "切换实例中…");
     chrome.runtime.sendMessage({ type: "UPDATE_PROXY_SETTING" });
+    void loadDashboard();
     if (isProvidersPanelOpen()) {
       clearProvidersPanelNotice();
       await Promise.all([loadProvidersList(), syncProviderRefreshTask({ announce: true })]);
     } else {
       void syncProviderRefreshTask();
     }
-    loadDashboard();
   });
 
   btnRefresh.addEventListener("click", () => {
@@ -1578,17 +1612,39 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Main Dashboard Loader
-  async function loadDashboard() {
-    if (dashboardLoading) return;
-    dashboardLoading = true;
+  function captureInstanceRequest() {
+    const instance = activeInstance;
+    const generation = instanceGeneration;
+    return {
+      instance,
+      isCurrent: () => instance === activeInstance && generation === instanceGeneration,
+    };
+  }
+
+  // Coalesce one instance's refreshes without blocking a newer instance.
+  function loadDashboard({ force = false } = {}) {
+    if (!force && dashboardLoad?.pending && dashboardLoad.isCurrent()) return dashboardLoad.promise;
+    const scope = captureInstanceRequest();
+    const load = {
+      instance: scope.instance,
+      pending: true,
+      isCurrent: () => scope.isCurrent() && dashboardLoad === load,
+    };
+    dashboardLoad = load;
+    load.promise = renderDashboard(load);
+    return load.promise;
+  }
+
+  async function renderDashboard(load) {
+    const instance = load.instance;
+    delete groupsContainer.dataset.snapshot;
     if (offlineRetryTimer !== null) {
       clearTimeout(offlineRetryTimer);
       offlineRetryTimer = null;
     }
 
-    if (!activeInstance) {
-      dashboardLoading = false;
+    if (!instance) {
+      load.pending = false;
       btnRefresh.classList.remove("testing");
       setStatus("offline", "未配置实例");
       profileName.textContent = "-";
@@ -1621,7 +1677,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     let cachedGroupsRendered = false;
     try {
-      const snapshot = await StorageManager.getPopupGroupSnapshot(activeInstance.id);
+      const snapshot = await StorageManager.getPopupGroupSnapshot(instance.id);
+      if (!load.isCurrent()) return;
       if (snapshot?.groups?.length) {
         currentGroupsData = snapshot.groups;
         ingestPersistedMemberInfo(currentGroupsData);
@@ -1630,16 +1687,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         cachedGroupsRendered = true;
       }
     } catch (error) {
+      if (!load.isCurrent()) return;
       console.warn(`Unable to restore popup group snapshot: ${error.message}`);
     }
 
     try {
       const [status, groupsData, outbound, policies] = await Promise.all([
-        SpikeApiClient.getStatus(activeInstance),
-        SpikeApiClient.getGroups(activeInstance),
-        optionalApiRequest("outbound mode", () => SpikeApiClient.getOutbound(activeInstance)),
-        optionalApiRequest("policy inventory", () => SpikeApiClient.getPolicies(activeInstance)),
+        SpikeApiClient.getStatus(instance),
+        SpikeApiClient.getGroups(instance),
+        optionalApiRequest("outbound mode", () => SpikeApiClient.getOutbound(instance)),
+        optionalApiRequest("policy inventory", () => SpikeApiClient.getPolicies(instance)),
       ]);
+      if (!load.isCurrent()) return;
 
       setStatus("online", "已连接");
       profileName.textContent = status.profile || "Default";
@@ -1650,13 +1709,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       badgeRules.textContent = `规则: ${status.rules || 0}`;
       renderProxyListeners(status);
       void refreshTraffic();
-      void refreshProfileControls(status);
-      void refreshDnsDelay();
+      void refreshProfileControls(status, load);
+      void refreshDnsDelay(load);
 
       currentGroupsData = groupsData.groups || [];
       delete groupsContainer.dataset.snapshot;
-      void StorageManager.setPopupGroupSnapshot(activeInstance.id, currentGroupsData).catch(
+      void StorageManager.setPopupGroupSnapshot(instance.id, currentGroupsData, load.isCurrent).catch(
         (error) => {
+          if (!load.isCurrent()) return;
           console.warn(`Unable to persist popup group snapshot: ${error.message}`);
         },
       );
@@ -1672,6 +1732,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderGroups(currentGroupsData);
       void restoreRecentGroupTests();
     } catch (err) {
+      if (!load.isCurrent()) return;
       setStatus("offline", "未连接");
       profileName.textContent = "-";
       profileName.title = "";
@@ -1715,8 +1776,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       groupsContainer.replaceChildren(errorNode);
       scheduleOfflineRetry();
     } finally {
-      dashboardLoading = false;
-      btnRefresh.classList.remove("testing");
+      load.pending = false;
+      if (load.isCurrent()) btnRefresh.classList.remove("testing");
     }
   }
 
@@ -1813,14 +1874,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function refreshTraffic() {
-    const targetInstance = activeInstance;
+    const scope = captureInstanceRequest();
+    if (!scope.instance) return;
     try {
-      const metrics = await SpikeApiClient.getMetrics(targetInstance);
-      if (activeInstance?.id !== targetInstance?.id) return;
+      const metrics = await SpikeApiClient.getMetrics(scope.instance);
+      if (!scope.isCurrent()) return;
       renderTraffic(metrics?.traffic);
       publishTrafficSample(metrics?.traffic);
     } catch (error) {
-      if (activeInstance?.id !== targetInstance?.id) return;
+      if (!scope.isCurrent()) return;
       renderTraffic(null);
       publishTrafficSample(null, error.message || "unreachable");
     }
@@ -1959,21 +2021,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     statusText.textContent = text;
   }
 
-  async function refreshProfileControls(status) {
-    currentProfileStem = SpikeApiClient.profileStem(status?.profile || "");
+  async function refreshProfileControls(status, load) {
+    const stem = SpikeApiClient.profileStem(status?.profile || "");
     try {
       const [list, current] = await Promise.all([
-        SpikeApiClient.getProfiles(activeInstance),
-        SpikeApiClient.getCurrentProfile(activeInstance),
+        SpikeApiClient.getProfiles(load.instance),
+        SpikeApiClient.getCurrentProfile(load.instance),
       ]);
+      if (!load.isCurrent()) return;
       const names = Array.isArray(list?.profiles) ? list.profiles : [];
       profileSelect.replaceChildren(
-        ...(names.length ? names : [currentProfileStem || ""]).map((name) =>
+        ...(names.length ? names : [stem || ""]).map((name) =>
           el("option", { value: name }, name),
         ),
       );
-      profileSelect.value = names.includes(currentProfileStem)
-        ? currentProfileStem
+      profileSelect.value = names.includes(stem)
+        ? stem
         : names[0] || "";
       updateQuickSummaries();
       const managed = SpikeApiClient.parseManagedProfile(current?.profile || "");
@@ -1987,6 +2050,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         managedBadge.hidden = true;
       }
     } catch {
+      if (!load.isCurrent()) return;
       profileSelect.replaceChildren(
         el("option", { value: currentProfileStem }, currentProfileStem || "—"),
       );
@@ -2014,7 +2078,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const switched = await SpikeApiClient.switchProfile(instance, name);
       if (!isCurrent()) return;
       if (switched?.error) throw new Error(switched.error);
-      await loadDashboard();
+      await loadDashboard({ force: true });
       if (!isCurrent()) return;
       setQuickPanel(null);
       showToast(`已切换到 ${name}`, "success");
@@ -2030,9 +2094,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function refreshDnsDelay() {
+  async function refreshDnsDelay(load) {
     try {
-      const result = await SpikeApiClient.measureDnsDelay(activeInstance);
+      const result = await SpikeApiClient.measureDnsDelay(load.instance);
+      if (!load.isCurrent()) return;
       if (result?.error) {
         badgeDnsDelay.textContent = "DNS: err";
         badgeDnsDelay.title = result.error;
@@ -2041,6 +2106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       badgeDnsDelay.textContent = `DNS: ${result?.delay ?? "—"} ms`;
       badgeDnsDelay.title = "";
     } catch (error) {
+      if (!load.isCurrent()) return;
       badgeDnsDelay.textContent = "DNS: —";
       badgeDnsDelay.title = error.message || "";
     }
