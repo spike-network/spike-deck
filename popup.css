@@ -1043,34 +1043,6 @@ input:checked + .slider::before {
   overflow-wrap: anywhere;
 }
 
-.ui-tooltip {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 110;
-  max-width: calc(100vw - 16px);
-  padding: 4px 7px;
-  border: 1px solid var(--sd-line);
-  border-radius: 4px;
-  background: var(--sd-surface-alt);
-  color: var(--text-main);
-  box-shadow: none;
-  font-size: 12px;
-  line-height: 1.35;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 0.1s ease,
-    visibility 0.1s ease;
-  white-space: nowrap;
-}
-
-.ui-tooltip.visible {
-  opacity: 1;
-  visibility: visible;
-}
-
 .toast.success {
   border-left-color: var(--status-online);
 }

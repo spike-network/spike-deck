@@ -31,9 +31,7 @@ assert.match(popup, /groupMemberAction\(currentGroup, member\)/);
 assert.match(popup, /className: "pin-icon"/);
 assert.doesNotMatch(popup, /el\("span", \{\}, "已固定"\)/);
 assert.doesNotMatch(popup, /className: "group-kind-badge"/);
-assert.match(popup, /GROUP_TYPE_TOOLTIP_SHOW_MS = 350/);
-assert.match(popup, /GROUP_TYPE_TOOLTIP_HIDE_MS = 100/);
-assert.match(popup, /attachGroupTypeTooltip\(groupTitleEl, groupNameEl, headerEl, groupType\)/);
-assert.match(popup, /addEventListener\("pointermove", queueTooltip\)/);
+assert.match(popup, /className: "group-name",\s+title: groupType,/);
+assert.doesNotMatch(popup, /attachGroupTypeTooltip|group-type-tooltip/);
 
 console.log("group selection tests passed");
