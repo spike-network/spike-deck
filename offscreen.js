@@ -22,15 +22,17 @@ let logGeneration = 0;
 let logRetryTimer = null;
 let logRetryMs = 1000;
 let logAfter = 0;
+let logNamespace = '';
 let logInstanceId = null;
 let logGapDetected = false;
 
-function publishLogState(status) {
+function publishLogState(status, namespaceKnown = false) {
   chrome.runtime.sendMessage({
     type: 'SPIKE_LOG_STREAM_STATE',
     instanceId: logInstanceId,
     status,
-    after: logAfter
+    after: logAfter,
+    eventNamespace: namespaceKnown ? logNamespace : undefined
   }).catch(() => {});
 }
 
@@ -71,15 +73,18 @@ async function startLogStream(expectedGeneration = null) {
     scheduleLogRetry(generation);
     return;
   }
+  if (generation !== logGeneration) return;
   if (!instance) {
     logInstanceId = null;
     logAfter = 0;
+    logNamespace = '';
     publishLogState('idle');
     return;
   }
   if (instance.id !== logInstanceId) {
     logInstanceId = instance.id;
     logAfter = 0;
+    logNamespace = '';
   }
 
   const controller = new AbortController();
@@ -89,18 +94,35 @@ async function startLogStream(expectedGeneration = null) {
   try {
     await SpikeApiClient.streamLogs(instance, {
       after: logAfter,
+      namespace: logNamespace,
       signal: controller.signal,
       onOpen: () => {
+        if (generation !== logGeneration) return;
         logRetryMs = 1000;
-        publishLogState('live');
+        publishLogState('live', false);
       },
       onMessage: (message) => {
+        if (generation !== logGeneration || controller.signal.aborted) return;
+        if (message.event === 'stream') {
+          const namespace = message.data?.event_namespace;
+          if (typeof namespace === 'string' && namespace) {
+            if (namespace !== logNamespace || message.data.reset === true) logAfter = 0;
+            logNamespace = namespace;
+            publishLogState('live', true);
+          }
+          return;
+        }
         if (message.event === 'gap') {
+          if (message.data?.reason === 'history_evicted') {
+            publishLogState('gap');
+            return;
+          }
           logGapDetected = true;
           controller.abort();
           return;
         }
         if (message.event !== 'log' || !message.data || typeof message.data !== 'object') return;
+        if (message.data.event_namespace && message.data.event_namespace !== logNamespace) return;
         const sequence = Number(message.data.sequence);
         if (!Number.isSafeInteger(sequence) || sequence <= logAfter) return;
         logAfter = sequence;

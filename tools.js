@@ -13,6 +13,16 @@ await initializeI18n();
 let instance = null;
 let logEntries = [];
 let eventEntries = [];
+let eventNamespace = '';
+
+function adoptEventNamespace(namespace) {
+  if (!namespace || namespace === eventNamespace) return;
+  eventNamespace = namespace;
+  logEntries = [];
+  eventEntries = [];
+  renderLogs();
+  renderEvents();
+}
 
 const byId = (id) => document.getElementById(id);
 const text = (tag, value, className, userContent = false) => {
@@ -100,7 +110,10 @@ async function loadSessionPools() {
 }
 
 async function loadLogs() {
+  const namespace = eventNamespace;
   const data = await SpikeApiClient.getLogs(instance, 200);
+  if (namespace !== eventNamespace && data.event_namespace !== eventNamespace) return;
+  adoptEventNamespace(data.event_namespace);
   const entries = Array.isArray(data.entries) ? data.entries : [];
   mergeLogEntries(entries);
 }
@@ -120,7 +133,10 @@ function eventRow(entry) {
 }
 
 async function loadEvents() {
+  const namespace = eventNamespace;
   const data = await SpikeApiClient.getEvents(instance, 500);
+  if (namespace !== eventNamespace && data.event_namespace !== eventNamespace) return;
+  adoptEventNamespace(data.event_namespace);
   eventEntries = (data.events || []).filter((entry) => entry.kind !== 'log').reverse();
   renderEvents();
 }
@@ -141,6 +157,7 @@ function renderEvents() {
 function mergeLogEntries(entries) {
   const bySequence = new Map(logEntries.map((entry) => [Number(entry.sequence), entry]));
   for (const entry of entries) {
+    if (entry?.event_namespace && entry.event_namespace !== eventNamespace) continue;
     const sequence = Number(entry?.sequence);
     if (Number.isSafeInteger(sequence)) bySequence.set(sequence, entry);
   }
@@ -170,6 +187,7 @@ function setLogStreamState(status) {
     connecting: '实时日志连接中…',
     live: '实时日志已连接',
     retrying: '实时日志重连中…',
+    gap: '部分历史日志已过期，正在接收新日志',
     idle: '等待活动实例'
   };
   const node = byId('logs-stream-state');
@@ -180,7 +198,10 @@ function setLogStreamState(status) {
 chrome.runtime.onMessage.addListener((message) => {
   if (!instance || message?.instanceId !== instance.id) return;
   if (message.type === 'SPIKE_LOG_STREAM_ENTRY') mergeLogEntries([message.entry]);
-  if (message.type === 'SPIKE_LOG_STREAM_STATE') setLogStreamState(message.status);
+  if (message.type === 'SPIKE_LOG_STREAM_STATE') {
+    adoptEventNamespace(message.eventNamespace);
+    setLogStreamState(message.status);
+  }
 });
 
 async function loadDnsCache() {
