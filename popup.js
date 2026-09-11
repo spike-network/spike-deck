@@ -13,12 +13,12 @@ import { initializeI18n } from "./lib/i18n.js";
 import { installPopupInteractions } from "./lib/popup-interactions.js";
 import {
   groupMemberAction,
+  isDirectGroupProbeResult,
   shouldCollapseGroupAfterSelection,
   splitSelectedSummary,
 } from "./lib/group-selection.js";
 
-// Global latency cache for leaf nodes by member name
-// key: memberName, value: { ms: number | null, ok: boolean, err?: string, at?: number }
+// Group/member-scoped current health; task samples only fill legacy metadata gaps.
 const leafProbeResults = new Map();
 let currentGroupsData = [];
 const terminalGroupTestStatuses = new Set(["completed", "cancelled", "failed"]);
@@ -26,6 +26,9 @@ const cancellingGroupTests = new Set();
 const submittingGroupTests = new Set();
 const groupTestTaskVersions = new Map();
 let groupTestEpoch = 0;
+let groupReadSequence = 0;
+let probeSnapshotRefresh = null;
+let probeSnapshotsDirty = false;
 
 /** Display labels for protocol / nested-group kinds (product typography, not raw slugs). */
 function formatMemberType(type) {
@@ -968,13 +971,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function handleGroupTestTask(task) {
+    const previous = groupTestTaskVersions.get(groupTestTaskKey(task));
     if (!acceptGroupTestTask(task)) return;
     const metadata = activeGroupTests.get(task.id) || {
       groupName: task.group,
       targetMember: task.requested_member || task.member || null,
       completedMembers: new Set(),
     };
-    metadata.completedMembers = new Set((task.results || []).map((result) => result.member));
+    metadata.completedMembers = new Set((task.results || []).filter((result) => isDirectGroupProbeResult(task.group, result)).map((result) => result.member));
     activeGroupTests.set(task.id, metadata);
     if (Array.isArray(task.results) && task.results.length > 0) {
       recordProbeResults(task.group, task.results, task.created_at_unix_ms || Date.now());
@@ -982,8 +986,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateAllLatencyBadgesDOM();
     if (terminalGroupTestStatuses.has(task.status)) {
       finishGroupTestTask(task.id);
-      void refreshProbeSnapshots();
     }
+    if (groupTaskHealthChanged(previous, task) || probeSnapshotsDirty) void refreshProbeSnapshots();
   }
 
   function finishGroupTestTask(taskId) {
@@ -1003,22 +1007,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateAllLatencyBadgesDOM();
   }
 
-  async function refreshProbeSnapshots() {
-    const targetInstance = activeInstance;
+  function refreshProbeSnapshots() {
+    probeSnapshotsDirty = true;
+    if (probeSnapshotRefresh?.isCurrent()) return probeSnapshotRefresh.promise;
+    const scope = captureInstanceRequest();
     const epoch = groupTestEpoch;
-    try {
-      const groupsData = await SpikeApiClient.getGroups(targetInstance);
-      if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstance?.id) return;
-      currentGroupsData = groupsData.groups || [];
-      ingestPersistedMemberInfo(currentGroupsData);
-      document.querySelectorAll(".group-card").forEach((card) => {
-        const group = currentGroupsData.find((candidate) => candidate.name === card.dataset.group);
-        if (group) paintSelection(card, group);
-      });
-      updateAllLatencyBadgesDOM();
-    } catch {
-      // Progressive task results already populated the UI; retry on refresh.
-    }
+    const refresh = {
+      isCurrent: () => scope.isCurrent() && groupTestEpoch === epoch && probeSnapshotRefresh === refresh,
+    };
+    probeSnapshotRefresh = refresh;
+    refresh.promise = (async () => {
+      while (refresh.isCurrent() && probeSnapshotsDirty) {
+        probeSnapshotsDirty = false;
+        try {
+          await refreshGroupsSelectionState("");
+        } catch {
+          // Preserve last-good health and retry on the next task-state notification.
+          if (refresh.isCurrent()) probeSnapshotsDirty = true;
+          break;
+        }
+      }
+    })().finally(() => {
+      if (probeSnapshotRefresh === refresh) probeSnapshotRefresh = null;
+    });
+    return refresh.promise;
   }
 
   async function restoreRecentGroupTests() {
@@ -1042,12 +1054,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     const previousActiveIds = new Set(previousEntries.keys());
     activeGroupTests.clear();
     let taskSettled = false;
+    let healthChanged = false;
 
     const ordered = Array.isArray(tasks)
       ? tasks.slice().sort((left, right) => left.id - right.id)
       : [];
     for (const task of ordered) {
+      const previous = groupTestTaskVersions.get(groupTestTaskKey(task));
       if (!acceptGroupTestTask(task)) continue;
+      healthChanged ||= groupTaskHealthChanged(previous, task);
       recordProbeResults(task.group, task.results, task.created_at_unix_ms || Date.now());
       if (terminalGroupTestStatuses.has(task.status)) {
         if (previousActiveIds.has(task.id)) taskSettled = true;
@@ -1057,12 +1072,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         groupName: task.group,
         targetMember:
           task.requested_member || task.member || previousEntries.get(task.id)?.targetMember || null,
-        completedMembers: new Set((task.results || []).map((result) => result.member)),
+        completedMembers: new Set((task.results || []).filter((result) => isDirectGroupProbeResult(task.group, result)).map((result) => result.member)),
       });
     }
     syncGroupTestButtons();
     updateAllLatencyBadgesDOM();
-    if (taskSettled) void refreshProbeSnapshots();
+    if (taskSettled || healthChanged || probeSnapshotsDirty) void refreshProbeSnapshots();
   }
 
   function syncGroupTestButtons() {
@@ -1083,6 +1098,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function resetGroupTestTracking() {
     groupTestEpoch += 1;
+    probeSnapshotRefresh = null;
+    probeSnapshotsDirty = false;
     activeGroupTests.clear();
     cancellingGroupTests.clear();
     submittingGroupTests.clear();
@@ -1694,10 +1711,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     groupsContainer.replaceChildren(loadingNode);
 
     let cachedGroupsRendered = false;
+    const cachedReadSequence = groupReadSequence;
     try {
       const snapshot = await StorageManager.getPopupGroupSnapshot(instance.id);
       if (!load.isCurrent()) return;
-      if (snapshot?.groups?.length) {
+      if (snapshot?.groups?.length && cachedReadSequence === groupReadSequence) {
         currentGroupsData = snapshot.groups;
         ingestPersistedMemberInfo(currentGroupsData);
         renderGroups(currentGroupsData);
@@ -1710,6 +1728,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
+      const sequence = ++groupReadSequence;
       const [status, groupsData, outbound, policies] = await Promise.all([
         SpikeApiClient.getStatus(instance),
         SpikeApiClient.getGroups(instance),
@@ -1730,7 +1749,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       void refreshProfileControls(status, load);
       void refreshDnsDelay(load);
 
-      currentGroupsData = groupsData.groups || [];
+      if (sequence === groupReadSequence) currentGroupsData = groupsData.groups || [];
       delete groupsContainer.dataset.snapshot;
       void StorageManager.setPopupGroupSnapshot(instance.id, currentGroupsData, load.isCurrent).catch(
         (error) => {
@@ -1969,6 +1988,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return `${task.task_namespace || "legacy"}:${task.id}`;
   }
 
+  function groupTaskHealthChanged(previous, task) {
+    return Number(task.completed || 0) > Number(previous?.completed || 0) ||
+      (terminalGroupTestStatuses.has(task.status) && (!previous || previous.status !== task.status));
+  }
+
   function acceptGroupTestTask(task) {
     const key = groupTestTaskKey(task);
     const previous = groupTestTaskVersions.get(key);
@@ -1989,37 +2013,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     return true;
   }
 
-  /** Ingest group-scoped member_info last_test_* fields. */
+  /** Replace current health, including absent samples, without replaying old tasks. */
   function ingestPersistedMemberInfo(groups) {
+    const valid = new Set();
+    const authoritative = new Set();
     (groups || []).forEach((g) => {
+      (g.members || []).forEach((member) => valid.add(probeResultKey(g.name, member)));
       if (Array.isArray(g.member_info)) {
         g.member_info.forEach((info) => {
-          if (info && info.name && typeof info.last_test_ok === "boolean") {
+          if (info && info.name) {
             const key = probeResultKey(g.name, info.name);
-            const existing = leafProbeResults.get(key);
-            const newAt = info.last_test_at_unix_ms || 0;
-            if (!existing || !existing.at || newAt >= existing.at) {
-              leafProbeResults.set(key, {
-                sourceMember: info.name,
-                ms: info.last_test_ms ?? null,
-                ok: info.last_test_ok === true,
-                err: info.last_test_ok ? null : "Timeout",
-                at: newAt,
-                udpOk: info.last_udp_test_ok,
-                udpMs: info.last_udp_test_ms ?? null,
-              });
-            }
+            authoritative.add(key);
+            leafProbeResults.set(key, {
+              authoritative: true,
+              sourceMember: info.name,
+              ms: info.last_test_ms ?? null,
+              ok: info.last_test_ok,
+              err: info.last_test_ok === false ? "Timeout" : null,
+              at: info.last_test_at_unix_ms || 0,
+              udpOk: info.last_udp_test_ok,
+              udpMs: info.last_udp_test_ms ?? null,
+            });
           }
         });
       }
     });
+    for (const key of leafProbeResults.keys()) {
+      if (!valid.has(key) || (leafProbeResults.get(key)?.authoritative && !authoritative.has(key))) {
+        leafProbeResults.delete(key);
+      }
+    }
   }
 
   function recordProbeResults(groupName, results, fallbackAt = Date.now()) {
     (results || []).forEach((result) => {
+      if (!isDirectGroupProbeResult(groupName, result)) return;
       const key = probeResultKey(groupName, result.member);
       const recordedAt = result.tested_at_unix_ms || fallbackAt;
       const existing = leafProbeResults.get(key);
+      if (existing?.authoritative) return;
       if (existing && existing.at && recordedAt < existing.at) return;
       leafProbeResults.set(key, {
         sourceMember: result.member,
@@ -2661,10 +2693,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  /** Re-fetch groups and patch one card when the visible group set is stable. */
+  /** Re-fetch groups and patch existing cards when the visible group set is stable. */
   async function refreshGroupsSelectionState(groupName = null) {
+    const scope = captureInstanceRequest();
+    const sequence = ++groupReadSequence;
     const previousVisible = renderedGroupNames();
-    const groupsData = await SpikeApiClient.getGroups(activeInstance);
+    const groupsData = await SpikeApiClient.getGroups(scope.instance);
+    if (!scope.isCurrent() || sequence !== groupReadSequence) return false;
     currentGroupsData = groupsData.groups || [];
     ingestPersistedMemberInfo(currentGroupsData);
     const nextVisible = displayedPolicyGroups(currentGroupsData).map(
@@ -2673,16 +2708,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const visibleGroupsStable =
       previousVisible.length === nextVisible.length &&
       previousVisible.every((name, index) => name === nextVisible[index]);
-    const group = currentGroupsData.find((candidate) => candidate.name === groupName);
-    const groupCard = groupName
-      ? document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`)
-      : null;
-    if (group && groupCard && visibleGroupsStable) {
-      paintSelection(groupCard, group);
+    if (groupName != null && visibleGroupsStable) {
+      document.querySelectorAll(".group-card").forEach((groupCard) => {
+        const group = currentGroupsData.find((candidate) => candidate.name === groupCard.dataset.group);
+        if (group) paintSelection(groupCard, group);
+      });
     } else {
       renderGroups(currentGroupsData);
     }
     updateAllLatencyBadgesDOM();
+    return true;
   }
 
   function paintSelection(groupCard, group) {
@@ -2879,6 +2914,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         recordProbeResults(groupName, result.results);
         updateAllLatencyBadgesDOM();
+        await refreshProbeSnapshots();
       }
     } catch (err) {
       if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;

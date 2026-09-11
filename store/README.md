@@ -29,6 +29,16 @@ clipping, and nonblank pixels. This is a layout smoke test, not baseline pixel c
 installed-extension/background-worker end-to-end coverage.
 English fixtures also reject visible untranslated Chinese UI text, excluding raw content and the language selector.
 
+## Group health regression
+
+Run `npm --prefix store run check:group-health` from the repository root after setup.
+It mounts the production popup with synthetic API and Chrome boundaries, checking
+that current member metadata supersedes historical task results, failed queries
+retain last-good health and retry, progress reads coalesce, and late reads cannot
+undo a selection refresh. No running Core or user browser profile is used.
+`DECK_BASELINE_REF` can select a commit's `popup.js` as a negative control while
+keeping the same fixture and assertions.
+
 ## Isolation And Failures
 
 `capture.mjs` loads production HTML/CSS/JS through a request interceptor. `fixture.mjs` supplies

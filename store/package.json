@@ -7,6 +7,7 @@
     "check": "node capture.mjs --check",
     "check:profile-switch": "node profile-switch-check.mjs",
     "check:dashboard-lifetime": "node dashboard-lifetime-check.mjs",
+    "check:group-health": "node group-health-check.mjs",
     "check:proxy-control": "node proxy-control-check.mjs",
     "check:provider-state": "node provider-state-check.mjs",
     "check:module-state": "node module-state-check.mjs"
