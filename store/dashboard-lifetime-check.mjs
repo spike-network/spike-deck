@@ -77,13 +77,16 @@ async function harness(options = {}) {
     activeInstanceId: "a",
     enableProxyMode: false,
     uiLanguage: "en",
-    groupExpandMode: "collapse-all",
+    groupExpandMode: options.sharedGroups ? "expand-all" : "collapse-all",
+    collapseGroupAfterSelection: options.collapseAfterSelection || false,
     healthCheckInterval: 300,
     trafficRefreshInterval: 60,
   };
   const requests = [];
   const errors = [];
   const versions = { a: 1, b: 1 };
+  const selections = { a: "a-node-1", b: "b-node-1" };
+  const overrides = { ...selections };
   const offline = new Set();
   const held = [];
   let snapshotReads = 0;
@@ -172,9 +175,10 @@ async function harness(options = {}) {
       payloads.status.listeners[0].address = `127.0.0.1:${id === "a" ? 6101 : 6102}`;
       payloads.groups.groups = [
         {
-          name: `${id}-group-${version}`,
-          kind: "select",
-          selected: `${id}-node-1`,
+          name: options.sharedGroups ? "shared-group" : `${id}-group-${version}`,
+          kind: options.sharedGroups ? "smart" : "select",
+          selected: options.sharedGroups ? selections[id] : `${id}-node-1`,
+          override_member: options.sharedGroups ? overrides[id] : undefined,
           members: [`${id}-node-1`, `${id}-node-2`],
         },
       ];
@@ -189,8 +193,10 @@ async function harness(options = {}) {
       }
       if (offline.has(id) || block?.failed) {
         await route.fulfill({ status: 503, json: { error: "mock unavailable" } });
-      } else if (request.method === "PUT" && key.startsWith("groups/")) {
-        await route.fulfill({ json: { ok: true } });
+      } else if (["PUT", "DELETE"].includes(request.method) && key.startsWith("groups/")) {
+        if (request.method === "PUT") selections[id] = JSON.parse(request.body).member;
+        overrides[id] = request.method === "PUT" ? selections[id] : null;
+        await route.fulfill({ json: { ok: true, member: selections[id] } });
       } else {
         assert.ok(Object.hasOwn(payloads, key), `Missing fixture: ${key}`);
         await route.fulfill({ json: payloads[key] });
@@ -411,7 +417,144 @@ async function serializedSelectionAndCoalescing() {
   }
 }
 
+async function sharedReady(page, id) {
+  await page.waitForFunction(
+    (id) =>
+      document.querySelector("#status-dot").classList.contains("online") &&
+      document.querySelector("#profile-select").value === `${id}-1` &&
+      document.querySelector(`.member-item[data-member="${id}-node-1"]`),
+    id,
+  );
+}
+
+async function activateGroup(page, id, action, modifiers = []) {
+  const card = page.locator('.group-card[data-group="shared-group"]');
+  if (!(await card.evaluate((element) => element.classList.contains("expanded"))))
+    await card.locator(".group-header").click();
+  const member = `${id}-node-${action === "select" ? 2 : 1}`;
+  await card.locator(`.member-item[data-member="${member}"]`).click({ modifiers });
+}
+
+async function staleGroupMutation({ action, failed = false, returnToA = false }) {
+  const h = await harness({ sharedGroups: true });
+  try {
+    const page = await h.open();
+    await sharedReady(page, "a");
+    const key = "groups/shared-group/select";
+    const old = h.hold((request) => request.id === "a" && request.key === key, failed);
+    await activateGroup(page, "a", action);
+    await old.started;
+    await changeInstance(page, "b");
+    await sharedReady(page, "b");
+    const current = returnToA ? "a" : "b";
+    if (returnToA) {
+      await changeInstance(page, "a");
+      await sharedReady(page, "a");
+    }
+    const newer = h.hold((request) => request.id === current && request.key === key);
+    await activateGroup(page, current, "select");
+    await newer.started;
+    const count = h.requests.length;
+    old.release();
+    await settled(page, "a", key);
+    assert.equal(h.requests.length, count, "old mutation must not refresh the new instance");
+    assert.deepEqual(await page.locator(".toast").allTextContents(), []);
+    const card = page.locator('.group-card[data-group="shared-group"]');
+    assert.equal(await card.evaluate((element) => element.classList.contains("selection-busy")), true);
+    // Keyboard activation must remain blocked while the newer request is pending.
+    await card.locator(`.member-item[data-member="${current}-node-1"]`).press("Enter");
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    assert.equal(h.requests.length, count, "old finally must not unlock the newer selection");
+    newer.release();
+    await settled(page, current, key, returnToA ? 2 : 1);
+    await page.waitForFunction(
+      (current) => {
+        const card = document.querySelector('.group-card[data-group="shared-group"]');
+        return !card.classList.contains("selection-busy") &&
+          card.querySelector(`.member-item[data-member="${current}-node-2"]`)?.classList.contains("pinned");
+      },
+      current,
+    );
+    await verify(h);
+  } finally {
+    await h.close();
+  }
+}
+
+async function ordinaryGroupMutation({ action, failed = false, alt = false, redraw = false }) {
+  const h = await harness({ sharedGroups: true, collapseAfterSelection: true });
+  try {
+    const page = await h.open();
+    await sharedReady(page, "a");
+    const key = "groups/shared-group/select";
+    const pending = h.hold((request) => request.id === "a" && request.key === key, failed);
+    await activateGroup(page, "a", action, alt ? ["Alt"] : []);
+    await pending.started;
+    const card = page.locator('.group-card[data-group="shared-group"]');
+    assert.equal(await card.evaluate((element) => element.classList.contains("expanded")), alt);
+    if (redraw) {
+      await page.locator("#btn-refresh").click();
+      await settled(page, "a", "groups", 2);
+      assert.equal(await card.evaluate((element) => element.classList.contains("selection-busy")), true);
+    }
+    pending.release();
+    await settled(page, "a", key);
+    if (!failed || action === "select") await settled(page, "a", "groups", redraw ? 3 : 2);
+    const pinned = await card.locator(".member-item.pinned").evaluateAll((items) => items[0]?.dataset.member || null);
+    assert.equal(pinned, failed ? "a-node-1" : action === "select" ? "a-node-2" : null);
+    assert.equal(await card.evaluate((element) => element.classList.contains("selection-busy")), false);
+    assert.equal((await page.locator(".toast.error").count()) > 0, failed);
+    assert.equal(h.requests.filter((request) => request.id === "b").length, 0);
+    assert.equal(h.requests.filter((request) => request.key === key).length, 1);
+    await verify(h);
+  } finally {
+    await h.close();
+  }
+}
+
+async function staleSelectionRefresh(action) {
+  const h = await harness({ sharedGroups: true });
+  try {
+    const page = await h.open();
+    await sharedReady(page, "a");
+    const refresh = h.hold((request) => request.id === "a" && request.key === "groups", true);
+    await activateGroup(page, "a", action);
+    await refresh.started;
+    await changeInstance(page, "b");
+    await sharedReady(page, "b");
+    const key = "groups/shared-group/select";
+    const pending = h.hold((request) => request.id === "b" && request.key === key);
+    await activateGroup(page, "b", "select");
+    await pending.started;
+    const count = h.requests.length;
+    refresh.release();
+    await settled(page, "a", "groups", 2);
+    assert.equal(h.requests.length, count);
+    assert.deepEqual(await page.locator(".toast").allTextContents(), []);
+    const card = page.locator('.group-card[data-group="shared-group"]');
+    await card.locator('.member-item[data-member="b-node-1"]').press("Enter");
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    assert.equal(h.requests.length, count);
+    pending.release();
+    await settled(page, "b", key);
+    await settled(page, "b", "groups", 2);
+    assert.equal(await card.evaluate((element) => element.classList.contains("selection-busy")), false);
+    await verify(h);
+  } finally {
+    await h.close();
+  }
+}
+
 try {
+  for (const action of ["select", "auto"]) {
+    for (const failed of [false, true]) {
+      for (const returnToA of [false, true])
+        await staleGroupMutation({ action, failed, returnToA });
+      await ordinaryGroupMutation({ action, failed });
+    }
+    await ordinaryGroupMutation({ action, alt: true, redraw: true });
+    await staleSelectionRefresh(action);
+  }
   await oldMainResponse();
   await oldMainResponse({ failed: true });
   await oldMainResponse({ failed: true, pendingB: true });
@@ -423,7 +566,7 @@ try {
   await oldAuxiliaryResponses({ returnToA: true });
   await oldAuxiliaryResponses({ failed: true, returnToA: true });
   await serializedSelectionAndCoalescing();
-  console.log("Dashboard lifetime browser checks passed (11 scenarios)");
+  console.log("Dashboard lifetime browser checks passed (11 loading and 16 group mutation scenarios)");
 } finally {
   await browser.close();
 }

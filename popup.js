@@ -397,7 +397,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let filterRenderTimer = null;
   let dashboardLoad = null;
   let offlineRetryTimer = null;
-  const selectingGroups = new Set();
+  const selectingGroups = new Map();
   updateHiddenToggleUI();
 
   function showProvidersPanelNotice(message, state, timeoutMs = 0) {
@@ -2664,7 +2664,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const groupCard = el(
         "div",
         {
-          className: `group-card ${isExpand ? "expanded" : ""}${isOverridden ? " overridden" : ""}`,
+          className: `group-card ${isExpand ? "expanded" : ""}${isOverridden ? " overridden" : ""}${selectingGroups.get(group.name)?.isCurrent() ? " selection-busy" : ""}`,
           dataset: { group: group.name },
         },
         headerEl,
@@ -2764,9 +2764,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (resumeButton) resumeButton.hidden = !isOverridden;
   }
 
+  function finishGroupSelection(groupName, scope, groupCard) {
+    if (selectingGroups.get(groupName) !== scope) return;
+    selectingGroups.delete(groupName);
+    groupCard?.classList.remove("selection-busy");
+    if (scope.isCurrent()) {
+      document
+        .querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`)
+        ?.classList.remove("selection-busy");
+    }
+  }
+
   async function selectMember(groupName, memberName) {
-    if (selectingGroups.has(groupName)) return;
-    selectingGroups.add(groupName);
+    const scope = captureInstanceRequest();
+    if (!scope.instance || selectingGroups.get(groupName)?.isCurrent()) return;
+    selectingGroups.set(groupName, scope);
 
     const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
     const group = currentGroupsData.find((g) => g.name === groupName);
@@ -2781,7 +2793,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     paintSelection(groupCard, optimisticGroup);
 
     try {
-      const selection = await SpikeApiClient.selectGroupMember(activeInstance, groupName, memberName);
+      const selection = await SpikeApiClient.selectGroupMember(scope.instance, groupName, memberName);
+      if (!scope.isCurrent()) return;
 
       if (group) {
         group.selected = selection?.member || memberName;
@@ -2795,30 +2808,34 @@ document.addEventListener("DOMContentLoaded", async () => {
       try {
         await refreshGroupsSelectionState(groupName);
       } catch {
+        if (!scope.isCurrent()) return;
         updateAllLatencyBadgesDOM();
       }
     } catch (err) {
+      if (!scope.isCurrent()) return;
       showToast(`切换节点失败: ${err.message || err}`, "error");
       try {
         await refreshGroupsSelectionState(groupName);
       } catch {
+        if (!scope.isCurrent()) return;
         const group = currentGroupsData.find((g) => g.name === groupName);
         paintSelection(groupCard, group);
       }
     } finally {
-      selectingGroups.delete(groupName);
-      groupCard?.classList.remove("selection-busy");
+      finishGroupSelection(groupName, scope, groupCard);
     }
   }
 
   /** Clear pin/override and resume url-test / fallback / smart automatic selection. */
   async function resumeAutomaticSelection(groupName) {
-    if (selectingGroups.has(groupName)) return;
-    selectingGroups.add(groupName);
+    const scope = captureInstanceRequest();
+    if (!scope.instance || selectingGroups.get(groupName)?.isCurrent()) return;
+    selectingGroups.set(groupName, scope);
     const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
     groupCard?.classList.add("selection-busy");
     try {
-      const selection = await SpikeApiClient.clearGroupSelection(activeInstance, groupName);
+      const selection = await SpikeApiClient.clearGroupSelection(scope.instance, groupName);
+      if (!scope.isCurrent()) return;
       const group = currentGroupsData.find((candidate) => candidate.name === groupName);
       if (group) {
         group.override_member = null;
@@ -2829,15 +2846,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       try {
         await refreshGroupsSelectionState(groupName);
       } catch (err) {
+        if (!scope.isCurrent()) return;
         updateAllLatencyBadgesDOM();
         showToast("已恢复自动选择，但暂时无法刷新状态");
         console.warn(`Cleared override but failed to refresh groups: ${err.message}`);
       }
     } catch (err) {
+      if (!scope.isCurrent()) return;
       showToast(`恢复自动选择失败: ${err.message || err}`, "error");
     } finally {
-      selectingGroups.delete(groupName);
-      groupCard?.classList.remove("selection-busy");
+      finishGroupSelection(groupName, scope, groupCard);
     }
   }
 

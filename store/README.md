@@ -41,6 +41,13 @@ keeping the same fixture and assertions.
 
 ## Isolation And Failures
 
+`npm --prefix store run check:dashboard-lifetime` covers 11 dashboard loading and
+16 group mutation scenarios in isolated Chromium contexts. Deferred API replies
+exercise instance switches, A-to-B-to-A transitions, old success/error/finally
+callbacks and selection-refresh failures. It also checks same-instance success
+and failure, busy state across redraws, click-to-collapse and Alt-click behavior.
+`DECK_BASELINE_REF` runs the same assertions against an earlier popup implementation.
+
 `capture.mjs` loads production HTML/CSS/JS through a request interceptor. `fixture.mjs` supplies
 fixed synthetic API responses and Chrome APIs. Unknown requests/messages fail; requests never
 reach the network. The only mocked POST is the startup DNS delay query. Production scripts
