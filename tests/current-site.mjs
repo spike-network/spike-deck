@@ -98,7 +98,8 @@ for (const route of [nativeRoute, { ...nativeRoute, ok: false, resolution: {
   let inspect, rendered;
   const checkButton = { disabled: false, addEventListener: (_, callback) => { inspect = callback; } };
   vm.runInNewContext(inspectBinding, {
-    activeInstance: {},
+    currentSiteOperation: null,
+    captureInstanceRequest: () => ({ instance: {}, isCurrent: () => true }),
     btnCurrentSiteCheck: checkButton,
     currentSiteHost: {},
     currentSiteResult: { replaceChildren: (...children) => { rendered = children; } },

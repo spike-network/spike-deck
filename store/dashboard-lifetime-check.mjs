@@ -91,6 +91,7 @@ async function harness(options = {}) {
   const offline = new Set();
   const held = [];
   let snapshotReads = 0;
+  let tabReads = 0;
   const api = JSON.parse(await readFile(resolve(root, "tests/fixtures/control-api-v1.json")));
   const hold = (match, failed = false) => {
     const item = { match, failed, gate: gate(), used: false };
@@ -116,11 +117,29 @@ async function harness(options = {}) {
   await context.exposeBinding("__storageRemove", async (_, keys) => {
     for (const key of Array.isArray(keys) ? keys : [keys]) delete storage[key];
   });
+  await context.exposeBinding("__currentTab", async () => {
+    if (++tabReads === 1 && options.tabGate) {
+      await options.tabGate.wait();
+      if (options.tabFailed) throw new Error("mock tab query failed");
+    }
+    return [{ id: 1, url: options.tabUrl || "https://www.example.test/" }];
+  });
   await context.addInitScript(installChromeMock, { theme: "dark", language: "en", now });
   await context.addInitScript(() => {
     chrome.storage.local.get = window.__storageGet;
     chrome.storage.local.set = window.__storageSet;
     chrome.storage.local.remove = window.__storageRemove;
+    window.__settledTabs = 0;
+    const nativeTabQuery = chrome.tabs.query;
+    chrome.tabs.query = async (query, callback) => {
+      // Popup sizing uses the callback form and is not part of the site request.
+      if (callback) return nativeTabQuery(query, callback);
+      try {
+        return await window.__currentTab();
+      } finally {
+        setTimeout(() => window.__settledTabs++, 0);
+      }
+    };
     const send = chrome.runtime.sendMessage;
     chrome.runtime.sendMessage = (message) =>
       message.type === "UPDATE_PROXY_SETTING" ? Promise.resolve({ ok: true }) : send(message);
@@ -174,6 +193,8 @@ async function harness(options = {}) {
       payloads.api = api;
       payloads.outbound = { ...outbounds[id] };
       payloads.policies = { policies: [1, 2].map((number) => ({ name: `${id}-node-${number}` })) };
+      payloads["rules/explain"] = { rule_policy: `${id}-expected`, matched_rule: "FINAL" };
+      payloads.connections = { live: [{ host: "www.example.test", port: 443, policy: `${id}-actual` }], recent: [] };
       payloads.status.profile = `${id}-${version}.conf`;
       payloads.status.listeners[0].address = `127.0.0.1:${id === "a" ? 6101 : 6102}`;
       payloads.groups.groups = [
@@ -227,6 +248,7 @@ async function harness(options = {}) {
     for (const item of held) item.gate.release();
     options.storageGate?.release();
     options.selectionGate?.release();
+    options.tabGate?.release();
     await context.close();
   };
   return { context, storage, requests, errors, versions, offline, hold, open, close };
@@ -637,7 +659,86 @@ async function ordinaryOutboundMutation({ mode, failed }) {
   }
 }
 
+async function checkSite(page) {
+  if ((await page.locator("#btn-current-site-toggle").getAttribute("aria-expanded")) !== "true")
+    await page.locator("#btn-current-site-toggle").click();
+  else await page.locator("#btn-current-site-check").click();
+}
+
+async function staleSiteCheck({ failed = false, returnToA = false, tab = false, key = "rules/explain" }) {
+  const tabGate = tab ? gate() : null;
+  const h = await harness({ tabGate, tabFailed: failed });
+  try {
+    const page = await h.open();
+    await ready(page, "a");
+    const old = tabGate || h.hold((request) => request.id === "a" && request.key === key, failed);
+    await checkSite(page);
+    await old.started;
+    await changeInstance(page, "b");
+    await ready(page, "b");
+    const current = returnToA ? "a" : "b";
+    if (returnToA) {
+      await changeInstance(page, "a");
+      await ready(page, "a");
+    }
+    assert.equal(await page.locator("#btn-current-site-check").isEnabled(), true, "new instance must not wait for the old site check");
+    assert.equal(await page.locator("#current-site-host").textContent(), "Not checked");
+    const newer = h.hold((request) => request.id === current && request.key === "rules/explain");
+    await checkSite(page);
+    await newer.started;
+    const before = await page.locator("#current-site-panel").innerHTML();
+    const count = h.requests.length;
+    old.release();
+    if (tab) await page.waitForFunction(() => window.__settledTabs === 2);
+    else await settled(page, "a", key);
+    assert.equal(await page.locator("#current-site-panel").innerHTML(), before, "stale site result must not change the current operation");
+    assert.equal(h.requests.length, count, "late tab query must not launch a request for another instance");
+    newer.release();
+    await settled(page, current, "rules/explain", !tab && returnToA ? 2 : 1);
+    await page.waitForFunction(() => !document.querySelector("#btn-current-site-check").disabled);
+    assert.deepEqual(await page.locator("#current-site-result strong").allTextContents(), [`${current}-expected`, `${current}-actual`]);
+    await verify(h);
+  } finally {
+    await h.close();
+  }
+}
+
+async function ordinarySiteCheck({ failed = false, unsupported = false }) {
+  const h = await harness({ tabUrl: unsupported ? "chrome://extensions/" : undefined });
+  try {
+    const page = await h.open();
+    await ready(page, "a");
+    const pending = unsupported ? null : h.hold(({ key }) => key === "rules/explain", failed);
+    await checkSite(page);
+    if (pending) {
+      await pending.started;
+      await page.locator("#btn-current-site-check").dispatchEvent("click");
+      pending.release();
+      await settled(page, "a", "rules/explain");
+    } else await page.waitForFunction(() => window.__settledTabs === 1);
+    await page.waitForFunction(() => !document.querySelector("#btn-current-site-check").disabled);
+    assert.equal(h.requests.filter(({ key }) => key === "rules/explain").length, unsupported ? 0 : 1);
+    if (!failed && !unsupported)
+      assert.deepEqual(await page.locator("#current-site-result strong").allTextContents(), ["a-expected", "a-actual"]);
+    else assert.equal(await page.locator("#current-site-result strong").count(), 0);
+    if (failed) assert.ok((await page.locator("#current-site-result").textContent()).includes("mock unavailable"));
+    assert.equal(h.requests.filter(({ id }) => id === "b").length, 0);
+    await verify(h);
+  } finally {
+    await h.close();
+  }
+}
+
 try {
+  for (const failed of [false, true])
+    for (const returnToA of [false, true])
+      for (const tab of [false, true])
+        await staleSiteCheck({ failed, returnToA, tab });
+  for (const failed of [false, true]) {
+    await staleSiteCheck({ failed, key: "connections" });
+    await ordinarySiteCheck({ failed });
+  }
+  await ordinarySiteCheck({ unsupported: true });
   for (const failed of [false, true])
     for (const returnToA of [false, true])
       await staleOutboundMutation({ failed, returnToA });
@@ -664,7 +765,7 @@ try {
   await oldAuxiliaryResponses({ returnToA: true });
   await oldAuxiliaryResponses({ failed: true, returnToA: true });
   await serializedSelectionAndCoalescing();
-  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation and 10 outbound mutation scenarios)");
+  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation, 10 outbound mutation and 13 site check scenarios)");
 } finally {
   await browser.close();
 }

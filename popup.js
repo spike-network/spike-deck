@@ -377,6 +377,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentOutbound = null;
   let currentOutboundPolicies = [];
   let outboundOperation = null;
+  let currentSiteOperation = null;
   let currentProfileStem = "";
   let currentModules = [];
   let moduleBusy = false;
@@ -1339,8 +1340,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Instance selector change handler
   instanceSelect.addEventListener("change", async (e) => {
-    // Invalidate a pending profile check before permission or storage awaits.
+    // Invalidate instance-owned requests before permission or storage awaits.
     const generation = ++instanceGeneration;
+    currentSiteOperation = null;
+    btnCurrentSiteCheck.disabled = false;
+    currentSiteHost.textContent = "等待检查";
+    currentSiteHost.title = "";
+    currentSiteResult.textContent = "查看当前标签页的规则预期线路与现有连接实际线路。";
     profileSwitchOperation = null;
     btnProfileSwitch.disabled = false;
     setQuickPanel(null);
@@ -1441,14 +1447,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   btnCurrentSiteCheck.addEventListener("click", async () => {
-    if (!activeInstance) {
+    const scope = captureInstanceRequest();
+    if (currentSiteOperation?.isCurrent()) return;
+    if (!scope.instance) {
       currentSiteResult.textContent = "请先配置并连接 Spike 实例。";
       return;
     }
+    currentSiteOperation = scope;
     btnCurrentSiteCheck.disabled = true;
+    currentSiteHost.textContent = "等待检查";
+    currentSiteHost.title = "";
     currentSiteResult.textContent = "正在检查当前标签页…";
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!scope.isCurrent()) return;
       const target = activeTabTarget(tab);
       if (!target) {
         currentSiteHost.textContent = "不可检查";
@@ -1458,9 +1470,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentSiteHost.textContent = target.host;
       currentSiteHost.title = target.host;
       const [route, connections] = await Promise.all([
-        SpikeApiClient.explainRoute(activeInstance, target),
-        SpikeApiClient.getConnections(activeInstance),
+        SpikeApiClient.explainRoute(scope.instance, target),
+        SpikeApiClient.getConnections(scope.instance),
       ]);
+      if (!scope.isCurrent()) return;
       const summary = summarizeCurrentSite(target, route, connections);
       currentSiteResult.replaceChildren(
         el("span", {}, summary.resolutionError ? "预期（解析失败）：" : "预期："),
@@ -1485,9 +1498,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           : []),
       );
     } catch (error) {
+      if (!scope.isCurrent()) return;
       currentSiteResult.textContent = `检查失败：${error.message || "未知错误"}`;
     } finally {
-      btnCurrentSiteCheck.disabled = false;
+      if (currentSiteOperation === scope) {
+        currentSiteOperation = null;
+        if (scope.isCurrent()) btnCurrentSiteCheck.disabled = false;
+      }
     }
   });
 
