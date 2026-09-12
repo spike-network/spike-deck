@@ -288,8 +288,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   let instanceGeneration = 0;
   let instanceSelectionWrite = Promise.resolve();
   let profileSwitchOperation = null;
+  const disconnectAffectedConnectionsOnSelection =
+    await StorageManager.shouldDisconnectAffectedConnectionsOnSelection();
   const popupInteractions = installPopupInteractions({
     getInstanceId: () => activeInstance?.id || null,
+    shouldDisconnectAffectedConnections: () =>
+      disconnectAffectedConnectionsOnSelection,
   });
 
   const instanceSelect = document.getElementById("instance-select");
@@ -2869,7 +2873,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     paintSelection(groupCard, optimisticGroup);
 
     try {
-      const selection = await SpikeApiClient.selectGroupMember(scope.instance, groupName, memberName);
+      const selection = await SpikeApiClient.selectGroupMember(
+        scope.instance,
+        groupName,
+        memberName,
+        disconnectAffectedConnectionsOnSelection,
+      );
       if (!scope.isCurrent()) return;
 
       if (group) {
@@ -2910,7 +2919,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const groupCard = document.querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`);
     groupCard?.classList.add("selection-busy");
     try {
-      const selection = await SpikeApiClient.clearGroupSelection(scope.instance, groupName);
+      const selection = await SpikeApiClient.clearGroupSelection(
+        scope.instance,
+        groupName,
+        disconnectAffectedConnectionsOnSelection,
+      );
       if (!scope.isCurrent()) return;
       const group = currentGroupsData.find((candidate) => candidate.name === groupName);
       if (group) {

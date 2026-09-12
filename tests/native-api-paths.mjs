@@ -59,7 +59,7 @@ globalThis.fetch = async (url, options) => {
 await SpikeApiClient.getStatus(instance);
 await SpikeApiClient.getGroups(instance);
 await SpikeApiClient.selectGroupMember(instance, 'Proxy / Auto', 'Direct');
-await SpikeApiClient.clearGroupSelection(instance, 'Proxy / Auto');
+await SpikeApiClient.clearGroupSelection(instance, 'Proxy / Auto', false);
 await SpikeApiClient.cancelGroupTestTask(instance, 41);
 await SpikeApiClient.getProfiles(instance);
 await SpikeApiClient.getCurrentProfile(instance);
@@ -87,7 +87,7 @@ assert.equal(cancelRequest.options.method, 'DELETE');
 const groupRequests = requests.filter(({ url }) => url.endsWith('/spike/groups/Proxy%20%2F%20Auto/select'));
 assert.deepEqual(JSON.parse(groupRequests[0].options.body), {
   member: 'Direct',
-  retest_active: false
+  retest_active: true
 });
 assert.deepEqual(JSON.parse(groupRequests[1].options.body), { retest_active: false });
 

@@ -44,6 +44,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const prefCollapseAfterSelectionCheckbox = document.getElementById(
     "pref-collapse-after-selection",
   );
+  const prefDisconnectAffectedConnectionsCheckbox = document.getElementById(
+    "pref-disconnect-affected-connections",
+  );
   const prefHealthIntervalInput = document.getElementById(
     "pref-health-interval",
   );
@@ -91,6 +94,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   prefCollapseAfterSelectionCheckbox.checked =
     await StorageManager.shouldCollapseGroupAfterSelection();
+  prefDisconnectAffectedConnectionsCheckbox.checked =
+    await StorageManager.shouldDisconnectAffectedConnectionsOnSelection();
 
   const profileExportText = document.getElementById("profile-export-text");
   const profileExportStatus = document.getElementById("profile-export-status");
@@ -158,6 +163,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   prefCollapseAfterSelectionCheckbox.addEventListener("change", async (e) => {
     await StorageManager.setCollapseGroupAfterSelection(e.target.checked);
   });
+
+  prefDisconnectAffectedConnectionsCheckbox.addEventListener(
+    "change",
+    async (e) => {
+      await StorageManager.setDisconnectAffectedConnectionsOnSelection(
+        e.target.checked,
+      );
+    },
+  );
 
   async function refreshPopupShortcutState() {
     try {

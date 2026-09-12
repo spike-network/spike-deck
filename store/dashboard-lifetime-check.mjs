@@ -79,6 +79,9 @@ async function harness(options = {}) {
     uiLanguage: "en",
     groupExpandMode: options.sharedGroups ? "expand-all" : "collapse-all",
     collapseGroupAfterSelection: options.collapseAfterSelection || false,
+    ...(options.disconnectAffectedConnections === false
+      ? { disconnectAffectedConnectionsOnSelection: false }
+      : {}),
     healthCheckInterval: 300,
     trafficRefreshInterval: 60,
   };
@@ -594,8 +597,18 @@ async function staleGroupMutation({ action, failed = false, returnToA = false })
   }
 }
 
-async function ordinaryGroupMutation({ action, failed = false, alt = false, redraw = false }) {
-  const h = await harness({ sharedGroups: true, collapseAfterSelection: true });
+async function ordinaryGroupMutation({
+  action,
+  failed = false,
+  alt = false,
+  redraw = false,
+  disconnectAffectedConnections = true,
+}) {
+  const h = await harness({
+    sharedGroups: true,
+    collapseAfterSelection: true,
+    disconnectAffectedConnections,
+  });
   try {
     const page = await h.open();
     await sharedReady(page, "a");
@@ -619,6 +632,11 @@ async function ordinaryGroupMutation({ action, failed = false, alt = false, redr
     assert.equal((await page.locator(".toast.error").count()) > 0, failed);
     assert.equal(h.requests.filter((request) => request.id === "b").length, 0);
     assert.equal(h.requests.filter((request) => request.key === key).length, 1);
+    const selectionRequest = h.requests.find((request) => request.key === key);
+    const expectedBody = action === "select"
+      ? { member: "a-node-2", retest_active: disconnectAffectedConnections }
+      : { retest_active: disconnectAffectedConnections };
+    assert.deepEqual(JSON.parse(selectionRequest.body), expectedBody);
     await verify(h);
   } finally {
     await h.close();
@@ -1074,6 +1092,7 @@ try {
       await ordinaryGroupMutation({ action, failed });
     }
     await ordinaryGroupMutation({ action, alt: true, redraw: true });
+    await ordinaryGroupMutation({ action, disconnectAffectedConnections: false });
     await staleSelectionRefresh(action);
   }
   await oldMainResponse();
@@ -1087,7 +1106,7 @@ try {
   await oldAuxiliaryResponses({ returnToA: true });
   await oldAuxiliaryResponses({ failed: true, returnToA: true });
   await serializedSelectionAndCoalescing();
-  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation, 10 outbound mutation, 13 site check, 19 group task and 11 provider scenarios)");
+  console.log("Dashboard lifetime browser checks passed (11 loading, 18 group mutation, 10 outbound mutation, 13 site check, 19 group task and 11 provider scenarios)");
 } finally {
   await browser.close();
 }

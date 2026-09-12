@@ -25,6 +25,7 @@ assert.equal(await StorageManager.getTrafficRefreshInterval(), DEFAULT_TRAFFIC_R
 assert.equal(await StorageManager.getTrafficRefreshInterval(), 1);
 assert.equal(await StorageManager.isPopupShortcutEnabled(), true);
 assert.equal(await StorageManager.shouldCollapseGroupAfterSelection(), true);
+assert.equal(await StorageManager.shouldDisconnectAffectedConnectionsOnSelection(), true);
 
 // Test custom settings
 await StorageManager.setHealthCheckInterval(10);
@@ -46,6 +47,12 @@ assert.equal(await StorageManager.shouldCollapseGroupAfterSelection(), false);
 assert.equal(storage.collapseGroupAfterSelection, false);
 await StorageManager.setCollapseGroupAfterSelection(true);
 assert.equal(await StorageManager.shouldCollapseGroupAfterSelection(), true);
+
+await StorageManager.setDisconnectAffectedConnectionsOnSelection(false);
+assert.equal(await StorageManager.shouldDisconnectAffectedConnectionsOnSelection(), false);
+assert.equal(storage.disconnectAffectedConnectionsOnSelection, false);
+await StorageManager.setDisconnectAffectedConnectionsOnSelection(true);
+assert.equal(await StorageManager.shouldDisconnectAffectedConnectionsOnSelection(), true);
 
 // Test boundary constraints
 await StorageManager.setHealthCheckInterval(0);
