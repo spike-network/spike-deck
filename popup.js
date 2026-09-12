@@ -376,7 +376,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let handledProviderTaskState = "";
   let currentOutbound = null;
   let currentOutboundPolicies = [];
-  let outboundBusy = false;
+  let outboundOperation = null;
   let currentProfileStem = "";
   let currentModules = [];
   let moduleBusy = false;
@@ -499,6 +499,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentOutbound = outbound;
     currentOutboundPolicies = policies || [];
     const unavailable = !outbound;
+    const outboundBusy = Boolean(outboundOperation?.isCurrent());
     outboundModeCard.classList.toggle("unavailable", unavailable);
     outboundModeCard.classList.toggle("busy", outboundBusy);
 
@@ -1611,7 +1612,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   async function switchOutboundMode(mode) {
-    if (!activeInstance || outboundBusy || !["rule", "direct", "global"].includes(mode)) return;
+    const scope = captureInstanceRequest();
+    if (!scope.instance || outboundOperation?.isCurrent() || !["rule", "direct", "global"].includes(mode)) return;
     const policy =
       outboundPolicySelect.value ||
       currentOutbound?.global_policy ||
@@ -1621,15 +1623,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       outboundModeState.textContent = "请选择全局策略";
       return;
     }
-    outboundBusy = true;
+    outboundOperation = scope;
     renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
     let errorMessage = "";
     try {
       const outbound = await SpikeApiClient.setOutbound(
-        activeInstance,
+        scope.instance,
         mode,
         mode === "global" ? policy : undefined,
       );
+      if (!scope.isCurrent()) return;
       renderOutboundMode(
         outbound,
         outboundPolicyNames(
@@ -1639,11 +1642,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         ),
       );
     } catch (err) {
+      if (!scope.isCurrent()) return;
       errorMessage = `切换失败: ${err.message || "未知错误"}`;
     } finally {
-      outboundBusy = false;
-      renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
-      if (errorMessage) outboundModeState.textContent = errorMessage;
+      if (outboundOperation === scope) {
+        outboundOperation = null;
+        if (scope.isCurrent()) {
+          renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
+          if (errorMessage) outboundModeState.textContent = errorMessage;
+        }
+      }
     }
   }
 

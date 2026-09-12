@@ -87,6 +87,7 @@ async function harness(options = {}) {
   const versions = { a: 1, b: 1 };
   const selections = { a: "a-node-1", b: "b-node-1" };
   const overrides = { ...selections };
+  const outbounds = { a: { mode: options.outboundMode || "rule" }, b: { mode: "rule" } };
   const offline = new Set();
   const held = [];
   let snapshotReads = 0;
@@ -171,6 +172,8 @@ async function harness(options = {}) {
       const version = versions[id];
       const payloads = fixture();
       payloads.api = api;
+      payloads.outbound = { ...outbounds[id] };
+      payloads.policies = { policies: [1, 2].map((number) => ({ name: `${id}-node-${number}` })) };
       payloads.status.profile = `${id}-${version}.conf`;
       payloads.status.listeners[0].address = `127.0.0.1:${id === "a" ? 6101 : 6102}`;
       payloads.groups.groups = [
@@ -193,6 +196,10 @@ async function harness(options = {}) {
       }
       if (offline.has(id) || block?.failed) {
         await route.fulfill({ status: 503, json: { error: "mock unavailable" } });
+      } else if (request.method === "PUT" && key === "outbound") {
+        const { mode, policy } = JSON.parse(request.body);
+        outbounds[id] = { mode, ...(policy ? { global_policy: policy } : {}) };
+        await route.fulfill({ json: outbounds[id] });
       } else if (["PUT", "DELETE"].includes(request.method) && key.startsWith("groups/")) {
         if (request.method === "PUT") selections[id] = JSON.parse(request.body).member;
         overrides[id] = request.method === "PUT" ? selections[id] : null;
@@ -545,7 +552,98 @@ async function staleSelectionRefresh(action) {
   }
 }
 
+async function openOutbound(page) {
+  if ((await page.locator("#btn-quick-outbound").getAttribute("aria-expanded")) !== "true")
+    await page.locator("#btn-quick-outbound").click();
+}
+
+async function staleOutboundMutation({ failed = false, returnToA = false }) {
+  const h = await harness();
+  try {
+    const page = await h.open();
+    await ready(page, "a");
+    await openOutbound(page);
+    const old = h.hold(({ id, key, method }) => id === "a" && key === "outbound" && method === "PUT", failed);
+    await page.locator('.btn-outbound-mode[data-mode="direct"]').click();
+    await old.started;
+    await changeInstance(page, "b");
+    await ready(page, "b");
+    const current = returnToA ? "a" : "b";
+    if (returnToA) {
+      await changeInstance(page, "a");
+      await ready(page, "a");
+    }
+    await openOutbound(page);
+    const global = page.locator('.btn-outbound-mode[data-mode="global"]');
+    assert.equal(await global.isEnabled(), true, "old mode mutation must not lock the new instance");
+    await page.locator("#outbound-policy-select").selectOption(`${current}-node-2`);
+    const newer = h.hold(({ id, key, method }) => id === current && key === "outbound" && method === "PUT");
+    await global.click();
+    await newer.started;
+    const before = await page.locator("#outbound-mode-card").innerHTML();
+    const count = h.requests.length;
+    old.release();
+    await settled(page, "a", "outbound", returnToA ? 3 : 2);
+    assert.equal(await page.locator("#outbound-mode-card").innerHTML(), before, "old callbacks must not change the current mode or busy state");
+    assert.equal(h.requests.length, count);
+    newer.release();
+    await settled(page, current, "outbound", returnToA ? 4 : 2);
+    assert.equal(await global.getAttribute("class"), "btn-outbound-mode active");
+    assert.equal(await page.locator("#outbound-mode-card").evaluate((el) => el.classList.contains("busy")), false);
+    assert.ok((await page.locator("#outbound-mode-state").textContent()).includes(`${current}-node-2`));
+    const mutations = h.requests.filter(({ key, method }) => key === "outbound" && method === "PUT");
+    assert.deepEqual(mutations.map(({ id, body }) => [id, JSON.parse(body)]), [
+      ["a", { mode: "direct" }],
+      [current, { mode: "global", policy: `${current}-node-2` }],
+    ]);
+    await verify(h);
+  } finally {
+    await h.close();
+  }
+}
+
+async function ordinaryOutboundMutation({ mode, failed }) {
+  const initial = mode === "rule" ? "direct" : "rule";
+  const h = await harness({ outboundMode: initial });
+  try {
+    const page = await h.open();
+    await ready(page, "a");
+    await openOutbound(page);
+    await page.locator("#outbound-policy-select").selectOption("a-node-2");
+    const pending = h.hold(({ key, method }) => key === "outbound" && method === "PUT", failed);
+    await page.locator(`.btn-outbound-mode[data-mode="${mode}"]`).click();
+    await pending.started;
+    await page.locator("#btn-refresh").click();
+    await settled(page, "a", "outbound", 2);
+    assert.equal(await page.locator("#outbound-mode-card").evaluate((el) => el.classList.contains("busy")), true);
+    assert.equal(await page.locator(".btn-outbound-mode:enabled").count(), 0);
+    assert.equal(await page.locator("#outbound-policy-select").isDisabled(), true);
+    await page.locator('.btn-outbound-mode[data-mode="direct"]').dispatchEvent("click");
+    assert.equal(h.requests.filter(({ method }) => method === "PUT").length, 1);
+    pending.release();
+    await settled(page, "a", "outbound", 3);
+    assert.equal(await page.locator(".btn-outbound-mode.active").getAttribute("data-mode"), failed ? initial : mode);
+    assert.equal(await page.locator("#outbound-mode-card").evaluate((el) => el.classList.contains("busy")), false);
+    assert.equal(await page.locator("#outbound-policy-select").isEnabled(), true);
+    assert.equal((await page.locator("#outbound-mode-state").textContent()).includes("mock unavailable"), failed);
+    if (!failed && mode === "global")
+      assert.ok((await page.locator("#outbound-mode-state").textContent()).includes("a-node-2"));
+    assert.deepEqual(h.requests.filter(({ method }) => method === "PUT").map(({ id, body }) => [id, JSON.parse(body)]), [
+      ["a", { mode, ...(mode === "global" ? { policy: "a-node-2" } : {}) }],
+    ]);
+    await verify(h);
+  } finally {
+    await h.close();
+  }
+}
+
 try {
+  for (const failed of [false, true])
+    for (const returnToA of [false, true])
+      await staleOutboundMutation({ failed, returnToA });
+  for (const mode of ["rule", "direct", "global"])
+    for (const failed of [false, true])
+      await ordinaryOutboundMutation({ mode, failed });
   for (const action of ["select", "auto"]) {
     for (const failed of [false, true]) {
       for (const returnToA of [false, true])
@@ -566,7 +664,7 @@ try {
   await oldAuxiliaryResponses({ returnToA: true });
   await oldAuxiliaryResponses({ failed: true, returnToA: true });
   await serializedSelectionAndCoalescing();
-  console.log("Dashboard lifetime browser checks passed (11 loading and 16 group mutation scenarios)");
+  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation and 10 outbound mutation scenarios)");
 } finally {
   await browser.close();
 }
