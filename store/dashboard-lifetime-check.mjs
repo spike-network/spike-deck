@@ -89,6 +89,10 @@ async function harness(options = {}) {
   const selections = { a: "a-node-1", b: "b-node-1" };
   const overrides = { ...selections };
   const outbounds = { a: { mode: options.outboundMode || "rule" }, b: { mode: "rule" } };
+  const providerVersions = { a: 1, b: 1 };
+  const providerTasks = { a: null, b: null };
+  const providerFailures = { a: {}, b: {} };
+  let providerTaskId = 0;
   const offline = new Set();
   const held = [];
   const groupTasks = Object.fromEntries(["a", "b"].map((id) => [id, options.runningTasks ? [
@@ -131,13 +135,32 @@ async function harness(options = {}) {
   await context.exposeBinding("__groupMessage", async (_, message) => {
     const request = { ...message, id: message.instanceId, key: message.type };
     messages.push(request);
+    const providerResponse = message.type === "GET_PROVIDER_REFRESH_TASK"
+      ? {
+          ok: true,
+          task: structuredClone(providerTasks[request.id]),
+          failures: structuredClone(providerFailures[request.id]),
+        }
+      : null;
     const block = held.find((item) => !item.used && item.match(request));
     if (block) {
       block.used = true;
       await block.gate.wait();
     }
-    if (block?.failed === "reject") throw new Error("mock group transport failure");
-    if (block?.failed) return { ok: false, error: "mock group rejection" };
+    if (block?.failed === "reject") throw new Error("mock task transport failure");
+    if (block?.failed) return { ok: false, error: "mock task rejection" };
+    if (providerResponse) return providerResponse;
+    if (message.type === "START_PROVIDER_REFRESH") {
+      const task = {
+        id: `${request.id}-refresh-${++providerTaskId}`,
+        instanceId: request.id,
+        providerId: message.providerId,
+        status: "running",
+        startedAtUnix: now / 1000,
+      };
+      providerTasks[request.id] = task;
+      return { ok: true, task: structuredClone(task) };
+    }
     const tasks = groupTasks[request.id];
     if (message.type === "START_GROUP_TEST") {
       if (options.legacyTasks) return { ok: true, mode: "sync", results: [] };
@@ -170,7 +193,7 @@ async function harness(options = {}) {
     const send = chrome.runtime.sendMessage;
     window.__settledMessages = {};
     chrome.runtime.sendMessage = async (message) => {
-      if (["GET_GROUP_TEST_STATE", "START_GROUP_TEST", "CANCEL_GROUP_TEST"].includes(message.type)) {
+      if (["GET_GROUP_TEST_STATE", "START_GROUP_TEST", "CANCEL_GROUP_TEST", "GET_PROVIDER_REFRESH_TASK", "START_PROVIDER_REFRESH"].includes(message.type)) {
         try { return await window.__groupMessage(message); }
         finally {
           const key = `${message.instanceId}:${message.type}`;
@@ -246,6 +269,17 @@ async function harness(options = {}) {
       payloads["dns/delay"] = { delay: (id === "a" ? 101 : 202) * version };
       payloads["metrics.json"].traffic.download_bytes_per_second =
         (id === "a" ? 111000 : 222000) * version;
+      payloads.providers = {
+        refreshing: false,
+        providers: [
+          {
+            ...payloads.providers.providers[0],
+            id: `${id}-provider-${providerVersions[id]}`,
+            group: `${id}-group-${providerVersions[id]}`,
+            source: `https://providers.example.test/${id}-${providerVersions[id]}.list`,
+          },
+        ],
+      };
       const block = held.find((item) => !item.used && item.match(request));
       if (block) {
         block.used = true;
@@ -287,7 +321,21 @@ async function harness(options = {}) {
     options.tabGate?.release();
     await context.close();
   };
-  return { context, storage, requests, messages, errors, versions, offline, hold, open, close };
+  return {
+    context,
+    storage,
+    requests,
+    messages,
+    errors,
+    versions,
+    providerVersions,
+    providerTasks,
+    providerFailures,
+    offline,
+    hold,
+    open,
+    close,
+  };
 }
 
 async function changeInstance(page, id) {
@@ -769,6 +817,122 @@ async function messageSettled(page, id, type, count = 1) {
   await page.waitForFunction(({ key, count }) => (window.__settledMessages[key] || 0) >= count, { key: `${id}:${type}`, count });
 }
 
+async function openProviders(page, providerId) {
+  if (await page.locator("#providers-panel").isHidden()) {
+    await page.locator("#btn-refresh-providers").click();
+  }
+  try {
+    await page.locator(`.provider-row[data-provider-id="${providerId}"]`).waitFor();
+  } catch (error) {
+    throw new Error(`Provider row unavailable: ${JSON.stringify({ providerId, panelHidden: await page.locator("#providers-panel").getAttribute("hidden"), html: await page.locator("#providers-list").innerHTML() })}`, { cause: error });
+  }
+}
+
+async function staleProviderList({ failed = false, switchAway = false }) {
+  const h = await harness();
+  try {
+    const page = await h.open();
+    await ready(page, "a");
+    const old = h.hold(({ id, key }) => id === "a" && key === "providers", failed);
+    await page.locator("#btn-refresh-providers").click({ noWaitAfter: true });
+    await old.started;
+    h.providerVersions.a = 2;
+    if (switchAway) {
+      await changeInstance(page, "b");
+      await ready(page, "b");
+      await changeInstance(page, "a");
+      await ready(page, "a");
+      await openProviders(page, "a-provider-2");
+    } else {
+      await page.locator("#btn-refresh").click();
+      await page.locator('.provider-row[data-provider-id="a-provider-2"]').waitFor();
+    }
+    old.release();
+    await settled(page, "a", "providers", 2);
+    assert.equal(await page.locator('.provider-row[data-provider-id="a-provider-2"]').count(), 1);
+    assert.equal(await page.locator('.provider-row[data-provider-id="a-provider-1"]').count(), 0);
+    assert.equal(await page.locator(".providers-empty.error").count(), 0);
+    await verify(h);
+  } finally { await h.close(); }
+}
+
+async function staleProviderTaskRead({ switchAway = false, failed = false }) {
+  const h = await harness();
+  try {
+    h.providerTasks.a = {
+      id: "old-task",
+      instanceId: "a",
+      providerId: "a-provider-1",
+      status: "failed",
+      error: "old failure",
+    };
+    const old = h.hold(({ id, key }) => id === "a" && key === "GET_PROVIDER_REFRESH_TASK", failed);
+    const page = await h.open();
+    await ready(page, "a");
+    await old.started;
+    h.providerVersions.a = 2;
+    h.providerTasks.a = {
+      id: "new-task",
+      instanceId: "a",
+      providerId: "a-provider-2",
+      status: "running",
+    };
+    if (switchAway) {
+      await changeInstance(page, "b");
+      await ready(page, "b");
+      await changeInstance(page, "a");
+      await ready(page, "a");
+    }
+    await openProviders(page, "a-provider-2");
+    await until(async () => page.locator('.provider-row[data-provider-id="a-provider-2"]').evaluate((el) => el.classList.contains("busy")));
+    old.release();
+    await messageSettled(page, "a", "GET_PROVIDER_REFRESH_TASK", 2);
+    assert.equal(await page.locator('.provider-row[data-provider-id="a-provider-2"]').evaluate((el) => el.classList.contains("busy")), true);
+    assert.equal(await page.locator("#providers-panel-notice").isHidden(), true);
+    await verify(h);
+  } finally { await h.close(); }
+}
+
+async function staleProviderStart({ failed = false }) {
+  const h = await harness();
+  try {
+    const page = await h.open();
+    await ready(page, "a");
+    await messageSettled(page, "a", "GET_PROVIDER_REFRESH_TASK");
+    await openProviders(page, "a-provider-1");
+    const old = h.hold(({ id, key }) => id === "a" && key === "START_PROVIDER_REFRESH", failed);
+    await page.locator('.provider-row[data-provider-id="a-provider-1"] .btn-provider-row-update').click();
+    await old.started;
+    await changeInstance(page, "b");
+    await ready(page, "b");
+    h.providerVersions.a = 2;
+    await changeInstance(page, "a");
+    await ready(page, "a");
+    await openProviders(page, "a-provider-2");
+    const newer = h.hold(({ id, key }) => id === "a" && key === "START_PROVIDER_REFRESH");
+    const row = page.locator('.provider-row[data-provider-id="a-provider-2"]');
+    await row.locator(".btn-provider-row-update").click();
+    await newer.started;
+    assert.equal(await row.evaluate((el) => el.classList.contains("busy")), true);
+    const count = h.messages.length;
+    old.release();
+    await messageSettled(page, "a", "START_PROVIDER_REFRESH");
+    assert.equal(await row.evaluate((el) => el.classList.contains("busy")), true);
+    assert.equal(await page.locator("#providers-panel-notice").isHidden(), true);
+    await row.locator(".btn-provider-row-update").dispatchEvent("click");
+    assert.equal(h.messages.length, count);
+    newer.release();
+    await messageSettled(page, "a", "START_PROVIDER_REFRESH", 2);
+    assert.equal(await row.evaluate((el) => el.classList.contains("busy")), true);
+    const starts = h.messages.filter(({ key }) => key === "START_PROVIDER_REFRESH");
+    assert.deepEqual(starts.map(({ instanceId, providerId }) => [instanceId, providerId]), [
+      ["a", "a-provider-1"],
+      ["a", "a-provider-2"],
+    ]);
+    await verify(h);
+  } finally { await h.close(); }
+}
+
 async function staleGroupTask({ cancel, failed, returnToA }) {
   const h = await harness({ sharedGroups: true, runningTasks: cancel });
   try {
@@ -851,6 +1015,13 @@ async function ordinaryGroupTask({ cancel = false, failed = false, legacy = fals
 }
 
 try {
+  for (const failed of [false, true]) {
+    for (const switchAway of [false, true]) {
+      await staleProviderList({ failed, switchAway });
+      await staleProviderTaskRead({ failed, switchAway });
+    }
+    await staleProviderStart({ failed });
+  }
   for (const cancel of [true, false])
     for (const failed of [false, true, "reject"])
       for (const returnToA of [false, true])
@@ -895,7 +1066,7 @@ try {
   await oldAuxiliaryResponses({ returnToA: true });
   await oldAuxiliaryResponses({ failed: true, returnToA: true });
   await serializedSelectionAndCoalescing();
-  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation, 10 outbound mutation, 13 site check and 19 group task scenarios)");
+  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation, 10 outbound mutation, 13 site check, 19 group task and 10 provider scenarios)");
 } finally {
   await browser.close();
 }
