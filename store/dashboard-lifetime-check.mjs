@@ -83,6 +83,7 @@ async function harness(options = {}) {
     trafficRefreshInterval: 60,
   };
   const requests = [];
+  const messages = [];
   const errors = [];
   const versions = { a: 1, b: 1 };
   const selections = { a: "a-node-1", b: "b-node-1" };
@@ -90,6 +91,9 @@ async function harness(options = {}) {
   const outbounds = { a: { mode: options.outboundMode || "rule" }, b: { mode: "rule" } };
   const offline = new Set();
   const held = [];
+  const groupTasks = Object.fromEntries(["a", "b"].map((id) => [id, options.runningTasks ? [
+    { id: 1, task_namespace: `${id}-process`, group: "shared-group", status: "running", completed: 0, total: 2, update_sequence: 1, results: [] },
+  ] : []]));
   let snapshotReads = 0;
   let tabReads = 0;
   const api = JSON.parse(await readFile(resolve(root, "tests/fixtures/control-api-v1.json")));
@@ -124,6 +128,29 @@ async function harness(options = {}) {
     }
     return [{ id: 1, url: options.tabUrl || "https://www.example.test/" }];
   });
+  await context.exposeBinding("__groupMessage", async (_, message) => {
+    const request = { ...message, id: message.instanceId, key: message.type };
+    messages.push(request);
+    const block = held.find((item) => !item.used && item.match(request));
+    if (block) {
+      block.used = true;
+      await block.gate.wait();
+    }
+    if (block?.failed === "reject") throw new Error("mock group transport failure");
+    if (block?.failed) return { ok: false, error: "mock group rejection" };
+    const tasks = groupTasks[request.id];
+    if (message.type === "START_GROUP_TEST") {
+      if (options.legacyTasks) return { ok: true, mode: "sync", results: [] };
+      const task = { id: tasks.length + 1, task_namespace: `${request.id}-process`, group: message.groupName, requested_member: message.memberName, status: "running", completed: 0, total: 2, update_sequence: 1, results: [] };
+      tasks.push(task);
+      return { ok: true, mode: "async", task };
+    }
+    if (message.type === "CANCEL_GROUP_TEST") {
+      const task = tasks.find((task) => task.id === message.taskId);
+      if (task) { task.status = "cancelled"; task.update_sequence++; }
+    }
+    return { ok: true, tasks: structuredClone(tasks) };
+  });
   await context.addInitScript(installChromeMock, { theme: "dark", language: "en", now });
   await context.addInitScript(() => {
     chrome.storage.local.get = window.__storageGet;
@@ -141,8 +168,17 @@ async function harness(options = {}) {
       }
     };
     const send = chrome.runtime.sendMessage;
-    chrome.runtime.sendMessage = (message) =>
-      message.type === "UPDATE_PROXY_SETTING" ? Promise.resolve({ ok: true }) : send(message);
+    window.__settledMessages = {};
+    chrome.runtime.sendMessage = async (message) => {
+      if (["GET_GROUP_TEST_STATE", "START_GROUP_TEST", "CANCEL_GROUP_TEST"].includes(message.type)) {
+        try { return await window.__groupMessage(message); }
+        finally {
+          const key = `${message.instanceId}:${message.type}`;
+          setTimeout(() => window.__settledMessages[key] = (window.__settledMessages[key] || 0) + 1, 0);
+        }
+      }
+      return message.type === "UPDATE_PROXY_SETTING" ? { ok: true } : send(message);
+    };
     window.__settledRequests = {};
     const nativeFetch = window.fetch;
     window.fetch = async (...args) => {
@@ -251,7 +287,7 @@ async function harness(options = {}) {
     options.tabGate?.release();
     await context.close();
   };
-  return { context, storage, requests, errors, versions, offline, hold, open, close };
+  return { context, storage, requests, messages, errors, versions, offline, hold, open, close };
 }
 
 async function changeInstance(page, id) {
@@ -729,7 +765,101 @@ async function ordinarySiteCheck({ failed = false, unsupported = false }) {
   }
 }
 
+async function messageSettled(page, id, type, count = 1) {
+  await page.waitForFunction(({ key, count }) => (window.__settledMessages[key] || 0) >= count, { key: `${id}:${type}`, count });
+}
+
+async function staleGroupTask({ cancel, failed, returnToA }) {
+  const h = await harness({ sharedGroups: true, runningTasks: cancel });
+  try {
+    const page = await h.open();
+    await sharedReady(page, "a");
+    await messageSettled(page, "a", "GET_GROUP_TEST_STATE");
+    const type = cancel ? "CANCEL_GROUP_TEST" : "START_GROUP_TEST";
+    const button = page.locator('.btn-test-group[data-group="shared-group"]');
+    const old = h.hold(({ id, key }) => id === "a" && key === type, failed);
+    await button.click();
+    await old.started;
+    await changeInstance(page, "b");
+    await sharedReady(page, "b");
+    await messageSettled(page, "b", "GET_GROUP_TEST_STATE");
+    const current = returnToA ? "a" : "b";
+    if (returnToA) {
+      await changeInstance(page, "a");
+      await sharedReady(page, "a");
+      await messageSettled(page, "a", "GET_GROUP_TEST_STATE", 2);
+    }
+    const newer = h.hold(({ id, key }) => id === current && key === type);
+    await button.click();
+    await newer.started;
+    const before = await button.evaluate((el) => ({ class: el.className, disabled: el.disabled, title: el.title }));
+    const count = h.messages.length;
+    old.release();
+    await messageSettled(page, "a", type);
+    assert.deepEqual(await button.evaluate((el) => ({ class: el.className, disabled: el.disabled, title: el.title })), before, "old task callback must not change new-instance controls");
+    assert.equal(h.messages.length, count, "old failure must not restore tasks for the new instance");
+    assert.deepEqual(await page.locator(".toast").allTextContents(), []);
+    await page.locator("#btn-refresh").click();
+    await messageSettled(page, current, "GET_GROUP_TEST_STATE", returnToA ? 3 : 2);
+    assert.equal(await button.isDisabled(), true, "redraw must preserve pending task ownership");
+    await button.dispatchEvent("click");
+    assert.equal(h.messages.filter(({ key }) => key === type).length, 2);
+    newer.release();
+    await messageSettled(page, current, type, returnToA ? 2 : 1);
+    assert.equal(await button.isEnabled(), true);
+    assert.equal(await button.evaluate((el) => el.classList.contains("testing")), !cancel);
+    assert.equal(h.messages.filter(({ key }) => key === type).length, 2);
+    await verify(h);
+  } finally { await h.close(); }
+}
+
+async function ordinaryGroupTask({ cancel = false, failed = false, legacy = false, member = false }) {
+  const h = await harness({ sharedGroups: true, runningTasks: cancel, legacyTasks: legacy });
+  try {
+    const page = await h.open();
+    await sharedReady(page, "a");
+    await messageSettled(page, "a", "GET_GROUP_TEST_STATE");
+    const type = cancel ? "CANCEL_GROUP_TEST" : "START_GROUP_TEST";
+    const button = page.locator('.btn-test-group[data-group="shared-group"]');
+    const trigger = member ? page.locator('.member-item[data-member="a-node-2"] .latency-badge') : button;
+    const pending = h.hold(({ key }) => key === type, failed);
+    await trigger.click();
+    await pending.started;
+    assert.equal(await button.isDisabled(), true);
+    await page.locator("#btn-refresh").click();
+    await messageSettled(page, "a", "GET_GROUP_TEST_STATE", 2);
+    assert.equal(await button.isDisabled(), true);
+    await trigger.dispatchEvent("click");
+    assert.equal(h.messages.filter(({ key }) => key === type).length, 1);
+    pending.release();
+    await messageSettled(page, "a", type);
+    await until(() => button.isEnabled());
+    assert.equal(await button.evaluate((el) => el.classList.contains("testing")), cancel ? failed : !failed && !legacy);
+    assert.equal(await page.locator(".toast.error").count(), failed ? 1 : 0);
+    const mutation = h.messages.find(({ key }) => key === type);
+    assert.equal(mutation.instanceId, "a");
+    if (!cancel) assert.equal(mutation.memberName, member ? "a-node-2" : null);
+    if (failed) {
+      await trigger.click();
+      await messageSettled(page, "a", type, 2);
+      await until(() => button.isEnabled());
+      assert.equal(await button.evaluate((el) => el.classList.contains("testing")), !cancel);
+    }
+    assert.equal(h.messages.filter(({ key, id }) => key === type && id !== "a").length, 0);
+    await verify(h);
+  } finally { await h.close(); }
+}
+
 try {
+  for (const cancel of [true, false])
+    for (const failed of [false, true, "reject"])
+      for (const returnToA of [false, true])
+        await staleGroupTask({ cancel, failed, returnToA });
+  for (const cancel of [false, true])
+    for (const failed of [false, true])
+      await ordinaryGroupTask({ cancel, failed });
+  await ordinaryGroupTask({ legacy: true });
+  for (const failed of [false, true]) await ordinaryGroupTask({ member: true, failed });
   for (const failed of [false, true])
     for (const returnToA of [false, true])
       for (const tab of [false, true])
@@ -765,7 +895,7 @@ try {
   await oldAuxiliaryResponses({ returnToA: true });
   await oldAuxiliaryResponses({ failed: true, returnToA: true });
   await serializedSelectionAndCoalescing();
-  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation, 10 outbound mutation and 13 site check scenarios)");
+  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation, 10 outbound mutation, 13 site check and 19 group task scenarios)");
 } finally {
   await browser.close();
 }

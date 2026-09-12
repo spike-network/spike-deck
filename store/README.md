@@ -42,7 +42,7 @@ keeping the same fixture and assertions.
 ## Isolation And Failures
 
 `npm --prefix store run check:dashboard-lifetime` covers 11 dashboard loading and
-16 group mutation, 10 outbound mutation and 13 site check scenarios in isolated
+16 group mutation, 10 outbound mutation, 13 site check and 19 group task scenarios in isolated
 Chromium contexts. Deferred API replies
 exercise instance switches, A-to-B-to-A transitions, old success/error/finally
 callbacks and selection-refresh failures. It also checks same-instance success
@@ -52,6 +52,9 @@ after instance switches, including switching back to the original instance.
 Site checks defer the tab query, route explanation or connection list separately;
 they verify stale results/errors cannot overwrite or unlock a newer check, and
 cover unsupported pages and ordinary failures without using real browsing data.
+Group task checks defer background submission/cancellation replies, including
+transport rejection and A-to-B-to-A transitions. Redraw, duplicate admission,
+same-instance retry, member probes and legacy synchronous results remain covered.
 `DECK_BASELINE_REF` runs the same assertions against an earlier popup implementation.
 
 `capture.mjs` loads production HTML/CSS/JS through a request interceptor. `fixture.mjs` supplies

@@ -22,8 +22,8 @@ import {
 const leafProbeResults = new Map();
 let currentGroupsData = [];
 const terminalGroupTestStatuses = new Set(["completed", "cancelled", "failed"]);
-const cancellingGroupTests = new Set();
-const submittingGroupTests = new Set();
+const cancellingGroupTests = new Map();
+const submittingGroupTests = new Map();
 const groupTestTaskVersions = new Map();
 let groupTestEpoch = 0;
 let groupReadSequence = 0;
@@ -1035,18 +1035,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     return refresh.promise;
   }
 
-  async function restoreRecentGroupTests() {
-    const targetInstanceId = activeInstance.id;
+  function captureGroupTestRequest() {
+    const scope = captureInstanceRequest();
     const epoch = groupTestEpoch;
+    return { instance: scope.instance, isCurrent: () => scope.isCurrent() && groupTestEpoch === epoch };
+  }
+
+  async function restoreRecentGroupTests() {
+    const scope = captureGroupTestRequest();
+    if (!scope.instance) return;
     try {
       const response = await chrome.runtime.sendMessage({
         type: "GET_GROUP_TEST_STATE",
-        instanceId: targetInstanceId,
+        instanceId: scope.instance.id,
       });
-      if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;
+      if (!scope.isCurrent()) return;
       if (!response?.ok) throw new Error(response?.error || "Unable to restore group tests");
       applyGroupTestState(response.tasks);
     } catch (error) {
+      if (!scope.isCurrent()) return;
       console.warn(`Unable to restore group tests: ${error.message}`);
     }
   }
@@ -1084,13 +1091,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function syncGroupTestButtons() {
     groupsContainer.querySelectorAll(".btn-test-group").forEach((button) => {
+      const submitting = Array.from(submittingGroupTests.values()).some(
+        (operation) => operation.groupName === button.dataset.group && operation.isCurrent(),
+      );
       const testing = Array.from(activeGroupTests.values()).some(
         (task) => task.groupName === button.dataset.group,
       );
-      const cancelling = cancellingGroupTests.has(button.dataset.group);
-      button.classList.toggle("testing", testing);
+      const cancelling = Boolean(cancellingGroupTests.get(button.dataset.group)?.isCurrent());
+      button.classList.toggle("testing", testing || submitting);
       button.classList.toggle("cancelling", cancelling);
-      button.disabled = cancelling;
+      button.disabled = cancelling || submitting;
       button.title = cancelling ? "正在取消该组测速" : testing ? "取消该组测速" : "测试该组延迟";
       button.setAttribute("aria-label", button.title);
       const label = button.querySelector(".group-test-action-label");
@@ -2716,6 +2726,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       groupsContainer.appendChild(groupCard);
     });
+    syncGroupTestButtons();
   }
 
   /** Re-fetch groups and patch existing cards when the visible group set is stable. */
@@ -2886,68 +2897,64 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Latency Testing with visual feedback
   async function cancelGroupTests(groupName) {
-    if (cancellingGroupTests.has(groupName)) return;
+    const scope = captureGroupTestRequest();
+    if (!scope.instance || cancellingGroupTests.get(groupName)?.isCurrent()) return;
     const taskIds = Array.from(activeGroupTests.entries())
       .filter(([, task]) => task.groupName === groupName)
       .map(([taskId]) => taskId);
     if (taskIds.length === 0) return;
 
-    cancellingGroupTests.add(groupName);
-    const targetInstanceId = activeInstance.id;
-    const epoch = groupTestEpoch;
+    cancellingGroupTests.set(groupName, scope);
     syncGroupTestButtons();
     try {
       for (const taskId of taskIds) {
         const result = await chrome.runtime.sendMessage({
           type: "CANCEL_GROUP_TEST",
-          instanceId: targetInstanceId,
+          instanceId: scope.instance.id,
           taskId,
         });
+        if (!scope.isCurrent()) return;
         if (!result?.ok) throw new Error(result?.error || "Unable to cancel group test");
-        if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;
         applyGroupTestState(result.tasks);
       }
       showToast("已请求取消测速任务", "success");
     } catch (err) {
+      if (!scope.isCurrent()) return;
       showToast(`取消测速失败: ${err.message || err}`, "error");
       await restoreRecentGroupTests();
     } finally {
-      cancellingGroupTests.delete(groupName);
-      syncGroupTestButtons();
+      if (cancellingGroupTests.get(groupName) === scope) {
+        cancellingGroupTests.delete(groupName);
+        if (scope.isCurrent()) syncGroupTestButtons();
+      }
     }
   }
 
   async function runTestGroup(groupName, targetMember = null) {
+    const scope = { ...captureGroupTestRequest(), groupName };
     const operationKey = `${groupName}\0${targetMember || "*"}`;
-    if (submittingGroupTests.has(operationKey)) return;
+    if (!scope.instance || submittingGroupTests.get(operationKey)?.isCurrent() || cancellingGroupTests.get(groupName)?.isCurrent()) return;
     const duplicate = Array.from(activeGroupTests.values()).some(
       (task) => task.groupName === groupName && (task.targetMember || null) === targetMember,
     );
     if (duplicate) return;
-    submittingGroupTests.add(operationKey);
-    const targetInstanceId = activeInstance.id;
-    const epoch = groupTestEpoch;
-    const testBtn = document.querySelector(
-      `.btn-test-group[data-group="${CSS.escape(groupName)}"]`,
-    );
-    if (!targetMember && testBtn?.classList.contains("testing")) return;
-    if (testBtn) testBtn.classList.add("testing");
+    if (!targetMember && Array.from(activeGroupTests.values()).some((task) => task.groupName === groupName)) return;
+    submittingGroupTests.set(operationKey, scope);
+    syncGroupTestButtons();
 
     // Update target badges to "Testing..." spinner status immediately
     setGroupBadgesTesting(groupName, targetMember);
 
-    let asyncTaskStarted = false;
     try {
       const result = await chrome.runtime.sendMessage({
         type: "START_GROUP_TEST",
-        instanceId: targetInstanceId,
+        instanceId: scope.instance.id,
         groupName,
         memberName: targetMember,
       });
-      if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;
+      if (!scope.isCurrent()) return;
       if (!result?.ok) throw new Error(result?.error || "Unable to start group test");
       if (result.mode === "async") {
-        asyncTaskStarted = true;
         activeGroupTests.set(result.task.id, {
           groupName,
           targetMember,
@@ -2960,13 +2967,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         await refreshProbeSnapshots();
       }
     } catch (err) {
-      if (groupTestEpoch !== epoch || activeInstance?.id !== targetInstanceId) return;
+      if (!scope.isCurrent()) return;
       console.error(`Group test failed: ${err.message}`);
       showToast(`无法启动测速: ${err.message || err}`, "error");
       updateAllLatencyBadgesDOM();
     } finally {
-      submittingGroupTests.delete(operationKey);
-      if (!asyncTaskStarted && testBtn) testBtn.classList.remove("testing");
+      if (submittingGroupTests.get(operationKey) === scope) {
+        submittingGroupTests.delete(operationKey);
+        if (scope.isCurrent()) syncGroupTestButtons();
+      }
     }
   }
 
