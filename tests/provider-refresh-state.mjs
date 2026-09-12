@@ -51,6 +51,7 @@ globalThis.chrome = {
 
 const { SpikeApiClient } = await import('../lib/spike-client.js');
 let nextCoreTaskId = 17;
+let coreTaskNamespace = 'provider-process-1';
 let coreTaskStatus = 'failed';
 let coreProviderResults = [
   { provider_id: 'provider-one', status: 'failed', error: 'mock refresh failure' },
@@ -59,6 +60,7 @@ let coreProviderResults = [
 ];
 SpikeApiClient.startProviderRefreshTask = async () => ({
   id: nextCoreTaskId++,
+  task_namespace: coreTaskNamespace,
   status: 'running',
   started_at_unix_ms: Date.now(),
   provider_results: coreProviderResults.map(result => ({
@@ -68,6 +70,7 @@ SpikeApiClient.startProviderRefreshTask = async () => ({
 });
 SpikeApiClient.getProviderRefreshTask = async (_instance, id) => ({
   id,
+  task_namespace: coreTaskNamespace,
   status: coreTaskStatus,
   completed_at_unix_ms: Date.now(),
   revision: 9,
@@ -95,6 +98,7 @@ const started = await startProviderRefreshTask(
 );
 assert.equal(started.status, 'running');
 assert.equal(started.coreTaskId, 17);
+assert.equal(started.coreTaskNamespace, coreTaskNamespace);
 assert.deepEqual(started.requestedProviderIds, ['provider-one', 'provider-two', 'provider-three']);
 
 storage.providerRefreshFailures = {
@@ -128,6 +132,15 @@ assert.equal(completed.total, 2);
 assert.equal(storage.providerRefreshTasks['test-instance'].status, 'succeeded');
 assert.equal(storage.providerRefreshFailures['test-instance']['provider-one'], undefined);
 assert.equal(storage.providerRefreshFailures['test-instance']['provider-three'].error, 'retained failure');
+
+const interrupted = await startProviderRefreshTask('test-instance', 'provider-one');
+assert.equal(interrupted.coreTaskNamespace, 'provider-process-1');
+coreTaskNamespace = 'provider-process-2';
+const unknown = await getProviderRefreshTask('test-instance');
+assert.equal(unknown.id, interrupted.id);
+assert.equal(unknown.status, 'unknown');
+assert.match(unknown.error, /Core 已重启/);
+assert.equal(storage.providerRefreshFailures['test-instance']['provider-one'], undefined);
 
 const redacted = safeProviderRefreshError(
   new Error('GET https://provider.example.test/list?token=mock-token failed')

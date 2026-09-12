@@ -459,7 +459,7 @@ async function startProviderRefresh(instanceId, providerId, providerIds) {
     providerIds
   );
   const task = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: globalThis.crypto?.randomUUID?.() || `provider-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     instanceId,
     providerId: providerId || null,
@@ -509,9 +509,18 @@ async function startProviderRefresh(instanceId, providerId, providerIds) {
     return task;
   }
   // Failure to persist an accepted task is not evidence that the Core task failed.
+  const coreTaskNamespace = typeof coreTask.task_namespace === 'string'
+    && coreTask.task_namespace.length > 0
+    ? coreTask.task_namespace
+    : null;
+  const coreTaskId = coreTaskNamespace && Number.isSafeInteger(Number(coreTask.id))
+    && Number(coreTask.id) > 0
+    ? Number(coreTask.id)
+    : null;
   return await persistProviderRefreshTask(instanceId, {
     ...task,
-    coreTaskId: coreTask.id,
+    coreTaskId,
+    coreTaskNamespace,
     startedAtUnix: Math.floor(Number(coreTask.started_at_unix_ms || Date.now()) / 1000),
     providerResults: normalizeProviderRefreshResults(coreTask.provider_results)
   });
@@ -589,7 +598,7 @@ async function readProviderRefreshTask(instanceId) {
   const instances = await StorageManager.getInstances();
   const instance = instances.find(candidate => candidate.id === instanceId);
   if (!instance) return task;
-  const reconciled = task.coreTaskId
+  const reconciled = task.coreTaskId && task.coreTaskNamespace
     ? await reconcileCoreProviderRefreshTask(instance, task)
     : await reconcileProviderRefreshTask(instance, task);
   return persistProviderRefreshTask(instanceId, reconciled);
@@ -656,6 +665,18 @@ function providerRefreshOutcome(state, task) {
 async function reconcileCoreProviderRefreshTask(instance, task) {
   try {
     const coreTask = await SpikeApiClient.getProviderRefreshTask(instance, task.coreTaskId);
+    if (
+      Number(coreTask.id) !== Number(task.coreTaskId)
+      || coreTask.task_namespace !== task.coreTaskNamespace
+    ) {
+      await SpikeApiClient.getProviders(instance).catch(() => null);
+      return {
+        ...task,
+        status: 'unknown',
+        finishedAtUnix: Math.floor(Date.now() / 1000),
+        error: 'Core 已重启，无法确认此前更新任务的结果；请检查当前资源状态'
+      };
+    }
     const providerResults = normalizeProviderRefreshResults(coreTask.provider_results);
     if (coreTask.status === 'running') {
       return providerResults.length > 0 ? { ...task, providerResults } : task;

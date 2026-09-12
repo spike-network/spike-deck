@@ -8,7 +8,7 @@
     "group_test_tasks": 1,
     "module_update_tasks": 1,
     "operational_event_metadata": 1,
-    "provider_refresh_tasks": 2,
+    "provider_refresh_tasks": 3,
     "reload_preview": 1,
     "runtime_event_stream": 1,
     "runtime_log_stream": 1,

@@ -802,6 +802,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           `更新失败：${task.error || "未知错误"}；当前运行配置未改变。`,
           "error",
         );
+      } else if (task.status === "unknown" && isProvidersPanelOpen()) {
+        handledProviderTaskState = stateKey;
+        showProvidersPanelNotice(task.error || "无法确认外部资源更新结果。", "error");
       }
     } else if (!providerRefreshTask && providersRefreshing) {
       clearProvidersPanelNotice();

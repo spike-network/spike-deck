@@ -40,16 +40,24 @@ let polls = 0;
 let beforeStart = async () => {};
 let beforePoll = async () => {};
 let coreStatus = "running";
+let coreTaskNamespace = "provider-process-1";
+let statusReads = 0;
 SpikeApiClient.startProviderRefreshTask = async () => {
   starts += 1;
   await beforeStart();
-  return { id: nextId++, started_at_unix_ms: Date.now(), provider_results: [] };
+  return {
+    id: nextId++,
+    task_namespace: coreTaskNamespace,
+    started_at_unix_ms: Date.now(),
+    provider_results: [],
+  };
 };
 SpikeApiClient.getProviderRefreshTask = async (_, id) => {
   polls += 1;
   await beforePoll();
   return {
     id,
+    task_namespace: coreTaskNamespace,
     status: coreStatus,
     completed_at_unix_ms: Date.now(),
     provider_results: [
@@ -58,6 +66,10 @@ SpikeApiClient.getProviderRefreshTask = async (_, id) => {
   };
 };
 SpikeApiClient.getProviders = async () => ({ providers: [{ id: "source", status: "ready" }] });
+SpikeApiClient.getStatus = async () => {
+  statusReads += 1;
+  return { provider_refresh: { refreshing: true } };
+};
 const { startProviderRefreshTask, getProviderRefreshTask } = await import("../background.js");
 const message = (body) => new Promise((resolve) => listeners.message(body, {}, resolve));
 const dismiss = (instanceId, taskId) =>
@@ -81,6 +93,8 @@ function reset() {
   writes.length = 0;
   starts = polls = 0;
   coreStatus = "running";
+  coreTaskNamespace = "provider-process-1";
+  statusReads = 0;
   beforeWrite = beforeStart = beforePoll = async () => {};
 }
 
@@ -89,6 +103,8 @@ reset();
 {
   const [a, b] = await Promise.all([start("a"), start("b")]);
   assert.notEqual(a.coreTaskId, b.coreTaskId);
+  assert.equal(a.coreTaskNamespace, coreTaskNamespace);
+  assert.equal(b.coreTaskNamespace, coreTaskNamespace);
   assert.equal(storage.providerRefreshTasks.a.id, a.id);
   assert.equal(storage.providerRefreshTasks.b.id, b.id);
   coreStatus = "failed";
@@ -97,6 +113,38 @@ reset();
     assert.equal(storage.providerRefreshTasks[id].status, "failed");
     assert.ok(storage.providerRefreshFailures[id].source);
   }
+}
+
+// A same-numbered task from a restarted Core is unrelated and cannot record failure.
+reset();
+{
+  const task = await start("a");
+  coreTaskNamespace = "provider-process-2";
+  const reconciled = await getProviderRefreshTask("a");
+  assert.equal(reconciled.id, task.id);
+  assert.equal(reconciled.status, "unknown");
+  assert.match(reconciled.error, /Core 已重启/);
+  assert.deepEqual(storage.providerRefreshFailures, {});
+  assert.equal(starts, 1);
+}
+
+// Legacy records without a namespace use status reconciliation, never numeric task lookup.
+reset();
+{
+  storage.providerRefreshTasks.a = {
+    schemaVersion: 2,
+    id: "legacy-task",
+    instanceId: "a",
+    providerId: "source",
+    requestedProviderIds: ["source"],
+    status: "running",
+    startedAtUnix: Math.floor(Date.now() / 1000),
+    coreTaskId: 1,
+  };
+  const legacy = await getProviderRefreshTask("a");
+  assert.equal(legacy.status, "running");
+  assert.equal(polls, 0);
+  assert.equal(statusReads, 1);
 }
 
 // Admission is reserved before POST. Queries and overlapping starts join it.

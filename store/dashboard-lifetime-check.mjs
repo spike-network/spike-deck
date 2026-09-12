@@ -933,6 +933,26 @@ async function staleProviderStart({ failed = false }) {
   } finally { await h.close(); }
 }
 
+async function unknownProviderTask() {
+  const h = await harness();
+  try {
+    h.providerTasks.a = {
+      id: "unknown-task",
+      instanceId: "a",
+      providerId: "a-provider-1",
+      status: "unknown",
+      error: "Core 已重启，无法确认此前更新任务的结果；请检查当前资源状态",
+    };
+    const page = await h.open();
+    await ready(page, "a");
+    await openProviders(page, "a-provider-1");
+    const notice = page.locator("#providers-panel-notice.error");
+    await notice.waitFor({ state: "visible" });
+    assert.match(await notice.textContent(), /Core 已重启/);
+    await verify(h);
+  } finally { await h.close(); }
+}
+
 async function staleGroupTask({ cancel, failed, returnToA }) {
   const h = await harness({ sharedGroups: true, runningTasks: cancel });
   try {
@@ -1022,6 +1042,7 @@ try {
     }
     await staleProviderStart({ failed });
   }
+  await unknownProviderTask();
   for (const cancel of [true, false])
     for (const failed of [false, true, "reject"])
       for (const returnToA of [false, true])
@@ -1066,7 +1087,7 @@ try {
   await oldAuxiliaryResponses({ returnToA: true });
   await oldAuxiliaryResponses({ failed: true, returnToA: true });
   await serializedSelectionAndCoalescing();
-  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation, 10 outbound mutation, 13 site check, 19 group task and 10 provider scenarios)");
+  console.log("Dashboard lifetime browser checks passed (11 loading, 16 group mutation, 10 outbound mutation, 13 site check, 19 group task and 11 provider scenarios)");
 } finally {
   await browser.close();
 }

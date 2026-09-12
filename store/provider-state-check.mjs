@@ -12,6 +12,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const profile = await mkdtemp(join(tmpdir(), "deck-provider-browser-"));
 const tasks = new Map();
 const starts = { a: 0, b: 0 };
+const taskNamespaces = { a: "a-process-1", b: "b-process-1" };
 let nextId = 1;
 let pending;
 let context;
@@ -46,6 +47,7 @@ const server = http.createServer(async (request, response) => {
       starts[instance] += 1;
       result = {
         id: nextId++,
+        task_namespace: taskNamespaces[instance],
         status: "running",
         started_at_unix_ms: Date.now(),
         provider_results: [],
@@ -221,8 +223,29 @@ try {
   assert.ok(restored.failures.source);
   assert.equal((await stored()).providerRefreshTasks.a.id, pendingA.task.id);
   assert.deepEqual(starts, { a: 3, b: 2 });
+
+  // A Core restart can reuse a numeric task ID. The namespace keeps it unrelated.
+  await send(reopened, "DISMISS_PROVIDER_REFRESH_TASK", "a", { taskId: pendingA.task.id });
+  const interrupted = await start(reopened, "a");
+  assert.equal(interrupted.ok, true);
+  const failureBefore = structuredClone((await stored()).providerRefreshFailures.a);
+  taskNamespaces.a = "a-process-2";
+  tasks.set(`a:${interrupted.task.coreTaskId}`, {
+    id: interrupted.task.coreTaskId,
+    task_namespace: taskNamespaces.a,
+    status: "succeeded",
+    completed_at_unix_ms: Date.now(),
+    revision: 11,
+    provider_results: [{ provider_id: "source", status: "succeeded" }],
+  });
+  const startsBeforeRestartRead = starts.a;
+  const unknown = await read(reopened, "a");
+  assert.equal(unknown.task.status, "unknown");
+  assert.match(unknown.task.error, /Core 已重启/);
+  assert.equal(starts.a, startsBeforeRestartRead, "Restart reconciliation replayed POST");
+  assert.deepEqual((await stored()).providerRefreshFailures.a, failureBefore);
   console.log(
-    "Real Chromium cross-context provider persistence, popup dismissal and restart checks passed",
+    "Real Chromium cross-context provider persistence, extension restart and Core identity checks passed",
   );
 } finally {
   pending?.release();
