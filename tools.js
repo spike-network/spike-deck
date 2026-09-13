@@ -14,10 +14,13 @@ let instance = null;
 let logEntries = [];
 let eventEntries = [];
 let eventNamespace = '';
+let clearedLogSequence = 0;
+let logRead = null;
 
 function adoptEventNamespace(namespace) {
   if (!namespace || namespace === eventNamespace) return;
   eventNamespace = namespace;
+  clearedLogSequence = 0;
   logEntries = [];
   eventEntries = [];
   renderLogs();
@@ -109,7 +112,13 @@ async function loadSessionPools() {
     : text('p', '暂无会话池指标'));
 }
 
-async function loadLogs() {
+function loadLogs() {
+  if (logRead) return logRead;
+  logRead = readLogs().finally(() => { logRead = null; });
+  return logRead;
+}
+
+async function readLogs() {
   const namespace = eventNamespace;
   const data = await SpikeApiClient.getLogs(instance, 200);
   if (namespace !== eventNamespace && data.event_namespace !== eventNamespace) return;
@@ -159,7 +168,7 @@ function mergeLogEntries(entries) {
   for (const entry of entries) {
     if (entry?.event_namespace && entry.event_namespace !== eventNamespace) continue;
     const sequence = Number(entry?.sequence);
-    if (Number.isSafeInteger(sequence)) bySequence.set(sequence, entry);
+    if (Number.isSafeInteger(sequence) && sequence > clearedLogSequence) bySequence.set(sequence, entry);
   }
   logEntries = Array.from(bySequence.values())
     .sort((left, right) => Number(left.sequence) - Number(right.sequence))
@@ -281,6 +290,7 @@ byId('logs-filter-clear').addEventListener('click', () => {
   input.focus();
 });
 byId('logs-view-clear').addEventListener('click', () => {
+  clearedLogSequence = Math.max(clearedLogSequence, ...logEntries.map((entry) => Number(entry.sequence)));
   logEntries = [];
   renderLogs();
   showNotice(t('当前视图日志已清空'));
@@ -337,8 +347,18 @@ try {
   instance = await StorageManager.getActiveInstance();
   if (!instance) throw new Error('请先在 SpikeDeck 设置中添加并选择实例');
   byId('instance-label').textContent = `${instance.name} · ${instance.baseUrl}`;
-  const stream = await chrome.runtime.sendMessage({ type: 'ENSURE_LOG_STREAM' });
-  if (!stream?.ok) throw new Error(stream?.error || '无法启动实时日志');
+  void chrome.runtime.sendMessage({ type: 'ENSURE_LOG_STREAM' }).then((stream) => {
+    if (!stream?.ok) setLogStreamState('retrying');
+  }).catch(() => setLogStreamState('retrying'));
+  const refreshLogs = () => {
+    if (!document.hidden) void loadLogs().catch(() => setLogStreamState('retrying'));
+  };
+  const timer = window.setInterval(refreshLogs, 3000);
+  document.addEventListener('visibilitychange', refreshLogs);
+  window.addEventListener('pagehide', () => {
+    window.clearInterval(timer);
+    document.removeEventListener('visibilitychange', refreshLogs);
+  }, { once: true });
   await loadAll();
 } catch (error) {
   handleError(error);
