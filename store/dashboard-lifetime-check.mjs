@@ -95,6 +95,7 @@ async function harness(options = {}) {
   const providerVersions = { a: 1, b: 1 };
   const providerTasks = { a: null, b: null };
   const providerFailures = { a: {}, b: {} };
+  const providerInventoryRefreshing = { a: false, b: false };
   let providerTaskId = 0;
   const offline = new Set();
   const held = [];
@@ -273,7 +274,7 @@ async function harness(options = {}) {
       payloads["metrics.json"].traffic.download_bytes_per_second =
         (id === "a" ? 111000 : 222000) * version;
       payloads.providers = {
-        refreshing: false,
+        refreshing: providerInventoryRefreshing[id],
         providers: [
           {
             ...payloads.providers.providers[0],
@@ -334,6 +335,7 @@ async function harness(options = {}) {
     providerVersions,
     providerTasks,
     providerFailures,
+    providerInventoryRefreshing,
     offline,
     hold,
     open,
@@ -951,6 +953,46 @@ async function staleProviderStart({ failed = false }) {
   } finally { await h.close(); }
 }
 
+async function terminalProviderTaskClearsStaleInventoryBusy() {
+  const h = await harness();
+  try {
+    h.providerInventoryRefreshing.a = true;
+    h.providerTasks.a = {
+      id: "running-task",
+      instanceId: "a",
+      providerId: null,
+      status: "running",
+      providerResults: [{ providerId: "a-provider-1", status: "pending", error: null }],
+    };
+    const page = await h.open();
+    await ready(page, "a");
+    await openProviders(page, "a-provider-1");
+    const updateAll = page.locator("#btn-providers-refresh-all");
+    assert.equal(await updateAll.isDisabled(), true);
+
+    const inventory = h.hold(({ id, key }) => id === "a" && key === "providers", true);
+    h.providerTasks.a = {
+      ...h.providerTasks.a,
+      status: "failed",
+      providerResults: [
+        {
+          providerId: "a-provider-1",
+          status: "failed",
+          error: "mock refresh failure",
+        },
+      ],
+    };
+    await inventory.started;
+    inventory.release();
+
+    await updateAll.getByText("Update all", { exact: true }).waitFor();
+    assert.equal(await updateAll.isEnabled(), true);
+    await verify(h);
+  } finally {
+    await h.close();
+  }
+}
+
 async function unknownProviderTask() {
   const h = await harness();
   try {
@@ -1060,6 +1102,7 @@ try {
     }
     await staleProviderStart({ failed });
   }
+  await terminalProviderTaskClearsStaleInventoryBusy();
   await unknownProviderTask();
   for (const cancel of [true, false])
     for (const failed of [false, true, "reject"])

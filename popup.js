@@ -787,6 +787,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       response.failures && typeof response.failures === "object" ? response.failures : {};
     const running = task?.status === "running";
     providersBusyKey = running ? task.providerId || "*" : "";
+    // A terminal task is authoritative even if the follow-up inventory read
+    // fails. A later inventory response can still report independent work.
+    if (task && !running) providersRefreshing = false;
     btnRefreshProviders.classList.toggle("testing", running || providersRefreshing);
 
     if (running) {
