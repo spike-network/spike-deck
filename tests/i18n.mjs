@@ -55,6 +55,11 @@ assert.equal(translateForLanguage("External value", "en"), "External value");
 assert.equal(translateForLanguage("3 分钟前", "en"), "3 min ago");
 assert.equal(translateForLanguage("远程 · 1h", "en"), "Remote · 1h");
 assert.equal(translateForLanguage("本地 · 1h", "en"), "Local · 1h");
+assert.equal(translateForLanguage("已获取", "en"), "Fetched");
+assert.equal(
+  translateForLanguage("更新失败：2 个资源未更新；当前运行配置未改变。", "en"),
+  "2 resources failed to update. The active runtime configuration was not changed.",
+);
 assert.equal(
   translateForLanguage(
     "https://rules.example.test/a\n组: Demo\n来源: remote",

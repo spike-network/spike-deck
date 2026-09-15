@@ -22,6 +22,9 @@ assert.match(css, /html\s*\{[\s\S]*?width:\s*415px;[\s\S]*?max-width:\s*415px;/)
 assert.match(css, /body\s*\{[\s\S]*?width:\s*415px;[\s\S]*?max-width:\s*415px;/);
 assert.match(css, /grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\) minmax\(0, 1\.4fr\);/);
 assert.match(css, /\.provider-row\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/);
+const providerErrorRule = css.match(/\.provider-row-error\s*\{([^}]+)\}/)[1];
+assert.match(providerErrorRule, /white-space:\s*nowrap;/);
+assert.match(providerErrorRule, /text-overflow:\s*ellipsis;/);
 const bodyRule = css.match(/body\s*\{([^}]+)\}/)[1];
 const containerRule = css.match(/\.container\s*\{([^}]+)\}/)[1];
 assert.match(bodyRule, /overflow:\s*hidden;/);

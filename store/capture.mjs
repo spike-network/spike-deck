@@ -75,7 +75,37 @@ async function capture(browser, scene, theme, language, width, staging) {
     payloads.api = JSON.parse(
       await readFile(resolve(root, "tests/fixtures/control-api-v1.json")),
     );
-    await context.addInitScript(installChromeMock, { theme, language, now });
+    const providerErrors = {
+      rules: "https://rules.example.test/default.list: HTTP 500 Internal Server Error",
+      policies:
+        "Fallback: https://providers.example.test/REDACTED?…: policy-path download timed out after 30s: deadline has elapsed",
+    };
+    const providerTask = check && scene.name === "providers"
+      ? {
+          id: "fixture-provider-refresh",
+          status: "failed",
+          providerId: null,
+          providerResults: Object.entries(providerErrors).map(([providerId, error]) => ({
+            providerId,
+            status: "failed",
+            error,
+          })),
+        }
+      : null;
+    await context.addInitScript(installChromeMock, {
+      theme,
+      language,
+      now,
+      providerTask,
+      providerFailures: providerTask
+        ? Object.fromEntries(
+            Object.entries(providerErrors).map(([providerId, error]) => [
+              providerId,
+              { failedAtUnix: now / 1000, error },
+            ]),
+          )
+        : {},
+    });
     await context.route("**/*", async (route) => {
       const request = route.request();
       const url = new URL(request.url());
@@ -134,6 +164,23 @@ async function capture(browser, scene, theme, language, width, staging) {
     await page.locator(scene.ready).first().waitFor();
     if (scene.name === "groups")
       await page.locator(".group-header").first().click();
+    if (check && scene.name === "providers") {
+      assert.equal(await page.locator(".provider-row-error").count(), 2);
+      assert.match(
+        await page.locator("#providers-panel-notice").textContent(),
+        language === "en" ? /2 resources failed/ : /2 个资源/,
+      );
+      const errorRows = await page.locator(".provider-row-error").evaluateAll((elements) =>
+        elements.map((element) => ({
+          height: element.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight),
+        })),
+      );
+      assert.ok(
+        errorRows.every(({ height, lineHeight }) => height <= lineHeight + 1),
+        "Provider errors must remain single-line",
+      );
+    }
     await page.evaluate(async () => {
       await document.fonts.ready;
       await Promise.all([...document.images].map((img) => img.decode()));

@@ -17,6 +17,13 @@ import {
   shouldCollapseGroupAfterSelection,
   splitSelectedSummary,
 } from "./lib/group-selection.js";
+import {
+  providerRefreshError,
+  providerTaskDisplayStatus,
+  providerTaskProgress,
+  providerTaskResult,
+  summarizeProviderRefreshError,
+} from "./lib/provider-refresh-view.js";
 
 // Group/member-scoped current health; task samples only fill legacy metadata gaps.
 const leafProbeResults = new Map();
@@ -446,6 +453,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (status === "stale") return "已过期";
     if (status === "refreshing") return "更新中";
     if (status === "update_failed") return "更新失败";
+    if (status === "refresh_succeeded") return "已获取";
+    if (status === "skipped") return "已跳过";
     if (status === "unknown") return "待确认";
     return status || "未知";
   }
@@ -802,13 +811,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         void loadDashboard();
       } else if (task.status === "failed" && isProvidersPanelOpen()) {
         handledProviderTaskState = stateKey;
+        const progress = providerTaskProgress(task);
         showProvidersPanelNotice(
-          `更新失败：${task.error || "未知错误"}；当前运行配置未改变。`,
+          progress.failed > 0
+            ? `更新失败：${progress.failed} 个资源未更新；当前运行配置未改变。`
+            : "外部资源更新失败；当前运行配置未改变。",
           "error",
         );
       } else if (task.status === "unknown" && isProvidersPanelOpen()) {
         handledProviderTaskState = stateKey;
-        showProvidersPanelNotice(task.error || "无法确认外部资源更新结果。", "error");
+        showProvidersPanelNotice(
+          summarizeProviderRefreshError(task.error || "无法确认外部资源更新结果。"),
+          "error",
+        );
       }
     } else if (!providerRefreshTask && providersRefreshing) {
       clearProvidersPanelNotice();
@@ -817,17 +832,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function resolveProviderDisplayStatus(provider) {
-    if (providersBusyKey === "*" || providersBusyKey === provider.id) {
-      return "refreshing";
-    }
+    const taskStatus = providerTaskDisplayStatus(providerRefreshTask, provider.id);
+    if (taskStatus) return taskStatus;
+    if (providersBusyKey === "*" || providersBusyKey === provider.id) return "refreshing";
     if (providersRefreshing && (provider.refreshing || provider.status === "refreshing")) {
       return "refreshing";
     }
     const availability =
       provider.availability || (provider.status === "missing" ? "missing" : "available");
-    if (availability === "missing" && providerRefreshFailures[provider.id]) {
-      return "update_failed";
-    }
+    if (providerRefreshFailures[provider.id]) return "update_failed";
     if (availability === "missing") return "missing";
     if (provider.freshness === "stale") return "stale";
     return "ready";
@@ -838,9 +851,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     providersPanelCount.textContent = count > 0 ? `${count} 项` : "";
     const anyLocalBusy = Boolean(providersBusyKey);
     const headerBusy = anyLocalBusy || providersRefreshing;
+    const progress = providerTaskProgress(providerRefreshTask);
 
     btnProvidersRefreshAll.disabled = count === 0 || anyLocalBusy || providersRefreshing;
-    btnProvidersRefreshAll.textContent = headerBusy ? "更新中…" : "全部更新";
+    btnProvidersRefreshAll.textContent = headerBusy
+      ? progress.total > 1 && progress.completed > 0
+        ? `${progress.completed}/${progress.total}`
+        : "更新中…"
+      : "全部更新";
     btnProvidersRefreshAll.classList.toggle("testing", headerBusy);
     btnRefreshProviders.classList.toggle("testing", headerBusy);
 
@@ -857,12 +875,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     providersList.replaceChildren();
     currentProviders.forEach((provider) => {
-      const rowUpdating = providersBusyKey === "*" || providersBusyKey === provider.id;
+      const taskResult = providerTaskResult(providerRefreshTask, provider.id);
+      const rowUpdating =
+        providersBusyKey === provider.id ||
+        (providersBusyKey === "*" && (!taskResult || taskResult.status === "pending"));
       const displayStatus = resolveProviderDisplayStatus(provider);
       const statusClass = `provider-status status-${displayStatus}`;
       const typeLabel = providerTypeLabel(provider.type);
       const statusLabel = providerStatusLabel(displayStatus);
-      const refreshFailure = providerRefreshFailures[provider.id];
+      const refreshError = providerRefreshError(
+        providerRefreshTask,
+        provider.id,
+        providerRefreshFailures[provider.id],
+      );
       const safeSource = safeProviderSource(provider);
       const sourceTitle = [
         safeSource,
@@ -919,7 +944,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               "span",
               {
                 className: statusClass,
-                title: refreshFailure?.error || "",
+                title: refreshError,
               },
               statusLabel,
             ),
@@ -934,6 +959,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           ),
           provider.group && safeSource
             ? el("div", { className: "provider-origin", title: safeSource }, safeSource)
+            : null,
+          refreshError
+            ? el(
+                "div",
+                { className: "provider-row-error", title: refreshError },
+                summarizeProviderRefreshError(refreshError),
+              )
             : null,
           el(
             "div",

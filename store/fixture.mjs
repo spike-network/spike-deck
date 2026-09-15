@@ -56,6 +56,20 @@ export function fixture(stress = false) {
           last_updated_unix: now / 1000,
           update_interval_seconds: 3600,
         },
+        ...(stress
+          ? [{
+              id: "policies",
+              type: "policy-group",
+              group: "Fallback",
+              source_kind: "remote",
+              source: "https://providers.example.test/private.list?…",
+              status: "ready",
+              availability: "available",
+              freshness: "stale",
+              last_updated_unix: now / 1000 - 86400,
+              update_interval_seconds: 3600,
+            }]
+          : []),
       ],
     },
     "metrics.json": {
@@ -70,7 +84,13 @@ export function fixture(stress = false) {
 }
 
 // Only the browser boundary is mocked; production page scripts render all UI.
-export function installChromeMock({ theme, language, now }) {
+export function installChromeMock({
+  theme,
+  language,
+  now,
+  providerTask = null,
+  providerFailures = {},
+}) {
   localStorage.setItem("spike.deck.theme", theme);
   Date.now = () => now;
   window.__screenshotErrors = [];
@@ -116,8 +136,9 @@ export function installChromeMock({ theme, language, now }) {
       }),
       async sendMessage({ type }) {
         if (type === "GET_GROUP_TEST_STATE") return { ok: true, tasks: [] };
-        if (type === "GET_PROVIDER_REFRESH_TASK" || type === "GET_MODULE_UPDATE")
-          return { ok: true, task: null };
+        if (type === "GET_PROVIDER_REFRESH_TASK")
+          return { ok: true, task: providerTask, failures: providerFailures };
+        if (type === "GET_MODULE_UPDATE") return { ok: true, task: null };
         if (type === "GET_PROXY_SETTING_STATE")
           return {
             ok: true,
