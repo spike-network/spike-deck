@@ -10,6 +10,11 @@ import {
   visiblePolicyGroups,
 } from "./lib/hidden-groups.js";
 import { initializeI18n } from "./lib/i18n.js";
+import {
+  ingestPersistedMemberInfo,
+  probeResultKey,
+  recordProbeResults,
+} from "./lib/probe-results.js";
 import { installPopupInteractions } from "./lib/popup-interactions.js";
 import {
   groupMemberAction,
@@ -1059,7 +1064,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     metadata.completedMembers = new Set((task.results || []).filter((result) => isDirectGroupProbeResult(task.group, result)).map((result) => result.member));
     activeGroupTests.set(task.id, metadata);
     if (Array.isArray(task.results) && task.results.length > 0) {
-      recordProbeResults(task.group, task.results, task.created_at_unix_ms || Date.now());
+      recordProbeResults(leafProbeResults, task.group, task.results, task.created_at_unix_ms || Date.now());
     }
     updateAllLatencyBadgesDOM();
     if (terminalGroupTestStatuses.has(task.status)) {
@@ -1148,7 +1153,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const previous = groupTestTaskVersions.get(groupTestTaskKey(task));
       if (!acceptGroupTestTask(task)) continue;
       healthChanged ||= groupTaskHealthChanged(previous, task);
-      recordProbeResults(task.group, task.results, task.created_at_unix_ms || Date.now());
+      recordProbeResults(leafProbeResults, task.group, task.results, task.created_at_unix_ms || Date.now());
       if (terminalGroupTestStatuses.has(task.status)) {
         if (previousActiveIds.has(task.id)) taskSettled = true;
         continue;
@@ -1831,7 +1836,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!load.isCurrent()) return;
       if (snapshot?.groups?.length && cachedReadSequence === groupReadSequence) {
         currentGroupsData = snapshot.groups;
-        ingestPersistedMemberInfo(currentGroupsData);
+        ingestPersistedMemberInfo(leafProbeResults, currentGroupsData);
         renderGroups(currentGroupsData);
         groupsContainer.dataset.snapshot = "cached";
         cachedGroupsRendered = true;
@@ -1878,7 +1883,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
 
       // Ingest persisted probe results from all group member_info fields
-      ingestPersistedMemberInfo(currentGroupsData);
+      ingestPersistedMemberInfo(leafProbeResults, currentGroupsData);
 
       renderGroups(currentGroupsData);
       void restoreRecentGroupTests();
@@ -2094,10 +2099,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     setProxyControlDot("", "未接管；其他代理扩展可控制浏览器");
   }
 
-  function probeResultKey(groupName, memberName) {
-    return `${groupName}\0${memberName}`;
-  }
-
   function groupTestTaskKey(task) {
     return `${task.task_namespace || "legacy"}:${task.id}`;
   }
@@ -2128,58 +2129,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /** Replace current health, including absent samples, without replaying old tasks. */
-  function ingestPersistedMemberInfo(groups) {
-    const valid = new Set();
-    const authoritative = new Set();
-    (groups || []).forEach((g) => {
-      (g.members || []).forEach((member) => valid.add(probeResultKey(g.name, member)));
-      if (Array.isArray(g.member_info)) {
-        g.member_info.forEach((info) => {
-          if (info && info.name) {
-            const key = probeResultKey(g.name, info.name);
-            authoritative.add(key);
-            leafProbeResults.set(key, {
-              authoritative: true,
-              sourceMember: info.name,
-              ms: info.last_test_ms ?? null,
-              ok: info.last_test_ok,
-              err: info.last_test_ok === false ? "Timeout" : null,
-              at: info.last_test_at_unix_ms || 0,
-              udpOk: info.last_udp_test_ok,
-              udpMs: info.last_udp_test_ms ?? null,
-            });
-          }
-        });
-      }
-    });
-    for (const key of leafProbeResults.keys()) {
-      if (!valid.has(key) || (leafProbeResults.get(key)?.authoritative && !authoritative.has(key))) {
-        leafProbeResults.delete(key);
-      }
-    }
-  }
-
-  function recordProbeResults(groupName, results, fallbackAt = Date.now()) {
-    (results || []).forEach((result) => {
-      if (!isDirectGroupProbeResult(groupName, result)) return;
-      const key = probeResultKey(groupName, result.member);
-      const recordedAt = result.tested_at_unix_ms || fallbackAt;
-      const existing = leafProbeResults.get(key);
-      if (existing?.authoritative) return;
-      if (existing && existing.at && recordedAt < existing.at) return;
-      leafProbeResults.set(key, {
-        sourceMember: result.member,
-        ms: result.latency_ms ?? null,
-        ok: result.ok === true,
-        err: result.error || (result.ok ? null : "Timeout"),
-        at: recordedAt,
-        udpOk: result.udp_ok,
-        udpMs: result.udp_latency_ms ?? null,
-        udpErr: result.udp_error || null,
-      });
-    });
-  }
-
   function setStatus(state, text) {
     statusDot.className = `status-dot ${state}`;
     statusText.textContent = text;
@@ -2816,7 +2765,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const groupsData = await SpikeApiClient.getGroups(scope.instance);
     if (!scope.isCurrent() || sequence !== groupReadSequence) return false;
     currentGroupsData = groupsData.groups || [];
-    ingestPersistedMemberInfo(currentGroupsData);
+    ingestPersistedMemberInfo(leafProbeResults, currentGroupsData);
     const nextVisible = displayedPolicyGroups(currentGroupsData).map(
       (group) => group.name,
     );
@@ -3050,7 +2999,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
         handleGroupTestTask(result.task);
       } else {
-        recordProbeResults(groupName, result.results);
+        recordProbeResults(leafProbeResults, groupName, result.results);
         updateAllLatencyBadgesDOM();
         await refreshProbeSnapshots();
       }

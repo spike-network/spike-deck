@@ -1,16 +1,14 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { isDirectGroupProbeResult } from "../lib/group-selection.js";
+import {
+  ingestPersistedMemberInfo,
+  probeResultKey as key,
+  recordProbeResults,
+} from "../lib/probe-results.js";
 
-const source = readFileSync(new URL("../popup.js", import.meta.url), "utf8");
-const start = source.indexOf("  function ingestPersistedMemberInfo(");
-const end = source.indexOf("  function setStatus(", start);
-assert.ok(start >= 0 && end > start);
 const samples = new Map();
-const key = (group, member) => `${group}\0${member}`;
-const { recordProbeResults: record, ingestPersistedMemberInfo: ingest } = new Function(
-  "leafProbeResults", "probeResultKey", "isDirectGroupProbeResult",
-  source.slice(start, end) + "\nreturn {recordProbeResults, ingestPersistedMemberInfo};")(samples, key, isDirectGroupProbeResult);
+const record = (group, results) => recordProbeResults(samples, group, results);
+const ingest = (groups) => ingestPersistedMemberInfo(samples, groups);
 const direct = { member: "Leaf", paths: [["Outer", "Leaf"]], ok: true, latency_ms: 12, tested_at_unix_ms: 1 };
 const nested = { member: "Leaf", paths: [["Outer", "Inner", "Leaf"]], ok: true, latency_ms: 90, tested_at_unix_ms: 2 };
 record("Outer", [direct, nested]);
