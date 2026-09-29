@@ -4,8 +4,12 @@
   "api_version": 1,
   "minimum_supported_api_version": 1,
   "features": {
+    "client_policy_read_lease": 1,
+    "local_client_config": 1,
+    "runtime_precondition": 1,
     "connection_decision_trace": 1,
     "group_test_tasks": 1,
+    "http_capture": 1,
     "module_update_tasks": 1,
     "operational_event_metadata": 1,
     "provider_refresh_tasks": 3,

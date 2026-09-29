@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import {
   CONTROL_API_VERSION,
@@ -8,6 +10,13 @@ import {
 } from '../lib/control-api-contract.js';
 
 const fixtureUrl = new URL('./fixtures/control-api-v1.json', import.meta.url);
+const coreFixtureUrl = process.env.SPIKE_CORE_DIR
+  ? pathToFileURL(`${process.env.SPIKE_CORE_DIR}/tests/fixtures/control-api-v1.json`)
+  : new URL('../../spike-core/tests/fixtures/control-api-v1.json', import.meta.url);
+
+test('fixture matches the Core-owned contract', { skip: !existsSync(coreFixtureUrl) && 'spike-core checkout not found; set SPIKE_CORE_DIR' }, async () => {
+  assert.equal(await readFile(fixtureUrl, 'utf8'), await readFile(coreFixtureUrl, 'utf8'));
+});
 
 test('accepts the native Control API v1 fixture', async () => {
   const fixture = JSON.parse(await readFile(fixtureUrl, 'utf8'));
