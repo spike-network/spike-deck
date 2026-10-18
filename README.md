@@ -73,6 +73,7 @@
    - **实例名称**：如 `Local Spike`
    - **Control API Base URL**：默认 `http://127.0.0.1:9090`
    - **Control Secret**：若在 Spike 配置中启用了控制面密码（`http-api`），填入该 Secret；未设置可留空。
+     远程实例（非 `127.0.0.1` / `localhost` / `[::1]`）带 Secret 时必须使用 `https://`（在 Spike 中启用 `http-api-tls`），SpikeDeck 不会通过明文 HTTP 发送 Secret。
    - **代理端口**：无需填写。开启浏览器代理时会读取 `/spike/status` 的 `listeners`（mixed / HTTP / SOCKS）。
 3. 点击 **⚡ 测试连接** 验证配置（成功时会展示发现的 listeners），无误后点击 **保存实例**。
 

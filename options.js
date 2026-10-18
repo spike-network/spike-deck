@@ -1,7 +1,7 @@
 import { StorageManager } from "./lib/storage.js";
 import { initializeOptionsTabs } from "./lib/options-tabs.js";
 import { SpikeApiClient } from "./lib/spike-client.js";
-import { ensureHostPermission } from "./lib/permissions.js";
+import { canSendSecret, ensureHostPermission } from "./lib/permissions.js";
 import {
   proxyListenerSummary,
   proxyListenersFromStatus,
@@ -429,6 +429,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       baseUrl: instUrlInput.value.trim(),
       secret: instSecretInput.value.trim(),
     };
+
+    if (formData.secret && !canSendSecret(formData.baseUrl)) {
+      showTestResult("error", "❌ 远程实例需使用 HTTPS 才能发送 Control Secret（请启用 http-api-tls）");
+      return;
+    }
 
     const granted = await ensureHostPermission(formData.baseUrl);
     if (!granted) {
