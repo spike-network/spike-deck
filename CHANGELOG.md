@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+---
+
+## [1.5.5] - 2026-10-19
+
 ### 🔐 安全 (Security)
 
 - **远程实例强制 HTTPS**：带 Control Secret 的远程实例只通过 `https://` 连接，明文 HTTP 不再发送 `Authorization` 头；保存此类实例时直接提示启用 `http-api-tls`。本机地址不受影响。
