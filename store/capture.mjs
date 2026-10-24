@@ -92,6 +92,10 @@ async function capture(browser, scene, theme, language, width, staging) {
           })),
         }
       : null;
+    if (providerTask) for (const provider of payloads.providers.providers) {
+      provider.refresh_state = "idle";
+      provider.last_refresh_error = providerErrors[provider.id];
+    }
     await context.addInitScript(installChromeMock, {
       theme,
       language,

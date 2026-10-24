@@ -155,6 +155,7 @@ async function harness(options = {}) {
     if (block?.failed) return { ok: false, error: "mock task rejection" };
     if (providerResponse) return providerResponse;
     if (message.type === "START_PROVIDER_REFRESH") {
+      providerInventoryRefreshing[request.id] = true;
       const task = {
         id: `${request.id}-refresh-${++providerTaskId}`,
         instanceId: request.id,
@@ -278,12 +279,17 @@ async function harness(options = {}) {
         providers: [
           {
             ...payloads.providers.providers[0],
+            refresh_state: providerInventoryRefreshing[id] ? "downloading" : "idle",
             id: `${id}-provider-${providerVersions[id]}`,
             group: `${id}-group-${providerVersions[id]}`,
             source: `https://providers.example.test/${id}-${providerVersions[id]}.list`,
           },
         ],
       };
+      if (options.independentProviders) payloads.providers.providers.push({
+        id: `${id}-idle-provider`, source: 'https://providers.example.test/idle.list',
+        source_kind: 'remote', status: 'ready', availability: 'available', refresh_state: 'idle'
+      });
       const block = held.find((item) => !item.used && item.match(request));
       if (block) {
         block.used = true;
@@ -891,6 +897,7 @@ async function staleProviderTaskRead({ switchAway = false, failed = false }) {
     await ready(page, "a");
     await old.started;
     h.providerVersions.a = 2;
+    h.providerInventoryRefreshing.a = true;
     h.providerTasks.a = {
       id: "new-task",
       instanceId: "a",
@@ -933,17 +940,14 @@ async function staleProviderStart({ failed = false }) {
     const row = page.locator('.provider-row[data-provider-id="a-provider-2"]');
     await row.locator(".btn-provider-row-update").click();
     await newer.started;
-    assert.equal(await row.evaluate((el) => el.classList.contains("busy")), true);
+    assert.equal(await row.evaluate((el) => el.classList.contains("busy")), false);
     const count = h.messages.length;
     old.release();
     await messageSettled(page, "a", "START_PROVIDER_REFRESH");
-    assert.equal(await row.evaluate((el) => el.classList.contains("busy")), true);
     assert.equal(await page.locator("#providers-panel-notice").isHidden(), true);
-    await row.locator(".btn-provider-row-update").dispatchEvent("click");
-    assert.equal(h.messages.length, count);
     newer.release();
     await messageSettled(page, "a", "START_PROVIDER_REFRESH", 2);
-    assert.equal(await row.evaluate((el) => el.classList.contains("busy")), true);
+    await until(async () => row.evaluate((el) => el.classList.contains("busy")));
     const starts = h.messages.filter(({ key }) => key === "START_PROVIDER_REFRESH");
     assert.deepEqual(starts.map(({ instanceId, providerId }) => [instanceId, providerId]), [
       ["a", "a-provider-1"],
@@ -986,11 +990,42 @@ async function terminalProviderTaskClearsStaleInventoryBusy() {
     inventory.release();
 
     await updateAll.getByText("Update all", { exact: true }).waitFor();
-    assert.equal(await updateAll.isEnabled(), true);
+    assert.equal(await updateAll.isDisabled(), true, "A terminal request cannot override independent inventory activity");
+    h.providerInventoryRefreshing.a = false;
+    await until(async () => updateAll.isEnabled());
     await verify(h);
   } finally {
     await h.close();
   }
+}
+
+async function independentProviderRows() {
+  const h = await harness({ independentProviders: true });
+  try {
+    h.providerInventoryRefreshing.a = true;
+    const page = await h.open();
+    await ready(page, "a");
+    await openProviders(page, "a-provider-1");
+    const active = page.locator('.provider-row[data-provider-id="a-provider-1"] .btn-provider-row-update');
+    const idle = page.locator('.provider-row[data-provider-id="a-idle-provider"] .btn-provider-row-update');
+    const all = page.locator('#btn-providers-refresh-all');
+    assert.equal(await active.isDisabled(), true);
+    assert.equal(await idle.isEnabled(), true);
+    assert.equal(await all.isEnabled(), true);
+    assert.equal(await all.textContent(), 'Update all');
+    const pending = h.hold(({ id, key }) => id === 'a' && key === 'START_PROVIDER_REFRESH');
+    await idle.click();
+    await pending.started;
+    assert.equal(await all.isEnabled(), true, 'An outstanding row request does not block Update All');
+    await all.click();
+    pending.release();
+    await messageSettled(page, 'a', 'START_PROVIDER_REFRESH', 2);
+    const starts = h.messages.filter(({ key }) => key === 'START_PROVIDER_REFRESH');
+    assert.deepEqual(starts.map(({ providerId }) => providerId), ['a-idle-provider', null]);
+    assert.equal(await active.isDisabled(), true);
+    assert.equal(await idle.isEnabled(), true, 'Request task results cannot override an idle inventory row');
+    await verify(h);
+  } finally { await h.close(); }
 }
 
 async function unknownProviderTask() {
@@ -1102,6 +1137,7 @@ try {
     }
     await staleProviderStart({ failed });
   }
+  await independentProviderRows();
   await terminalProviderTaskClearsStaleInventoryBusy();
   await unknownProviderTask();
   for (const cancel of [true, false])
@@ -1149,7 +1185,7 @@ try {
   await oldAuxiliaryResponses({ returnToA: true });
   await oldAuxiliaryResponses({ failed: true, returnToA: true });
   await serializedSelectionAndCoalescing();
-  console.log("Dashboard lifetime browser checks passed (11 loading, 18 group mutation, 10 outbound mutation, 13 site check, 19 group task and 11 provider scenarios)");
+  console.log("Dashboard lifetime browser checks passed (11 loading, 18 group mutation, 10 outbound mutation, 13 site check, 19 group task and 12 provider scenarios)");
 } finally {
   await browser.close();
 }

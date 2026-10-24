@@ -21,6 +21,8 @@ test('fixture matches the Core-owned contract', { skip: !existsSync(coreFixtureU
 test('accepts the native Control API v1 fixture', async () => {
   const fixture = JSON.parse(await readFile(fixtureUrl, 'utf8'));
   assert.deepEqual(validateControlApiInfo(fixture), fixture);
+  assert.equal(fixture.features.provider_refresh_independent, 1);
+  assert.equal(fixture.features.provider_refresh_tasks, 3);
   assert.equal(CONTROL_API_VERSION, 1);
   assert.equal(CONTROL_API_VERSION_HEADER, 'Spike-Control-Api-Version');
 });
@@ -29,4 +31,12 @@ test('rejects an incomplete feature inventory', async () => {
   const fixture = JSON.parse(await readFile(fixtureUrl, 'utf8'));
   delete fixture.features.connection_decision_trace;
   assert.throws(() => validateControlApiInfo(fixture), /connection_decision_trace/u);
+});
+
+test('independent refresh capability is additive and validated', async () => {
+  const fixture = JSON.parse(await readFile(fixtureUrl, 'utf8'));
+  delete fixture.features.provider_refresh_independent;
+  assert.equal(validateControlApiInfo(fixture), fixture);
+  fixture.features.provider_refresh_independent = "1";
+  assert.throws(() => validateControlApiInfo(fixture), /provider refresh capability/u);
 });

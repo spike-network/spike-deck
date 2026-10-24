@@ -437,11 +437,13 @@ function safeGroupTestError(error) {
 }
 
 function startProviderRefreshTask(instanceId, providerId, providerIds = []) {
-  if (providerRefreshStarts.has(instanceId)) return providerRefreshStarts.get(instanceId);
+  const key = `${instanceId}:${providerId || "*"}`;
+  if (providerRefreshStarts.has(key)) return providerRefreshStarts.get(key);
+
   const operation = startProviderRefresh(instanceId, providerId, providerIds).finally(() => {
-    if (providerRefreshStarts.get(instanceId) === operation) providerRefreshStarts.delete(instanceId);
+    if (providerRefreshStarts.get(key) === operation) providerRefreshStarts.delete(key);
   });
-  providerRefreshStarts.set(instanceId, operation);
+  providerRefreshStarts.set(key, operation);
   return operation;
 }
 
@@ -451,7 +453,7 @@ async function startProviderRefresh(instanceId, providerId, providerIds) {
   if (!instance) throw new Error('Spike instance not found');
 
   const existing = await refreshProviderTask(instanceId);
-  if (existing?.status === 'running') return existing;
+  if (providerId && existing?.status === "running" && existing.providerId === providerId) return existing;
 
   const requestedProviderIds = await resolveRequestedProviderIds(
     instance,
@@ -474,7 +476,6 @@ async function startProviderRefresh(instanceId, providerId, providerIds) {
     error: null
   };
   const reserved = await StorageManager.updateProviderRefreshState(instanceId, state => {
-    if (state.task?.status === 'running') return;
     return { ...state, task };
   });
   if (reserved.task?.id !== task.id) return reserved.task;
@@ -577,7 +578,7 @@ async function getProviderRefreshState(instanceId) {
 }
 
 function getProviderRefreshTask(instanceId) {
-  return providerRefreshStarts.get(instanceId) || refreshProviderTask(instanceId);
+  return refreshProviderTask(instanceId);
 }
 
 function refreshProviderTask(instanceId) {
@@ -594,6 +595,9 @@ async function readProviderRefreshTask(instanceId) {
   const task = await StorageManager.getProviderRefreshTask(instanceId);
   if (!task) return null;
   if (task.status !== 'running') return persistProviderRefreshTask(instanceId, task);
+  // Admission is reserved before POST; a concurrent reader must not infer an
+  // unknown outcome while Core has not returned the accepted task identity.
+  if (!task.coreTaskId && providerRefreshStarts.has(`${instanceId}:${task.providerId || '*'}`)) return task;
   if (providerRefreshOperations.has(instanceId)) return task;
   const instances = await StorageManager.getInstances();
   const instance = instances.find(candidate => candidate.id === instanceId);
@@ -613,7 +617,7 @@ async function persistProviderRefreshTask(instanceId, task) {
     }
     return providerRefreshOutcome(state, task);
   });
-  return committed.task;
+  return committed.task?.id === task?.id ? committed.task : task;
 }
 
 async function dismissProviderRefreshTask(instanceId, taskId) {
@@ -687,6 +691,7 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
         status: 'failed',
         finishedAtUnix: Math.floor(Number(coreTask.completed_at_unix_ms || Date.now()) / 1000),
         error: safeProviderRefreshError(coreTask.error || '外部资源更新失败'),
+        revision: Number(coreTask.revision) || null,
         providerResults
       };
     }
@@ -722,7 +727,7 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
 
 function normalizeProviderRefreshResults(results) {
   if (!Array.isArray(results)) return [];
-  const validStatuses = new Set(['pending', 'succeeded', 'failed', 'skipped']);
+  const validStatuses = new Set(['pending', 'running', 'succeeded', 'failed', 'skipped']);
   return results.flatMap((result) => {
     const providerId = typeof result?.provider_id === 'string'
       ? result.provider_id
@@ -732,6 +737,7 @@ function normalizeProviderRefreshResults(results) {
     return [{
       providerId,
       status,
+      joined: result.joined === true,
       error: status === 'failed'
         ? safeProviderRefreshError(result.error || '外部资源更新失败')
         : null

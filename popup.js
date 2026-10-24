@@ -23,10 +23,9 @@ import {
   splitSelectedSummary,
 } from "./lib/group-selection.js";
 import {
-  providerRefreshError,
-  providerTaskDisplayStatus,
+  providerRefreshState,
+  observeProviderActivations,
   providerTaskProgress,
-  providerTaskResult,
   summarizeProviderRefreshError,
 } from "./lib/provider-refresh-view.js";
 
@@ -384,15 +383,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   /** @type {Array<{id: string, type: string, source: string, source_kind: string, group?: string, status: string, last_updated_unix?: number, update_interval_seconds: number}>} */
   let currentProviders = [];
   let providersRefreshing = false;
-  /** Busy key: '*' for all, or a provider id. */
-  let providersBusyKey = "";
+  let providerObservations = new Map();
+  let providerFlashTimer = null;
+  const providerRefreshOperations = new Set();
   let providerRefreshTask = null;
-  let providerRefreshFailures = {};
   let providerRefreshPollTimer = null;
   let handledProviderTaskState = "";
   let providerListRead = null;
   let providerTaskRead = null;
-  let providerRefreshOperation = null;
   let currentOutbound = null;
   let currentOutboundPolicies = [];
   let outboundOperation = null;
@@ -456,9 +454,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (status === "ready") return "就绪";
     if (status === "missing") return "缺失";
     if (status === "stale") return "已过期";
-    if (status === "refreshing") return "更新中";
+    if (status === "refreshing") return "更新中…";
     if (status === "update_failed") return "更新失败";
-    if (status === "refresh_succeeded") return "已获取";
+    if (status === "refresh_succeeded") return "已更新";
+    if (status === "queued") return "等待中…";
     if (status === "skipped") return "已跳过";
     if (status === "unknown") return "待确认";
     return status || "未知";
@@ -722,7 +721,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await SpikeApiClient.getProviders(scope.instance);
       if (!read.isCurrent()) return;
       currentProviders = Array.isArray(data.providers) ? data.providers : [];
-      providersRefreshing = data.refreshing === true;
+      providerObservations = observeProviderActivations(providerObservations, currentProviders);
+      providersRefreshing = currentProviders.some(provider => providerRefreshState(provider) !== "idle");
       renderProvidersList();
       if (providersRefreshing) {
         scheduleProviderRefreshPoll();
@@ -745,7 +745,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function scheduleProviderRefreshPoll(delay = 750) {
+  function scheduleProviderRefreshPoll(delay = 350) {
     if (providerRefreshPollTimer !== null) return;
     const scope = captureInstanceRequest();
     providerRefreshPollTimer = setTimeout(async () => {
@@ -753,23 +753,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!scope.isCurrent()) return;
       await syncProviderRefreshTask({ announce: true });
       if (!scope.isCurrent()) return;
-      if (providerRefreshTask?.status !== "running" && providersRefreshing) {
-        await loadProvidersList(false);
-      }
-      if (providerRefreshTask?.status === "running" || providersRefreshing) {
-        scheduleProviderRefreshPoll(1000);
+      await loadProvidersList(false);
+      if (providerRefreshTask?.status === "running" || providersRefreshing || [...providerRefreshOperations].some(operation => operation.isCurrent())) {
+        scheduleProviderRefreshPoll(350);
       }
     }, delay);
   }
 
   async function syncProviderRefreshTask({ announce = false } = {}) {
     const scope = captureInstanceRequest();
-    if (!scope.instance || providerRefreshOperation?.isCurrent()) return;
+    if (!scope.instance) return;
     const read = {
       isCurrent: () =>
         scope.isCurrent() &&
         providerTaskRead === read &&
-        !providerRefreshOperation?.isCurrent(),
+        ![...providerRefreshOperations].some(operation => operation.isCurrent()),
     };
     providerTaskRead = read;
     let response;
@@ -788,13 +786,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const previousStatus = providerRefreshTask?.status;
     const task = response.task || null;
     providerRefreshTask = task;
-    providerRefreshFailures =
-      response.failures && typeof response.failures === "object" ? response.failures : {};
     const running = task?.status === "running";
-    providersBusyKey = running ? task.providerId || "*" : "";
-    // A terminal task is authoritative even if the follow-up inventory read
-    // fails. A later inventory response can still report independent work.
-    if (task && !running) providersRefreshing = false;
+
     btnRefreshProviders.classList.toggle("testing", running || providersRefreshing);
 
     if (running) {
@@ -822,8 +815,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const progress = providerTaskProgress(task);
         showProvidersPanelNotice(
           progress.failed > 0
-            ? `更新失败：${progress.failed} 个资源未更新；当前运行配置未改变。`
-            : "外部资源更新失败；当前运行配置未改变。",
+            ? `更新失败：${progress.failed} 个资源未更新。`
+            : "外部资源更新失败。",
           "error",
         );
       } else if (task.status === "unknown" && isProvidersPanelOpen()) {
@@ -840,33 +833,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function resolveProviderDisplayStatus(provider) {
-    const taskStatus = providerTaskDisplayStatus(providerRefreshTask, provider.id);
-    if (taskStatus) return taskStatus;
-    if (providersBusyKey === "*" || providersBusyKey === provider.id) return "refreshing";
-    if (providersRefreshing && (provider.refreshing || provider.status === "refreshing")) {
-      return "refreshing";
-    }
+    const state = providerRefreshState(provider);
+    if (state === "queued") return "queued";
+    if (state !== "idle") return "refreshing";
+    if (provider.last_refresh_error) return "update_failed";
+    if (providerObservations.get(provider.id)?.updatedUntil > Date.now()) return "refresh_succeeded";
     const availability =
       provider.availability || (provider.status === "missing" ? "missing" : "available");
-    if (providerRefreshFailures[provider.id]) return "update_failed";
     if (availability === "missing") return "missing";
     if (provider.freshness === "stale") return "stale";
     return "ready";
   }
 
   function renderProvidersList() {
+    clearTimeout(providerFlashTimer);
+    const flashUntil = Math.min(...[...providerObservations.values()].map(row => row.updatedUntil).filter(time => time > Date.now()));
+    if (Number.isFinite(flashUntil)) providerFlashTimer = setTimeout(renderProvidersList, flashUntil - Date.now() + 5);
     const count = currentProviders.length;
     providersPanelCount.textContent = count > 0 ? `${count} 项` : "";
-    const anyLocalBusy = Boolean(providersBusyKey);
-    const headerBusy = anyLocalBusy || providersRefreshing;
-    const progress = providerTaskProgress(providerRefreshTask);
-
-    btnProvidersRefreshAll.disabled = count === 0 || anyLocalBusy || providersRefreshing;
-    btnProvidersRefreshAll.textContent = headerBusy
-      ? progress.total > 1 && progress.completed > 0
-        ? `${progress.completed}/${progress.total}`
-        : "更新中…"
-      : "全部更新";
+    const headerBusy = providersRefreshing || [...providerRefreshOperations].some(operation => operation.isCurrent());
+    btnProvidersRefreshAll.disabled = !activeInstance || !currentProviders.some(provider => providerRefreshState(provider) === "idle");
+    btnProvidersRefreshAll.textContent = "全部更新";
     btnProvidersRefreshAll.classList.toggle("testing", headerBusy);
     btnRefreshProviders.classList.toggle("testing", headerBusy);
 
@@ -883,19 +870,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     providersList.replaceChildren();
     currentProviders.forEach((provider) => {
-      const taskResult = providerTaskResult(providerRefreshTask, provider.id);
-      const rowUpdating =
-        providersBusyKey === provider.id ||
-        (providersBusyKey === "*" && (!taskResult || taskResult.status === "pending"));
+      const rowUpdating = providerRefreshState(provider) !== "idle";
       const displayStatus = resolveProviderDisplayStatus(provider);
       const statusClass = `provider-status status-${displayStatus}`;
       const typeLabel = providerTypeLabel(provider.type);
       const statusLabel = providerStatusLabel(displayStatus);
-      const refreshError = providerRefreshError(
-        providerRefreshTask,
-        provider.id,
-        providerRefreshFailures[provider.id],
-      );
+      const refreshError = provider.last_refresh_error || "";
       const safeSource = safeProviderSource(provider);
       const sourceTitle = [
         safeSource,
@@ -914,7 +894,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         {
           type: "button",
           className: "btn-provider-row-update",
-          disabled: anyLocalBusy || providersRefreshing,
+          disabled: !activeInstance || rowUpdating,
           title: provider.source_kind === "local" ? "重新读取此本地资源" : "强制下载并应用此资源",
           onClick: (e) => {
             e.stopPropagation();
@@ -996,13 +976,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function runProviderRefresh(providerId) {
-    if (providersBusyKey || providersRefreshing) return;
     const scope = captureInstanceRequest();
-    if (!scope.instance || providerRefreshOperation?.isCurrent()) return;
+    if (!scope.instance) return;
     const operation = {
-      isCurrent: () => scope.isCurrent() && providerRefreshOperation === operation,
+      isCurrent: () => scope.isCurrent() && providerRefreshOperations.has(operation),
     };
-    providerRefreshOperation = operation;
+    providerRefreshOperations.add(operation);
     providerTaskRead = null;
     const providerIds = providerId ? [providerId] : currentProviders.map((provider) => provider.id);
     providerRefreshTask = {
@@ -1011,10 +990,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       providerId: providerId || null,
       status: "running",
     };
-    providersBusyKey = providerId || "*";
+
     btnRefreshProviders.classList.add("testing");
     clearProvidersPanelNotice();
     renderProvidersList();
+    scheduleProviderRefreshPoll();
 
     try {
       const response = await chrome.runtime.sendMessage({
@@ -1028,15 +1008,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error(response?.error || "无法启动外部资源更新");
       }
       providerRefreshTask = response.task;
-      providersBusyKey = providerRefreshTask.providerId || "*";
+
       handledProviderTaskState = "";
       clearProvidersPanelNotice();
       renderProvidersList();
-      scheduleProviderRefreshPoll(250);
+      await loadProvidersList(false);
+      scheduleProviderRefreshPoll();
     } catch (err) {
       if (!operation.isCurrent()) return;
       providerRefreshTask = null;
-      providersBusyKey = "";
+
       btnRefreshProviders.classList.remove("testing");
       showProvidersPanelNotice(
         `无法启动更新：${err.message || "未知错误"}；当前运行配置未改变。`,
@@ -1044,9 +1025,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
       renderProvidersList();
     } finally {
-      if (providerRefreshOperation === operation) {
-        providerRefreshOperation = null;
-      }
+      providerRefreshOperations.delete(operation);
     }
     if (scope.isCurrent() && providerRefreshTask === null) {
       await syncProviderRefreshTask({ announce: true });
@@ -1488,10 +1467,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     resetModuleTracking();
     providerListRead = null;
     providerTaskRead = null;
-    providerRefreshOperation = null;
-    providersBusyKey = "";
+    providerObservations = new Map();
     providerRefreshTask = null;
-    providerRefreshFailures = {};
     handledProviderTaskState = "";
     if (providerRefreshPollTimer !== null) {
       clearTimeout(providerRefreshPollTimer);

@@ -59,9 +59,10 @@ SpikeApiClient.getProviderRefreshTask = async (_, id) => {
     id,
     task_namespace: coreTaskNamespace,
     status: coreStatus,
+    revision: coreStatus === "failed" ? 42 : undefined,
     completed_at_unix_ms: Date.now(),
     provider_results: [
-      { provider_id: "source", status: coreStatus === "running" ? "pending" : coreStatus },
+      { provider_id: "source", status: coreStatus === "running" ? "running" : coreStatus, joined: true },
     ],
   };
 };
@@ -160,6 +161,7 @@ reset();
   const results = await Promise.all([first, second, read]);
   assert.equal(starts, 1);
   assert.equal(polls, 0);
+  assert.equal(statusReads, 0, "A pending POST is not reconciled from an idle status snapshot");
   assert.ok(results.every((task) => task.id === results[0].id));
 }
 
@@ -266,3 +268,47 @@ reset();
 }
 
 console.log("Provider refresh concurrency, dismissal and atomic outcome checks passed");
+
+// Independent rows and Update All submit distinct requests; Core joins resources.
+reset();
+{
+  const first = await startProviderRefreshTask("a", "source");
+  const second = await startProviderRefreshTask("a", "other");
+  const all = await startProviderRefreshTask("a", null, ["source", "other"]);
+  assert.equal(starts, 3);
+  assert.notEqual(first.coreTaskId, second.coreTaskId);
+  assert.notEqual(second.coreTaskId, all.coreTaskId);
+  assert.equal(first.providerId, "source");
+  assert.equal(second.providerId, "other");
+  assert.deepEqual(all.requestedProviderIds, ["source", "other"]);
+  // Even while the previous all request remains running, idle resources may retry.
+  await startProviderRefreshTask("a", null, ["source", "other"]);
+  assert.equal(starts, 4);
+}
+
+reset();
+{
+  const pending = gate();
+  beforeStart = () => pending.wait();
+  const first = startProviderRefreshTask("a", "source");
+  await pending.entered;
+  const second = startProviderRefreshTask("a", "other");
+  await new Promise(resolve => setTimeout(resolve, 0));
+  pending.release();
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(starts, 2);
+  assert.notEqual(a.coreTaskId, b.coreTaskId);
+  assert.equal(a.providerId, "source");
+  assert.equal(b.providerId, "other");
+}
+
+reset();
+{
+  await start("a");
+  const running = await getProviderRefreshTask("a");
+  assert.equal(running.providerResults[0].status, "running");
+  assert.equal(running.providerResults[0].joined, true);
+  coreStatus = "failed";
+  const failed = await getProviderRefreshTask("a");
+  assert.equal(failed.revision, 42, "Partial failures retain an activated revision");
+}
