@@ -28,6 +28,11 @@
     </section>
     <section class="panel wide">
       <div class="panel-head"><div><p class="eyebrow">TRAFFIC</p><h2>连接</h2></div></div>
+      <div class="event-filter">
+        <label>筛选连接<input id="connections-filter" type="search" placeholder="筛选主机、客户端、策略或类型" autocomplete="off"></label>
+        <label>连接状态<select id="connections-state"><option value="all">全部连接</option><option value="live">活动连接</option><option value="recent">连接历史</option><option value="failed">失败连接</option></select></label>
+        <span id="connections-count" class="muted" aria-live="polite">0 / 0</span>
+      </div>
       <div id="connections" class="table-wrap"></div>
     </section>
 

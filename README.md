@@ -159,6 +159,10 @@ extension/
 ```
 # Policy selection parity
 
+UI17: the Tools connection snapshot supports local keyword and state filters,
+with visible/total counts. Filtering never requests or terminates a connection;
+termination remains an explicit action on the original live connection ID.
+
 UI13: load-balance and subnet groups support manual pinning and restoring
 automatic selection, matching the current Core contract. Unknown future kinds
 remain inactive. Native clients already support the current group kinds.

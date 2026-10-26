@@ -17,6 +17,8 @@ let eventNamespace = '';
 let clearedLogSequence = 0;
 let logRead = null;
 let readinessSequence = 0;
+let connectionsSequence = 0;
+let connectionSnapshot = { live: [], recent: [] };
 
 function adoptEventNamespace(namespace) {
   if (!namespace || namespace === eventNamespace) return;
@@ -83,14 +85,29 @@ function connectionRow(row, live) {
 }
 
 async function loadConnections() {
-  const data = await SpikeApiClient.getConnections(instance);
+  const target = instance;
+  const sequence = ++connectionsSequence;
+  const data = await SpikeApiClient.getConnections(target);
+  if (instance !== target || sequence !== connectionsSequence) return;
+  connectionSnapshot = { live: data.live || [], recent: data.recent || [] };
+  renderConnections();
+}
+
+function renderConnections() {
+  const query = byId('connections-filter').value.trim().toLocaleLowerCase();
+  const state = byId('connections-state').value || 'all';
+  const matches = (row, live) => {
+    if (state === 'live' && !live || state === 'recent' && live || state === 'failed' && (live || row.ok !== false)) return false;
+    return !query || [row.id, row.host, row.port, row.peer, row.policy, row.kind].join(' ').toLocaleLowerCase().includes(query);
+  };
   const rows = [
-    ...(data.live || []).map((row) => connectionRow(row, true)),
-    ...(data.recent || []).map((row) => connectionRow(row, false))
+    ...connectionSnapshot.live.filter(row => matches(row, true)).map(row => connectionRow(row, true)),
+    ...connectionSnapshot.recent.filter(row => matches(row, false)).map(row => connectionRow(row, false))
   ];
+  byId('connections-count').textContent = `${rows.length} / ${connectionSnapshot.live.length + connectionSnapshot.recent.length}`;
   byId('connections').replaceChildren(rows.length
     ? makeTable(['ID', 'Peer', 'Target', 'Policy', 'Decision', 'Kind', 'Status', 'Action'], rows)
-    : text('p', '暂无连接'));
+    : text('p', connectionSnapshot.live.length + connectionSnapshot.recent.length ? '暂无匹配连接' : '暂无连接'));
 }
 
 async function loadReadiness() {
@@ -304,6 +321,8 @@ async function loadAll() {
 
 byId('refresh-all').addEventListener('click', loadAll);
 byId('readiness-refresh').addEventListener('click', loadReadiness);
+byId('connections-filter').addEventListener('input', renderConnections);
+byId('connections-state').addEventListener('change', renderConnections);
 byId('logs-refresh').addEventListener('click', () => loadLogs().catch(handleError));
 byId('events-refresh').addEventListener('click', () => loadEvents().catch(handleError));
 byId('events-filter').addEventListener('input', renderEvents);
