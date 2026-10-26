@@ -338,6 +338,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const badgeDnsDelay = document.getElementById("badge-dns-delay");
   const profileSelect = document.getElementById("profile-select");
   const btnProfileSwitch = document.getElementById("btn-profile-switch");
+  const profileListError = document.getElementById("profile-list-error");
+  const btnProfileRetry = document.getElementById("btn-profile-retry");
   const btnModules = document.getElementById("btn-modules");
   const modulesPanel = document.getElementById("modules-panel");
   const modulesPanelCount = document.getElementById("modules-panel-count");
@@ -396,6 +398,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   let outboundOperation = null;
   let currentSiteOperation = null;
   let currentProfileStem = "";
+  let profileInventoryInstance = null;
+  let profileInventoryStem = "";
+  let profileInventoryFailed = true;
+  let profileInventoryRead = 0;
   let currentModules = [];
   let moduleBusy = false;
   let moduleTask = null;
@@ -1418,7 +1424,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentSiteHost.title = "";
     currentSiteResult.textContent = "查看当前标签页的规则预期线路与现有连接实际线路。";
     profileSwitchOperation = null;
-    btnProfileSwitch.disabled = false;
+    btnProfileSwitch.disabled = true;
+    profileInventoryFailed = true;
     setQuickPanel(null);
     const selectedId = e.target.value;
     const targetInst = instances.find((i) => i.id === selectedId);
@@ -1636,6 +1643,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   btnProfileSwitch.addEventListener("click", () => {
     void switchActiveProfile();
   });
+  btnProfileRetry.addEventListener("click", () => {
+    if (activeInstance) void refreshProfileControls({ profile: currentProfileStem }, captureInstanceRequest());
+  });
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === "PROXY_HEALTH_CHANGED") {
@@ -1786,6 +1796,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       badgeRules.textContent = "规则: -";
       badgeDnsDelay.textContent = "DNS: —";
       currentProfileStem = "";
+      profileInventoryInstance = null;
+      profileInventoryFailed = true;
+      profileListError.hidden = true;
       profileSelect.replaceChildren(el("option", { value: "" }, "—"));
       renderTraffic(null);
       publishTrafficSample(null, "no instance");
@@ -2113,13 +2126,27 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function refreshProfileControls(status, load) {
     const stem = SpikeApiClient.profileStem(status?.profile || "");
+    const read = ++profileInventoryRead;
+    const isCurrent = () => load.isCurrent() && read === profileInventoryRead;
+    if (profileInventoryInstance !== load.instance) {
+      profileSelect.replaceChildren(el("option", { value: stem }, stem || "—"));
+      managedBadge.hidden = true;
+    } else if (profileInventoryStem !== stem) managedBadge.hidden = true;
+    profileInventoryInstance = load.instance;
+    profileInventoryStem = stem;
+    profileInventoryFailed = false;
+    profileListError.hidden = true;
+    btnProfileRetry.disabled = true;
+    profileSelect.disabled = true;
+    btnProfileSwitch.disabled = true;
     try {
       const [list, current] = await Promise.all([
         SpikeApiClient.getProfiles(load.instance),
         SpikeApiClient.getCurrentProfile(load.instance),
       ]);
-      if (!load.isCurrent()) return;
-      const names = Array.isArray(list?.profiles) ? list.profiles : [];
+      if (!isCurrent()) return;
+      if (!Array.isArray(list?.profiles)) throw new Error("Invalid profile inventory");
+      const names = list.profiles;
       profileSelect.replaceChildren(
         ...(names.length ? names : [stem || ""]).map((name) =>
           el("option", { value: name }, name),
@@ -2139,19 +2166,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         managedBadge.hidden = true;
       }
+      profileSelect.disabled = names.length === 0;
     } catch {
-      if (!load.isCurrent()) return;
-      profileSelect.replaceChildren(
-        el("option", { value: currentProfileStem }, currentProfileStem || "—"),
-      );
-      managedBadge.hidden = true;
-      updateQuickSummaries();
+      if (!isCurrent()) return;
+      profileInventoryFailed = true;
+      profileListError.hidden = false;
+      profileSelect.disabled = true;
+    } finally {
+      if (isCurrent()) {
+        btnProfileRetry.disabled = false;
+        btnProfileSwitch.disabled = !!profileSwitchOperation || profileInventoryFailed || profileSelect.disabled;
+      }
     }
   }
 
   async function switchActiveProfile() {
     const name = profileSelect.value;
-    if (!activeInstance || profileSwitchOperation || !name || name === currentProfileStem) return;
+    if (!activeInstance || profileSwitchOperation || profileInventoryFailed || profileSelect.disabled || !name || name === currentProfileStem) return;
     const instance = activeInstance;
     const generation = instanceGeneration;
     const operation = {};
@@ -2179,7 +2210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } finally {
       if (isCurrent()) {
         profileSwitchOperation = null;
-        btnProfileSwitch.disabled = false;
+        btnProfileSwitch.disabled = profileInventoryFailed || profileSelect.disabled;
       }
     }
   }
