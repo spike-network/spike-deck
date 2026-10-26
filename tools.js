@@ -16,6 +16,7 @@ let eventEntries = [];
 let eventNamespace = '';
 let clearedLogSequence = 0;
 let logRead = null;
+let readinessSequence = 0;
 
 function adoptEventNamespace(namespace) {
   if (!namespace || namespace === eventNamespace) return;
@@ -90,6 +91,32 @@ async function loadConnections() {
   byId('connections').replaceChildren(rows.length
     ? makeTable(['ID', 'Peer', 'Target', 'Policy', 'Decision', 'Kind', 'Status', 'Action'], rows)
     : text('p', '暂无连接'));
+}
+
+async function loadReadiness() {
+  const target = instance;
+  const sequence = ++readinessSequence;
+  byId('readiness-refresh').disabled = true;
+  try {
+    const report = await SpikeApiClient.getReadiness(target);
+    if (instance !== target || sequence !== readinessSequence) return;
+    const labels = { ready: '就绪', degraded: '已降级', not_ready: '未就绪' };
+    const rows = report.checks.map(check => {
+      const row = document.createElement('tr');
+      row.append(text('td', check.name, undefined, true), text('td', t(labels[check.status])),
+        text('td', check.reason, undefined, true), text('td', `${check.active ?? '—'} / ${check.expected ?? '—'}`));
+      return row;
+    });
+    byId('readiness').replaceChildren(text('p', t(labels[report.status])),
+      makeTable(['检查项', '状态', '原因', '活动 / 预期'], rows));
+  } catch (error) {
+    if (instance !== target || sequence !== readinessSequence) return;
+    const message = text('p', t(error?.status === 404 ? '当前运行时不支持就绪检查。' : '无法读取就绪检查，请重试。'));
+    message.role = 'alert';
+    byId('readiness').replaceChildren(message);
+  } finally {
+    if (instance === target && sequence === readinessSequence) byId('readiness-refresh').disabled = false;
+  }
 }
 
 async function loadSessionPools() {
@@ -263,6 +290,7 @@ function handleError(error) {
 async function loadAll() {
   if (!instance) return;
   const results = await Promise.allSettled([
+    loadReadiness(),
     loadConnections(),
     loadSessionPools(),
     loadLogs(),
@@ -275,6 +303,7 @@ async function loadAll() {
 }
 
 byId('refresh-all').addEventListener('click', loadAll);
+byId('readiness-refresh').addEventListener('click', loadReadiness);
 byId('logs-refresh').addEventListener('click', () => loadLogs().catch(handleError));
 byId('events-refresh').addEventListener('click', () => loadEvents().catch(handleError));
 byId('events-filter').addEventListener('input', renderEvents);
