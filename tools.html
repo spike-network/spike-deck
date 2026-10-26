@@ -74,10 +74,18 @@
     <section class="panel">
       <div class="panel-head"><div><p class="eyebrow">ROUTER</p><h2>路由解释</h2></div></div>
       <form id="route-form" class="form-grid">
-        <label>Host<input id="route-host" required placeholder="example.com"></label>
+        <label>Host<input id="route-host" required placeholder="example.test"></label>
         <label>Port<input id="route-port" type="number" min="1" max="65535" value="443"></label>
         <label>Protocol<select id="route-protocol"><option>TCP</option><option>UDP</option></select></label>
         <label>Source IP<input id="route-source" placeholder="可选"></label>
+        <label>Source port<input id="route-source-port" type="number" min="1" max="65535" placeholder="可选"></label>
+        <label>Inbound port<input id="route-in-port" type="number" min="1" max="65535" placeholder="可选"></label>
+        <label>Destination IP<input id="route-destination" placeholder="可选"></label>
+        <label>Request URL<input id="route-url" placeholder="可选"></label>
+        <label>User-Agent<input id="route-user-agent" placeholder="可选"></label>
+        <label>Process name<input id="route-process-name" placeholder="可选"></label>
+        <label>Process path<input id="route-process-path" placeholder="可选"></label>
+        <label>Process cgroup<input id="route-process-cgroup" placeholder="可选"></label>
         <button class="primary">解释</button>
       </form>
       <pre id="route-output"></pre>

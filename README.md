@@ -159,6 +159,11 @@ extension/
 ```
 # Policy selection parity
 
+UI15: route diagnostics accept all optional source/destination ports and IPs,
+URL/User-Agent and process name/path/cgroup. Local validation rejects invalid
+metadata before a request; blank fields are omitted and error messages never
+echo input values. No profile or runtime setting changes are made.
+
 UI18: connection details expose ordered group decisions, process identity
 (name/PID/path/container/lookup), individual phase durations, absolute event
 times with microsecond offsets, and connection lifetime. Missing observations

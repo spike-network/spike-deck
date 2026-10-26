@@ -7,6 +7,7 @@ import {
   sortRuntimeLogs
 } from './lib/runtime-logs.js';
 import { formatConnectionTrace, connectionDetailFields } from './lib/connection-trace.js';
+import { routeContext } from './lib/route-context.js';
 
 await initializeI18n();
 
@@ -372,15 +373,18 @@ byId('dns-flush').addEventListener('click', async () => {
 
 byId('route-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const body = {
-    host: byId('route-host').value.trim(),
-    port: Number(byId('route-port').value),
-    protocol: byId('route-protocol').value
-  };
-  const sourceIp = byId('route-source').value.trim();
-  if (sourceIp) body.source_ip = sourceIp;
-  try { output('route-output', await SpikeApiClient.explainRoute(instance, body)); }
-  catch (error) { handleError(error); }
+  try {
+    const body = routeContext({host: byId('route-host').value, port: byId('route-port').value,
+      protocol: byId('route-protocol').value, source_ip: byId('route-source').value,
+      source_port: byId('route-source-port').value, in_port: byId('route-in-port').value,
+      destination_ip: byId('route-destination').value, url: byId('route-url').value,
+      user_agent: byId('route-user-agent').value, process_name: byId('route-process-name').value,
+      process_path: byId('route-process-path').value, process_cgroup: byId('route-process-cgroup').value});
+    output('route-output', await SpikeApiClient.explainRoute(instance, body));
+  } catch (error) {
+    if (error.field) showNotice(`${t('路由上下文无效，请检查填写的字段。')} ${t(error.field)}`);
+    else handleError(error);
+  }
 });
 
 byId('dns-form').addEventListener('submit', async (event) => {
