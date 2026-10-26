@@ -268,6 +268,18 @@
         </div>
       </div>
 
+      <section class="group-batch-controls" aria-label="跨组测速">
+        <div class="group-batch-actions">
+          <button type="button" id="group-batch-start" class="btn-task-action" disabled>测试匹配的组</button>
+          <button type="button" id="group-batch-cancel" class="btn-task-action" hidden>取消批量测速</button>
+          <button type="button" id="group-batch-retry" class="btn-task-action" hidden>重试查询状态</button>
+          <button type="button" id="group-batch-forget" class="btn-task-action" hidden>停止观察</button>
+          <button type="button" id="group-batch-reload" class="btn-task-action" disabled>重新读取组目录</button>
+        </div>
+        <small>依次测试每个匹配组的全部成员。关闭弹窗会停止排队，已接受的测试可能继续在引擎中运行。</small>
+        <div id="group-batch-status" role="status" aria-live="polite"></div>
+      </section>
+
       <section class="runtime-task-hub" id="runtime-task-hub" aria-label="运行中的任务" hidden>
         <div class="runtime-task-title">运行中的任务</div>
         <div id="runtime-task-list" class="runtime-task-list"></div>

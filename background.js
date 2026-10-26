@@ -183,7 +183,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === 'START_GROUP_TEST') {
-    startGroupTestTask(message.instanceId, message.groupName, message.memberName).then((result) => {
+    startGroupTestTask(message.instanceId, message.groupName, message.memberName, message.runtimeNamespace).then((result) => {
       sendResponse({ ok: true, ...result });
     }).catch(err => {
       sendResponse({ ok: false, error: safeGroupTestError(err) });
@@ -199,7 +199,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === 'CANCEL_GROUP_TEST') {
-    cancelGroupTestTask(message.instanceId, message.taskId).then((result) => {
+    cancelGroupTestTask(message.instanceId, message.taskId, message.runtimeNamespace).then((result) => {
       sendResponse({ ok: true, ...result });
     }).catch(err => {
       sendResponse({ ok: false, error: safeGroupTestError(err) });
@@ -260,16 +260,20 @@ function serializeGroupTestOperation(instanceId, operation) {
   });
 }
 
-function startGroupTestTask(instanceId, groupName, memberName) {
+function startGroupTestTask(instanceId, groupName, memberName, runtimeNamespace) {
   return serializeGroupTestOperation(instanceId, () =>
-    startGroupTestTaskInner(instanceId, groupName, memberName)
+    startGroupTestTaskInner(instanceId, groupName, memberName, runtimeNamespace)
   );
 }
 
-async function startGroupTestTaskInner(instanceId, groupName, memberName) {
+async function startGroupTestTaskInner(instanceId, groupName, memberName, runtimeNamespace) {
   if (!groupName) throw new Error('Policy group is required');
   const instance = await findInstance(instanceId);
-  const result = await SpikeApiClient.startGroupTest(instance, groupName, memberName || undefined);
+  let receivedNamespace = null;
+  const result = await SpikeApiClient.startGroupTest(instance, groupName, memberName || undefined, {
+    runtimeNamespace, onRuntime: value => { receivedNamespace = value; }
+  });
+  if (runtimeNamespace && receivedNamespace !== runtimeNamespace) throw new Error('Group test runtime changed');
   if (result.mode !== 'async') return result;
 
   const tasks = mergeGroupTestTasks(
@@ -279,21 +283,25 @@ async function startGroupTestTaskInner(instanceId, groupName, memberName) {
   await StorageManager.setGroupTestTasks(instanceId, tasks);
   broadcastGroupTestState(instanceId, tasks);
   scheduleGroupTestPoll(instanceId);
-  return result;
+  return runtimeNamespace ? { ...result, runtimeNamespace: receivedNamespace } : result;
 }
 
-function cancelGroupTestTask(instanceId, taskId) {
+function cancelGroupTestTask(instanceId, taskId, runtimeNamespace) {
   return serializeGroupTestOperation(instanceId, () =>
-    cancelGroupTestTaskInner(instanceId, taskId)
+    cancelGroupTestTaskInner(instanceId, taskId, runtimeNamespace)
   );
 }
 
-async function cancelGroupTestTaskInner(instanceId, taskId) {
+async function cancelGroupTestTaskInner(instanceId, taskId, runtimeNamespace) {
   const id = Number(taskId);
   if (!Number.isSafeInteger(id) || id < 1) throw new Error('Group test task is required');
 
   const instance = await findInstance(instanceId);
-  const task = await SpikeApiClient.cancelGroupTestTask(instance, id);
+  let receivedNamespace = null;
+  const task = await SpikeApiClient.cancelGroupTestTask(instance, id, {
+    runtimeNamespace, onRuntime: value => { receivedNamespace = value; }
+  });
+  if (runtimeNamespace && receivedNamespace !== runtimeNamespace) throw new Error('Group test runtime changed');
   const tasks = mergeGroupTestTasks(
     await StorageManager.getGroupTestTasks(instanceId),
     [task]
@@ -306,7 +314,7 @@ async function cancelGroupTestTaskInner(instanceId, taskId) {
   } else {
     stopGroupTestPoll(instanceId);
   }
-  return { task, tasks };
+  return { task, tasks, ...(runtimeNamespace ? { runtimeNamespace: receivedNamespace } : {}) };
 }
 
 function refreshGroupTestState(instanceId, { broadcast = false } = {}) {

@@ -10,6 +10,7 @@ import {
   visiblePolicyGroups,
 } from "./lib/hidden-groups.js";
 import { initializeI18n } from "./lib/i18n.js";
+import { GroupBatchControls } from "./lib/group-batch-controls.js";
 import {
   ingestPersistedMemberInfo,
   probeResultKey,
@@ -422,6 +423,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   let dashboardLoad = null;
   let offlineRetryTimer = null;
   const selectingGroups = new Map();
+  const groupBatch = new GroupBatchControls({
+    document,
+    scope: captureGroupTestRequest,
+    names: () => displayedPolicyGroups(currentGroupsData).map(group => group.name),
+    active: group => Array.from(activeGroupTests.values()).some(task => task.groupName === group),
+    record: handleGroupTestTask,
+    changed: () => { syncGroupTestButtons(); updateAllLatencyBadgesDOM(); },
+  });
+  window.addEventListener("pagehide", () => groupBatch.reset());
   updateHiddenToggleUI();
 
   function showProvidersPanelNotice(message, state, timeoutMs = 0) {
@@ -1166,7 +1176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const cancelling = Boolean(cancellingGroupTests.get(button.dataset.group)?.isCurrent());
       button.classList.toggle("testing", testing || submitting);
       button.classList.toggle("cancelling", cancelling);
-      button.disabled = cancelling || submitting;
+      button.disabled = cancelling || submitting || (groupBatch.reserved.includes(button.dataset.group) && !testing);
       button.title = cancelling ? "正在取消该组测速" : testing ? "取消该组测速" : "测试该组延迟";
       button.setAttribute("aria-label", button.title);
       const label = button.querySelector(".group-test-action-label");
@@ -1175,6 +1185,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function resetGroupTestTracking() {
+    groupBatch.reset();
     groupTestEpoch += 1;
     probeSnapshotRefresh = null;
     probeSnapshotsDirty = false;
@@ -1858,7 +1869,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       void refreshProfileControls(status, load);
       void refreshDnsDelay(load);
 
-      if (sequence === groupReadSequence) currentGroupsData = groupsData.groups || [];
+      if (sequence === groupReadSequence) {
+        currentGroupsData = groupsData.groups || [];
+        groupBatch.observeRevision(groupsData.revision);
+      }
       delete groupsContainer.dataset.snapshot;
       void StorageManager.setPopupGroupSnapshot(instance.id, currentGroupsData, load.isCurrent).catch(
         (error) => {
@@ -2510,6 +2524,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Render Policy Groups
   function renderGroups(groups) {
+    groupBatch.render();
     const normalizedFilter = groupFilterText.toLowerCase();
     const filteredGroups = displayedPolicyGroups(groups);
 
@@ -2773,6 +2788,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const groupsData = await SpikeApiClient.getGroups(scope.instance);
     if (!scope.isCurrent() || sequence !== groupReadSequence) return false;
     currentGroupsData = groupsData.groups || [];
+    groupBatch.observeRevision(groupsData.revision);
     ingestPersistedMemberInfo(leafProbeResults, currentGroupsData);
     const nextVisible = displayedPolicyGroups(currentGroupsData).map(
       (group) => group.name,
@@ -2976,6 +2992,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function runTestGroup(groupName, targetMember = null) {
+    if (groupBatch.reserved.includes(groupName)) return;
     const scope = { ...captureGroupTestRequest(), groupName };
     const operationKey = `${groupName}\0${targetMember || "*"}`;
     if (!scope.instance || submittingGroupTests.get(operationKey)?.isCurrent() || cancellingGroupTests.get(groupName)?.isCurrent()) return;

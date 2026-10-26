@@ -1791,3 +1791,22 @@ input:checked + .slider::before {
 .btn-onboarding-action:active {
   transform: translateY(0);
 }
+
+.group-batch-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 16px 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.group-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+#group-batch-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
