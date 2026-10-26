@@ -107,7 +107,7 @@ const api = new Proxy({}, { get: (_, method) => async (_instance, ...args) => {
   if (method.startsWith('getThroughput') || method.endsWith('ThroughputTest')) {
     options?.onRuntime?.(data.namespace);
     if (options.runtimeNamespace && options.runtimeNamespace !== data.namespace) throw Object.assign(new Error('mock-secret'), { status: 412 });
-    if (method === 'getThroughputTests') return { tasks: data.tasks };
+    if (method === 'getThroughputTests') { if (data.listHold) await data.listHold; return { tasks: data.tasks }; }
     if (method === 'startThroughputTest') { const value = task(args[0]); data.tasks = [value]; if (data.hold) await data.hold; return value; }
     if (method === 'cancelThroughputTest') { data.tasks[0] = { ...data.tasks[0], status: 'cancelled' }; return data.tasks[0]; }
     return data.tasks[0];
@@ -124,7 +124,12 @@ const context = vm.createContext({ document, console, ThroughputSession, PanelOb
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } } });
 const descendants = root => [root, ...root.children.flatMap(descendants)];
 try {
-  await vm.runInContext(`(async()=>{${source}})()`, context);
+  const initial = defer(); data.listHold = initial.promise;
+  const opening = vm.runInContext(`(async()=>{${source}})()`, context);
+  await flush();
+  assert.ok(descendants(nodes.get('throughput-history')).some(node => node.textContent === 'Reading throughput tasks…'));
+  assert.ok(!descendants(nodes.get('throughput-history')).some(node => node.textContent === 'No recent throughput tests'));
+  initial.resolve(); data.listHold = null; await opening;
   assert.equal(calls.filter(method => method === 'startThroughputTest').length, 0);
   assert.deepEqual(Array.from(nodes.get('throughput-policy').children, node => node.value), ['DIRECT', 'Mock Policy']);
   nodes.get('throughput-direction').value = 'upload'; nodes.get('throughput-policy').value = 'Mock Policy';

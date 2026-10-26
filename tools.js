@@ -134,7 +134,7 @@ function renderTransfer() {
     observe.disabled = transfer.reading || transfer.starting || transfer.cancelling || !transfer.namespace;
     observe.addEventListener('click', () => transfer.observe(task)); action.append(observe); row.append(action); return row;
   });
-  byId('throughput-history').replaceChildren(history.length ? makeTable(['Time', 'Policy', 'Direction', 'Status', 'Transfer', 'Action'], history) : text('p', t('No recent throughput tests')));
+  byId('throughput-history').replaceChildren(history.length ? makeTable(['Time', 'Policy', 'Direction', 'Status', 'Transfer', 'Action'], history) : text('p', t(transfer.reading ? 'Reading throughput tasks…' : 'No recent throughput tests')));
 }
 
 async function loadTransferPolicies() {

@@ -166,6 +166,7 @@ resubmit a test. Unknown start receipts remain locked until inspected or
 explicitly forgotten. Stop observing is confirmed and leaves Core tasks intact.
 Requests use runtime preconditions, including panel refreshes; closing Tools
 stops observation while the bounded Core task continues.
+The first task-list read shows loading until the empty or populated result is known.
 
 UI22: Tools shows read-only static/script information panels and explicit
 per-script refresh buttons. Opening Tools or refreshing its snapshots only
