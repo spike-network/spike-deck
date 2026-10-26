@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { connectionDetailFields } from '../lib/connection-trace.js';
 
 const instance = { id: 'mock-instance', baseUrl: 'https://example.test', secret: 'mock-secret' };
-const live = [{ id: 11, host: 'alpha.example.test', peer: '192.0.2.1:4000', port: 443, policy: 'Mock Alpha', kind: 'tcp', ok: true },
+const live = [{ id: 11, host: 'alpha.example.test', peer: '192.0.2.1:4000', port: 443, policy: 'Mock Alpha', kind: 'tcp', ok: true,
+  process: {pid:42,name:'mock-service',path:'/mock-bin/mock-service'},
+  decision_trace:{route:{group_steps:[{group:'Mock Outer',selected:'Mock Leaf',stage:'selected'}]}},
+  timeline:[{elapsed_us:1234,phase:'establish',duration_us:1234,category:'connect',message:'mock connected'}]},
   { id: 22, host: 'beta.example.test', peer: '192.0.2.2:5000', port: 53, policy: 'Mock Beta', kind: 'udp', ok: true }];
 const recent = [{ id: 33, host: 'old.example.test', peer: '192.0.2.1:6000', port: 443, policy: 'Mock Old', kind: 'tcp', ok: false }];
 const nodes = new Map();
@@ -20,7 +24,7 @@ const context = vm.createContext({ document, console,
   window: { confirm: () => true, setInterval() {}, clearInterval() {}, setTimeout() {}, addEventListener() {} },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } },
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => instance },
-  initializeI18n: async () => {}, t: value => value, formatConnectionTrace: () => '',
+  initializeI18n: async () => {}, t: value => value, formatConnectionTrace: () => '', connectionDetailFields,
   filterRuntimeLogs: entries => entries, sortRuntimeLogs: entries => entries, formatRuntimeLogs: () => '',
 });
 const source = fs.readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
@@ -30,6 +34,9 @@ const query = nodes.get('connections-filter');
 const state = nodes.get('connections-state');
 const initialReads = reads;
 assert.equal(nodes.get('connections-count').textContent, '3 / 3');
+assert.match(content(), /mock-service/);
+assert.match(content(), /Mock Outer → Mock Leaf/);
+assert.match(content(), /1.2 ms/);
 query.value = 'MOCK BETA'; query.listeners.input();
 assert.match(content(), /beta.example.test/); assert.doesNotMatch(content(), /alpha.example.test|old.example.test/);
 assert.equal(nodes.get('connections-count').textContent, '1 / 3');

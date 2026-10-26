@@ -6,7 +6,7 @@ import {
   formatRuntimeLogs,
   sortRuntimeLogs
 } from './lib/runtime-logs.js';
-import { formatConnectionTrace } from './lib/connection-trace.js';
+import { formatConnectionTrace, connectionDetailFields } from './lib/connection-trace.js';
 
 await initializeI18n();
 
@@ -68,7 +68,21 @@ function connectionRow(row, live) {
     formatConnectionTrace(row.decision_trace),
     row.kind
   ]
-    .forEach((value) => tr.append(text('td', value, undefined, true)));
+    .forEach((value, index) => {
+      const cell = text('td', index === 4 ? '' : value, undefined, index !== 4);
+      if (index === 4) {
+        cell.append(text('span', value, undefined, true));
+        const details = document.createElement('details');
+        details.append(text('summary', 'Details'));
+        const fields = document.createElement('dl');
+        for (const field of connectionDetailFields(row, t)) {
+          fields.append(text('dt', field.label), text('dd', field.value, 'connection-detail-value', true));
+        }
+        details.append(fields);
+        cell.append(details);
+      }
+      tr.append(cell);
+    });
   tr.append(text('td', row.ok === false ? row.error || 'failed' : live ? 'live' : 'finished'));
   const action = document.createElement('td');
   if (live) {

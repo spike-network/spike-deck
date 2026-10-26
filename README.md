@@ -159,6 +159,11 @@ extension/
 ```
 # Policy selection parity
 
+UI18: connection details expose ordered group decisions, process identity
+(name/PID/path/container/lookup), individual phase durations, absolute event
+times with microsecond offsets, and connection lifetime. Missing observations
+remain explicitly unavailable rather than being inferred from total duration.
+
 UI17: the Tools connection snapshot supports local keyword and state filters,
 with visible/total counts. Filtering never requests or terminates a connection;
 termination remains an explicit action on the original live connection ID.

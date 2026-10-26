@@ -279,3 +279,8 @@ pre {
     grid-column: 1 / -1;
   }
 }
+.connection-detail-value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 52ch;
+}
