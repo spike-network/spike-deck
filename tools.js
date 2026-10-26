@@ -9,6 +9,7 @@ import {
 import { formatConnectionTrace, connectionDetailFields } from './lib/connection-trace.js';
 import { routeContext } from './lib/route-context.js';
 import { chronological, downloadJournal } from './lib/journal-export.js';
+import { PanelObservation } from './lib/panels.js';
 
 await initializeI18n();
 
@@ -31,6 +32,7 @@ function adoptEventNamespace(namespace) {
     frozenLogs = null; frozenEvents = null;
   }
   eventNamespace = namespace;
+  panels.runtime(namespace);
   clearedLogSequence = 0;
   clearedEventSequence = 0;
   logEntries = [];
@@ -40,6 +42,10 @@ function adoptEventNamespace(namespace) {
 }
 
 const byId = (id) => document.getElementById(id);
+const panels = new PanelObservation({
+  read: onRuntime => SpikeApiClient.getPanels(instance, { onRuntime }),
+  refresh: (name, onRuntime) => SpikeApiClient.refreshPanel(instance, name, { onRuntime })
+}, renderPanels);
 const text = (tag, value, className, userContent = false) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -65,6 +71,40 @@ function makeTable(headers, rows) {
   headers.forEach((header) => head.append(text('th', header)));
   table.append(head, ...rows);
   return table;
+}
+
+function renderPanels() {
+  byId('panels-refresh').disabled = panels.loading || panels.pending.size > 0;
+  const cards = [];
+  if (panels.loading) cards.push(text('p', t('正在读取面板…')));
+  if (panels.error) { const error = text('p', t('无法读取面板，请重试状态查询。')); error.role = 'alert'; cards.push(error); }
+  if (panels.loaded && !panels.loading && !panels.panels.length) cards.push(text('p', t('未配置面板')));
+  for (const panel of panels.panels) {
+    const card = document.createElement('article'); card.className = 'information-panel';
+    card.dataset.style = ['good', 'alert', 'error'].includes(panel.style) ? panel.style : 'info';
+    const heading = document.createElement('div'); heading.className = 'panel-head';
+    const icons = { wifi: '◉', network: '⇄', globe: '◎', server: '▤', cloud: '☁', clock: '◷', power: '⏻', shield: '◇' };
+    const icon = text('span', Object.hasOwn(icons, panel.icon) ? icons[panel.icon] : 'ⓘ', undefined, true);
+    icon.setAttribute('aria-hidden', 'true');
+    if (/^#?(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(panel.icon_color || '')) icon.style.color = '#' + panel.icon_color.replace(/^#/, '');
+    heading.append(icon);
+    heading.append(text('h3', panel.title, undefined, true));
+    if (panel.script_name != null) {
+      const button = text('button', t('刷新'));
+      button.setAttribute('aria-label', `${t('刷新面板')} ${panel.name}`);
+      button.disabled = panels.loading || panels.pending.has(panel.name) || panel.refreshing;
+      button.addEventListener('click', () => panels.refresh(panel.name));
+      heading.append(button);
+    }
+    card.append(heading, text('pre', panel.content, 'information-panel-content', true));
+    if (panels.errors.has(panel.name) || panel.error) {
+      const error = text('p', t('面板刷新失败，已保留原有内容。')); error.role = 'alert'; card.append(error);
+    }
+    if (panels.pending.has(panel.name) || panel.refreshing) card.append(text('p', t('正在刷新…')));
+    else if (panel.last_updated_at_unix != null) card.append(text('small', `${t('上次更新')} ${new Date(panel.last_updated_at_unix * 1000).toLocaleString()}`));
+    cards.push(card);
+  }
+  byId('panels').replaceChildren(...cards);
 }
 
 function connectionRow(row, live) {
@@ -374,13 +414,15 @@ async function loadAll() {
     loadLogs(),
     loadEvents(),
     loadDnsCache(),
-    loadScripts()
+    loadScripts(),
+    panels.load()
   ]);
   const failed = results.find((result) => result.status === 'rejected');
   if (failed) handleError(failed.reason);
 }
 
 byId('refresh-all').addEventListener('click', loadAll);
+byId('panels-refresh').addEventListener('click', () => panels.load());
 byId('readiness-refresh').addEventListener('click', loadReadiness);
 byId('connections-filter').addEventListener('input', renderConnections);
 byId('connections-state').addEventListener('change', renderConnections);
@@ -486,6 +528,7 @@ try {
   const timer = window.setInterval(refreshLogs, 3000);
   document.addEventListener('visibilitychange', refreshLogs);
   window.addEventListener('pagehide', () => {
+    panels.retire();
     window.clearInterval(timer);
     document.removeEventListener('visibilitychange', refreshLogs);
   }, { once: true });

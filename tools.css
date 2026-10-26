@@ -286,3 +286,8 @@ pre {
   overflow-wrap: anywhere;
   max-width: 52ch;
 }
+.information-panel { border: 1px solid var(--border-color, #888); border-left-width: 3px; border-radius: 8px; padding: 12px; margin-top: 10px; }
+.information-panel[data-style="good"] { border-left-color: #22a06b; }
+.information-panel[data-style="alert"] { border-left-color: #d99a16; }
+.information-panel[data-style="error"] { border-left-color: #e04f5f; }
+.information-panel-content { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; font-family: inherit; }

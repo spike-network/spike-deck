@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { chronological, serializeJournal, downloadJournal } from '../lib/journal-export.js';
+import { PanelObservation } from '../lib/panels.js';
 import { filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs } from '../lib/runtime-logs.js';
 
 const source=fs.readFileSync(new URL('../tools.js',import.meta.url),'utf8').replace(/^import[\s\S]*?;\n/gm,'');
@@ -25,7 +26,7 @@ async function harness(namespace='mock-runtime') {
     assert.ok(key.startsWith('get'),'observation controls must not mutate the runtime');
     return {};
   }});
-  const context=vm.createContext({document,console,chronological,filterRuntimeLogs,formatRuntimeLogs,sortRuntimeLogs,
+  const context=vm.createContext({document,console,PanelObservation,chronological,filterRuntimeLogs,formatRuntimeLogs,sortRuntimeLogs,
     downloadJournal:(rows,json,name)=>{if(data.failExport)throw new Error('mock-secret');data.exports.push({rows:JSON.parse(JSON.stringify(rows)),json,name});},
     window:{setInterval(){},clearInterval(){},setTimeout(){},addEventListener(){}},
     chrome:{runtime:{onMessage:{addListener(){}},sendMessage:async()=>{throw new Error('mock stream unavailable');}}},

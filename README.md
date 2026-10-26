@@ -159,6 +159,11 @@ extension/
 ```
 # Policy selection parity
 
+UI22: Tools shows read-only static/script information panels and explicit
+per-script refresh buttons. Opening Tools or refreshing its snapshots only
+reads panel status. Failed executions retain content; namespace/profile changes
+retire old responses, and closing Tools retires its outstanding observations.
+
 UI21: event recommendations link to fixed Tools sections or the corresponding
 popup overview, policy, profile or provider panel. Opening the provider panel
 reads its inventory/task status only. Unknown targets keep their original
