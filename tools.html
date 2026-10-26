@@ -95,9 +95,16 @@
     </section>
 
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">CONFIG SAFETY</p><h2>重载预览</h2></div><button id="reload-preview" class="primary">预览</button></div>
-      <p class="panel-description">在应用 Profile 前检查热更新和需要重启的变更。</p>
+      <div class="panel-head"><div><p class="eyebrow">CONFIG SAFETY</p><h2>重载预览</h2></div><button id="reload-preview" class="primary" disabled>预览</button></div>
+      <p class="panel-description">预览只检查当前配置，不应用更改。重新加载会再次读取当前配置文件，不会重启引擎。</p>
+      <div class="filter-bar">
+        <button id="reload-apply" disabled>重新加载配置</button>
+        <button id="reload-check" disabled>检查运行时状态</button>
+      </div>
+      <p id="reload-operation-status" role="status"></p>
+      <p id="reload-operation-error" role="alert"></p>
       <pre id="reload-preview-output"></pre>
+      <pre id="reload-result-output"></pre>
     </section>
 
     <section class="panel">

@@ -12,6 +12,7 @@ import { chronological, downloadJournal } from './lib/journal-export.js';
 import { PanelObservation } from './lib/panels.js';
 import { ThroughputSession } from './lib/throughput.js';
 import { policyProbeRequest } from './lib/policy-probe.js';
+import { reloadView, reloadStatusView } from './lib/reload-view.js';
 
 await initializeI18n();
 
@@ -33,6 +34,11 @@ let probeBusy = false;
 let probeGeneration = 0;
 let probeLive = true;
 let probeCatalogRead = 0;
+let reloadLive = true;
+let reloadBusy = false;
+let reloadUnconfirmed = false;
+let reloadNamespace = '';
+let reloadGeneration = 0;
 
 function adoptEventNamespace(namespace) {
   if (!namespace || namespace === eventNamespace) return;
@@ -40,6 +46,17 @@ function adoptEventNamespace(namespace) {
     frozenLogs = null; frozenEvents = null;
   }
   eventNamespace = namespace;
+  if ((reloadNamespace && reloadNamespace !== namespace) || reloadBusy) {
+    reloadGeneration++;
+    reloadBusy = false;
+    reloadUnconfirmed = false;
+    reloadNamespace = '';
+    byId('reload-preview-output').textContent = '';
+    byId('reload-result-output').textContent = '';
+    byId('reload-operation-status').textContent = '';
+    byId('reload-operation-error').textContent = t('Runtime changed. Check current status before reloading.');
+    updateReloadControls();
+  }
   if (probeNamespace && probeNamespace !== namespace) {
     probeNamespace = ''; probeGeneration++; probeCatalogRead++; probeBusy = false;
     byId('policy-probe-start').disabled = true;
@@ -612,11 +629,70 @@ byId('logs-view-clear').addEventListener('click', () => {
   renderLogs();
   showNotice(t('当前视图日志已清空'));
 });
-byId('reload-preview').addEventListener('click', async () => {
+function updateReloadControls() {
+  const disabled = !instance || !reloadLive || reloadBusy;
+  byId('reload-preview').disabled = disabled;
+  byId('reload-apply').disabled = disabled || reloadUnconfirmed;
+  byId('reload-check').disabled = disabled;
+}
+
+async function runReload(mode) {
+  if (!instance || !reloadLive || reloadBusy || (mode === 'apply' && reloadUnconfirmed)) return;
+  const target = instance, generation = ++reloadGeneration;
+  const current = () => reloadLive && instance === target && reloadGeneration === generation;
+  reloadBusy = true;
+  if (mode === 'preview') byId('reload-preview-output').textContent = '';
+  byId('reload-operation-error').textContent = '';
+  byId('reload-operation-status').textContent = t('Reading runtime status…');
+  updateReloadControls();
   try {
-    output('reload-preview-output', await SpikeApiClient.previewReload(instance));
-  } catch (error) { handleError(error); }
-});
+    let namespace = null;
+    const before = await SpikeApiClient.getStatus(target, {onRuntime: value => { namespace = value; }});
+    if (!current()) return;
+    if (!namespace) throw new Error('Runtime identity unavailable');
+    const status = reloadStatusView(before, t);
+    reloadNamespace = namespace;
+    if (mode === 'check') {
+      output('reload-result-output', status);
+      reloadUnconfirmed = false;
+      byId('reload-operation-status').textContent = t('Runtime status checked. Retry reload explicitly if needed.');
+      return;
+    }
+    let received = null;
+    const options = {runtimeNamespace: namespace, onRuntime: value => { received = value; }};
+    if (mode === 'preview') {
+      const result = await SpikeApiClient.previewReload(target, options);
+      if (!current()) return;
+      if (received !== namespace || result.current_revision !== before.revision) throw new Error('Preview context changed');
+      output('reload-preview-output', reloadView(result, true, t));
+      byId('reload-operation-status').textContent = t('Preview only. No configuration was applied.');
+    } else {
+      reloadUnconfirmed = true;
+      const result = await SpikeApiClient.reloadRuntime(target, options);
+      if (!current()) return;
+      if (received !== namespace || result.revision < before.revision) throw new Error('Reload context changed');
+      output('reload-result-output', reloadView(result, false, t));
+      byId('reload-preview-output').textContent = '';
+      reloadUnconfirmed = false;
+      byId('reload-operation-status').textContent = t(result.restart_required?.length
+        ? 'Profile reloaded. Restart-required changes remain pending.' : 'Profile reloaded.');
+      void loadAll();
+    }
+  } catch {
+    if (current()) {
+      byId('reload-operation-status').textContent = '';
+      byId('reload-operation-error').textContent = t(reloadUnconfirmed
+        ? 'Reload result is unconfirmed. Check runtime status before trying again.'
+        : 'Unable to read reload information. Check runtime status and configuration.');
+    }
+  } finally {
+    if (current()) { reloadBusy = false; updateReloadControls(); }
+  }
+}
+
+byId('reload-preview').addEventListener('click', () => runReload('preview'));
+byId('reload-apply').addEventListener('click', () => runReload('apply'));
+byId('reload-check').addEventListener('click', () => runReload('check'));
 byId('dns-cache-refresh').addEventListener('click', () => loadDnsCache().catch(handleError));
 byId('dns-flush').addEventListener('click', async () => {
   try {
@@ -666,6 +742,7 @@ try {
   await StorageManager.init();
   instance = await StorageManager.getActiveInstance();
   if (!instance) throw new Error('请先在 SpikeDeck 设置中添加并选择实例');
+  updateReloadControls();
   byId('instance-label').textContent = `${instance.name} · ${instance.baseUrl}`;
   void chrome.runtime.sendMessage({ type: 'ENSURE_LOG_STREAM' }).then((stream) => {
     if (!stream?.ok) setLogStreamState('retrying');
@@ -679,6 +756,7 @@ try {
     panels.retire();
     transfer.dispose();
     probeLive = false; probeGeneration++;
+    reloadLive = false; reloadGeneration++;
     window.clearInterval(timer);
     document.removeEventListener('visibilitychange', refreshLogs);
   }, { once: true });
