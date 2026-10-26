@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { chronological } from '../lib/journal-export.js';
 import { PanelObservation } from '../lib/panels.js';
+import { ThroughputSession } from '../lib/throughput.js';
 
 const nodes = new Map();
 const node = () => ({ value: '', dataset: {}, classList: { add() {}, remove() {} },
@@ -37,6 +38,7 @@ const source = fs.readFileSync(new URL('../tools.js', import.meta.url), 'utf8')
   .replace(/^import[\s\S]*?;\n/gm, '');
 context.chronological = chronological;
 context.PanelObservation = PanelObservation;
+context.ThroughputSession = ThroughputSession;
 await vm.runInContext(`(async () => { ${source} })()`, context);
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 assert.match(nodes.get('logs-output').textContent, /log-100/);

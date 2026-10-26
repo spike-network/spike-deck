@@ -22,6 +22,19 @@
   </header>
 
   <main>
+    <section class="panel wide" aria-label="Policy throughput test">
+      <div class="panel-head"><h2>Policy throughput test</h2><button id="throughput-reload">Reload recent tests</button></div>
+      <p>Measure bounded transfer throughput using the configured Testing URL. Tests continue in Core when this page closes.</p>
+      <form id="throughput-form" class="form-grid">
+        <label>Direction<select id="throughput-direction"><option value="download">Download</option><option value="upload">Upload</option></select></label>
+        <label>Policy<select id="throughput-policy"><option data-i18n-ignore>DIRECT</option></select></label>
+        <button id="throughput-start" type="submit" disabled>Start throughput test</button>
+        <button id="throughput-cancel" type="button" disabled>Cancel throughput test</button>
+      </form>
+      <p id="throughput-policy-error" role="alert"></p>
+      <div id="throughput-result" aria-live="polite"></div>
+      <details><summary>Recent throughput tests</summary><div id="throughput-history" class="table-wrap"></div></details>
+    </section>
     <section class="panel wide">
       <div class="panel-head"><div><p class="eyebrow">INFORMATION</p><h2>信息面板</h2></div><button id="panels-refresh">重新读取面板列表</button></div>
       <p class="panel-description">当前配置的只读信息。刷新只运行所选面板的脚本。</p>

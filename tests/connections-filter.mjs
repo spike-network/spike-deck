@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { chronological } from '../lib/journal-export.js';
 import { PanelObservation } from '../lib/panels.js';
+import { ThroughputSession } from '../lib/throughput.js';
 import { connectionDetailFields } from '../lib/connection-trace.js';
 
 const instance = { id: 'mock-instance', baseUrl: 'https://example.test', secret: 'mock-secret' };
@@ -32,6 +33,7 @@ const context = vm.createContext({ document, console,
 const source = fs.readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
 context.chronological = chronological;
 context.PanelObservation = PanelObservation;
+context.ThroughputSession = ThroughputSession;
 await vm.runInContext(`(async () => { ${source} })()`, context);
 const content = () => JSON.stringify(nodes.get('connections'));
 const query = nodes.get('connections-filter');

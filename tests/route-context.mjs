@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { chronological } from '../lib/journal-export.js';
 import { PanelObservation } from '../lib/panels.js';
+import { ThroughputSession } from '../lib/throughput.js';
 import { routeContext } from '../lib/route-context.js';
 
 const nodes = new Map();
@@ -22,6 +23,7 @@ const context = vm.createContext({document,console,URL,routeContext,
 const source=fs.readFileSync(new URL('../tools.js',import.meta.url),'utf8').replace(/^import[\s\S]*?;\n/gm,'');
 context.chronological = chronological;
 context.PanelObservation = PanelObservation;
+context.ThroughputSession = ThroughputSession;
 await vm.runInContext(`(async()=>{${source}})()`,context);
 const values={'route-host':'example.test','route-port':'443','route-protocol':'TCP',
   'route-source':'192.0.2.1','route-source-port':'5300','route-in-port':'19001','route-destination':'2001:db8::2',

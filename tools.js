@@ -10,6 +10,7 @@ import { formatConnectionTrace, connectionDetailFields } from './lib/connection-
 import { routeContext } from './lib/route-context.js';
 import { chronological, downloadJournal } from './lib/journal-export.js';
 import { PanelObservation } from './lib/panels.js';
+import { ThroughputSession } from './lib/throughput.js';
 
 await initializeI18n();
 
@@ -42,9 +43,21 @@ function adoptEventNamespace(namespace) {
 }
 
 const byId = (id) => document.getElementById(id);
+async function transferRequest(method, ...args) {
+  let namespace = null;
+  const options = args.pop();
+  const value = await SpikeApiClient[method](instance, ...args, { ...options, onRuntime: value => { namespace = value; } });
+  return { value, namespace };
+}
+const transfer = new ThroughputSession({
+  list: () => transferRequest('getThroughputTests', {}),
+  start: (body, runtimeNamespace) => transferRequest('startThroughputTest', body, { runtimeNamespace }),
+  get: (id, runtimeNamespace) => transferRequest('getThroughputTest', id, { runtimeNamespace }),
+  cancel: (id, runtimeNamespace) => transferRequest('cancelThroughputTest', id, { runtimeNamespace })
+}, renderTransfer);
 const panels = new PanelObservation({
   read: onRuntime => SpikeApiClient.getPanels(instance, { onRuntime }),
-  refresh: (name, onRuntime) => SpikeApiClient.refreshPanel(instance, name, { onRuntime })
+  refresh: (name, onRuntime) => SpikeApiClient.refreshPanel(instance, name, { onRuntime, runtimeNamespace: panels.namespace })
 }, renderPanels);
 const text = (tag, value, className, userContent = false) => {
   const node = document.createElement(tag);
@@ -71,6 +84,68 @@ function makeTable(headers, rows) {
   headers.forEach((header) => head.append(text('th', header)));
   table.append(head, ...rows);
   return table;
+}
+
+function transferBytes(bytes) {
+  const units = ['B', 'KiB', 'MiB', 'GiB'];
+  let value = Math.max(0, Number(bytes) || 0), index = 0;
+  while (value >= 1024 && index < units.length - 1) { value /= 1024; index++; }
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${units[index]}`;
+}
+
+function transferLabel(value) { return t(value[0].toUpperCase() + value.slice(1)); }
+
+function renderTransfer() {
+  const busy = transfer.busy || transfer.reading;
+  byId('throughput-start').disabled = busy || !transfer.namespace;
+  byId('throughput-direction').disabled = byId('throughput-policy').disabled = busy;
+  byId('throughput-cancel').disabled = !transfer.busy || transfer.uncertain || transfer.cancelling || transfer.starting && transfer.cancelRequested;
+  byId('throughput-reload').disabled = transfer.reading || transfer.starting || transfer.cancelling;
+  const rows = [];
+  if (transfer.starting) rows.push(text('p', t(transfer.cancelRequested ? 'Cancellation will be sent when the task starts.' : 'Starting throughput test…')));
+  if (transfer.error || transfer.uncertain) {
+    const error = text('p', t(transfer.error || 'Start result is unconfirmed. Check recent tasks before starting again.')); error.role = 'alert'; rows.push(error);
+  }
+  if (transfer.uncertain) {
+    const dismiss = text('button', t('Forget unconfirmed start'));
+    dismiss.addEventListener('click', () => { if (window.confirm(t('Forget the unconfirmed start? This does not cancel or confirm any Core task.'))) transfer.dismissUnconfirmed(); }); rows.push(dismiss);
+  }
+  if (transfer.task) {
+    const task = transfer.task;
+    rows.push(text('p', `${transferLabel(task.status)} · ${transferLabel(task.direction)} · ${transferBytes(task.bytes_per_second)}/s · ${transferBytes(task.bytes)} / ${transferBytes(task.byte_limit)}`));
+    rows.push(text('p', task.policy, undefined, true));
+    const progress = document.createElement('progress'); progress.max = Math.max(1, task.byte_limit); progress.value = Math.min(task.bytes, task.byte_limit);
+    progress.setAttribute('aria-label', t('Transferred bytes')); rows.push(progress);
+    if (task.status === 'failed') rows.push(text('p', t('Throughput test failed. Check the policy and configured Testing URL.')));
+    if (task.cancel_requested && ['queued', 'running'].includes(task.status)) rows.push(text('p', t('Cancellation requested')));
+    const check = text('button', t('Check task status')); check.disabled = transfer.polling || transfer.starting || transfer.cancelling;
+    check.addEventListener('click', () => transfer.check()); rows.push(check);
+    const stop = text('button', t('Stop observing')); stop.disabled = transfer.starting || transfer.cancelling;
+    stop.addEventListener('click', () => { if (window.confirm(t('Stop observing this task? It may continue in Core.'))) transfer.stopObserving(); }); rows.push(stop);
+  }
+  if (transfer.reading) rows.push(text('p', t('Reading throughput tasks…')));
+  byId('throughput-result').replaceChildren(...rows);
+  const history = transfer.tasks.map(task => {
+    const row = document.createElement('tr');
+    row.append(text('td', new Date(task.created_at_unix_ms).toLocaleString()), text('td', task.policy, undefined, true),
+      text('td', transferLabel(task.direction)), text('td', transferLabel(task.status)), text('td', `${transferBytes(task.bytes)} · ${transferBytes(task.bytes_per_second)}/s`));
+    const action = text('td', ''); const observe = text('button', t('Observe'));
+    observe.setAttribute('aria-label', `${t('Observe throughput task')} ${task.id}`);
+    observe.disabled = transfer.reading || transfer.starting || transfer.cancelling || !transfer.namespace;
+    observe.addEventListener('click', () => transfer.observe(task)); action.append(observe); row.append(action); return row;
+  });
+  byId('throughput-history').replaceChildren(history.length ? makeTable(['Time', 'Policy', 'Direction', 'Status', 'Transfer', 'Action'], history) : text('p', t('No recent throughput tests')));
+}
+
+async function loadTransferPolicies() {
+  try {
+    const result = await SpikeApiClient.getPolicies(instance);
+    const selected = byId('throughput-policy').value || 'DIRECT';
+    const names = [...new Set(['DIRECT', ...(result.policies || []).filter(item => item.type.toLowerCase() !== 'reject').map(item => item.name), selected])];
+    byId('throughput-policy').replaceChildren(...names.map(name => { const option = text('option', name, undefined, true); option.value = name; return option; }));
+    byId('throughput-policy').value = selected;
+    byId('throughput-policy-error').textContent = '';
+  } catch { byId('throughput-policy-error').textContent = t('Unable to load throughput policies. Refresh the status list to retry.'); }
 }
 
 function renderPanels() {
@@ -415,7 +490,9 @@ async function loadAll() {
     loadEvents(),
     loadDnsCache(),
     loadScripts(),
-    panels.load()
+    panels.load(),
+    transfer.load(),
+    loadTransferPolicies()
   ]);
   const failed = results.find((result) => result.status === 'rejected');
   if (failed) handleError(failed.reason);
@@ -423,6 +500,9 @@ async function loadAll() {
 
 byId('refresh-all').addEventListener('click', loadAll);
 byId('panels-refresh').addEventListener('click', () => panels.load());
+byId('throughput-form').addEventListener('submit', event => { event.preventDefault(); return transfer.start(byId('throughput-direction').value, byId('throughput-policy').value); });
+byId('throughput-cancel').addEventListener('click', () => transfer.cancel());
+byId('throughput-reload').addEventListener('click', () => transfer.load());
 byId('readiness-refresh').addEventListener('click', loadReadiness);
 byId('connections-filter').addEventListener('input', renderConnections);
 byId('connections-state').addEventListener('change', renderConnections);
@@ -529,6 +609,7 @@ try {
   document.addEventListener('visibilitychange', refreshLogs);
   window.addEventListener('pagehide', () => {
     panels.retire();
+    transfer.dispose();
     window.clearInterval(timer);
     document.removeEventListener('visibilitychange', refreshLogs);
   }, { once: true });

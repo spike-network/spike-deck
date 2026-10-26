@@ -159,6 +159,14 @@ extension/
 ```
 # Policy selection parity
 
+UI23: Tools exposes bounded download/upload throughput with policy selection,
+byte/rate progress, Cancel (including a pending start), and recent-task
+observation. Failed polling stops after three attempts; status retries never
+resubmit a test. Unknown start receipts remain locked until inspected or
+explicitly forgotten. Stop observing is confirmed and leaves Core tasks intact.
+Requests use runtime preconditions, including panel refreshes; closing Tools
+stops observation while the bounded Core task continues.
+
 UI22: Tools shows read-only static/script information panels and explicit
 per-script refresh buttons. Opening Tools or refreshing its snapshots only
 reads panel status. Failed executions retain content; namespace/profile changes
