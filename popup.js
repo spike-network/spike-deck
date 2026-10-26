@@ -3128,10 +3128,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     return "";
   }
 
+  function applyEventAction(hash) {
+    switch (hash) {
+      case '#event-providers':
+        void openProvidersPanel().catch(() => showToast('无法打开外部资源，请重试。', 'error'));
+        return true;
+      case '#event-config':
+        setQuickPanel('profile'); quickPanelProfile.scrollIntoView({ block: 'start' }); return true;
+      case '#event-groups':
+        groupsContainer.scrollIntoView({ block: 'start' }); return true;
+      case '#event-overview': window.scrollTo(0, 0); return true;
+      default: return false;
+    }
+  }
+
   // Initial load
   void syncModuleUpdate();
   void syncProviderRefreshTask();
-  loadDashboard();
+  void loadDashboard().then(() => applyEventAction(window.location?.hash));
   void refreshTraffic();
   trafficTimer = setInterval(() => {
     void refreshTraffic();

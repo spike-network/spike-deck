@@ -159,6 +159,11 @@ extension/
 ```
 # Policy selection parity
 
+UI21: event recommendations link to fixed Tools sections or the corresponding
+popup overview, policy, profile or provider panel. Opening the provider panel
+reads its inventory/task status only. Unknown targets keep their original
+readable label without becoming executable URLs.
+
 UI20: Tools logs/events can freeze observation, clear only the visible journal,
 select time order and export filtered records as JSONL/Text. Streams and bounded
 background caches continue while paused; clear floors are independent per

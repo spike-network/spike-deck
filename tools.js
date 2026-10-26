@@ -194,6 +194,20 @@ async function readLogs() {
   mergeLogEntries(entries);
 }
 
+function eventDestination(target) {
+  switch (target) {
+    case 'overview': return { href: 'popup.html#event-overview', label: '打开概览' };
+    case 'groups': return { href: 'popup.html#event-groups', label: '打开策略组' };
+    case 'providers': return { href: 'popup.html#event-providers', label: '打开外部资源' };
+    case 'config': return { href: 'popup.html#event-config', label: '打开配置文件' };
+    case 'connections': return { href: '#connections', label: '打开连接' };
+    case 'diagnostics': return { href: '#route-form', label: '打开诊断' };
+    case 'events': return { href: '#events', label: '打开事件' };
+    case 'logs': return { href: '#logs-output', label: '打开日志' };
+    default: return null;
+  }
+}
+
 function eventRow(entry) {
   const tr = document.createElement('tr');
   tr.className = `event-severity-${entry.severity || 'info'}`;
@@ -202,9 +216,17 @@ function eventRow(entry) {
     entry.severity || 'info',
     entry.category || 'runtime',
     entry.summary || entry.kind,
-    entry.kind,
-    entry.action?.label || '—'
+    entry.kind
   ].forEach((value) => tr.append(text('td', value, undefined, true)));
+  const action = text('td', '');
+  const destination = eventDestination(entry.action?.target);
+  if (destination) {
+    const link = text('a', t(destination.label));
+    link.href = destination.href;
+    if (!destination.href.startsWith('#')) { link.target = '_blank'; link.rel = 'noopener'; }
+    action.append(link);
+  } else action.append(text('span', entry.action?.label || '—', undefined, true));
+  tr.append(action);
   return tr;
 }
 
