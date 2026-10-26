@@ -27,7 +27,7 @@ let connectionSnapshot = { live: [], recent: [] };
 
 function adoptEventNamespace(namespace) {
   if (!namespace || namespace === eventNamespace) return;
-  if (eventNamespace || logEntries.length || eventEntries.length || clearedLogSequence || clearedEventSequence) {
+  if (eventNamespace || logEntries.length || eventEntries.length || frozenLogs?.length || frozenEvents?.length || clearedLogSequence || clearedEventSequence) {
     frozenLogs = null; frozenEvents = null;
   }
   eventNamespace = namespace;

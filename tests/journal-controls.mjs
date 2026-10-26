@@ -77,9 +77,13 @@ await empty.click('logs-refresh');assert.doesNotMatch(empty.nodes.get('logs-outp
 empty.click('logs-pause');assert.match(empty.nodes.get('logs-output').textContent,/Mock Arrival/);
 const legacy=await harness('');legacy.data.logs=[{...makeLog(1,'Mock Legacy'),event_namespace:undefined}];
 await legacy.click('logs-refresh');legacy.click('logs-pause');
+legacy.data.events=[{...makeEvent(1,'Mock Legacy Event'),event_namespace:undefined}];
+await legacy.click('events-refresh');legacy.click('events-pause');
+legacy.data.events=[];await legacy.click('events-refresh');
 legacy.data.namespace='mock-named';legacy.data.logs=[{...makeLog(1,'Mock Named'),event_namespace:'mock-named'}];
 await legacy.click('logs-refresh');assert.match(legacy.nodes.get('logs-output').textContent,/Mock Named/);
 assert.doesNotMatch(legacy.nodes.get('logs-output').textContent,/Mock Legacy/);
+assert.equal(legacy.nodes.get('events-pause').textContent,'暂停观察');
 
 const records=[makeEvent(2,'Mock Second'),makeEvent(1,'Mock First')];
 assert.deepEqual(serializeJournal(records,true).trim().split('\n').map(line=>JSON.parse(line)),[records[1],records[0]]);
