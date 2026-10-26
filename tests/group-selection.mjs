@@ -23,6 +23,13 @@ assert.equal(
   "select",
 );
 assert.equal(groupMemberAction({ kind: "select", selected: "A" }, "A"), "none");
+for (const kind of ["url-test", "fallback", "load-balance", "smart", "subnet"]) {
+  assert.equal(groupMemberAction({ kind, selected: "A" }, "A"), "select", kind);
+  assert.equal(groupMemberAction({ kind, selected: "A", override_member: "A" }, "A"), "auto", kind);
+  assert.equal(groupMemberAction({ kind, selected: "A", override_member: "A" }, "B"), "select", kind);
+}
+assert.equal(groupMemberAction({ kind: "other", selected: "A" }, "B"), "select");
+assert.equal(groupMemberAction({ kind: "mock-future", selected: "A" }, "B"), "none");
 assert.equal(shouldCollapseGroupAfterSelection(true, { altKey: false }), true);
 assert.equal(shouldCollapseGroupAfterSelection(true, { altKey: true }), false);
 assert.equal(shouldCollapseGroupAfterSelection(false, { altKey: false }), false);

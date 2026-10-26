@@ -157,3 +157,8 @@ extension/
 │   └── spike-client.js    # Spike Control REST API 客户端
 └── icons/                 # 扩展图标 (16x16, 48x48, 128x128, SVG)
 ```
+# Policy selection parity
+
+UI13: load-balance and subnet groups support manual pinning and restoring
+automatic selection, matching the current Core contract. Unknown future kinds
+remain inactive. Native clients already support the current group kinds.
