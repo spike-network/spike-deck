@@ -75,7 +75,7 @@ function connectionRow(row, live) {
         const details = document.createElement('details');
         details.append(text('summary', 'Details'));
         const fields = document.createElement('dl');
-        for (const field of connectionDetailFields(row, t)) {
+        for (const field of connectionDetailFields(row, t, live)) {
           fields.append(text('dt', field.label), text('dd', field.value, 'connection-detail-value', true));
         }
         details.append(fields);

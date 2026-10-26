@@ -163,6 +163,8 @@ UI18: connection details expose ordered group decisions, process identity
 (name/PID/path/container/lookup), individual phase durations, absolute event
 times with microsecond offsets, and connection lifetime. Missing observations
 remain explicitly unavailable rather than being inferred from total duration.
+For live sessions, the active phase uses runtime lifetime minus the recorded
+establishment offset, without a wall-clock timer or duplicate explicit phase.
 
 UI17: the Tools connection snapshot supports local keyword and state filters,
 with visible/total counts. Filtering never requests or terminates a connection;

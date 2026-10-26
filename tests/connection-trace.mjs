@@ -52,6 +52,15 @@ test('localized phase labels never translate user process or policy names', () =
   assert.equal(fields.find(field => field.label === 'Phase timings').value, '活动: 1.0 ms');
 });
 
+test('live active duration follows the runtime clock after establishment', () => {
+  const row = {duration_ms:600,timeline:[{phase:'establish',elapsed_us:1234,duration_us:1234}]};
+  const fields = connectionDetailFields(row, value => value, true);
+  assert.match(fields.find(field => field.label === 'Phase timings').value,/Active: 598.8 ms/);
+  row.timeline.push({phase:'active',elapsed_us:2000,duration_us:1000});
+  const observed = connectionDetailFields(row, value => value, true).find(field => field.label === 'Phase timings').value;
+  assert.equal(observed.split('Active:').length,2,'an explicit active phase must not be duplicated');
+});
+
 test('keeps older connection payloads readable', () => {
   assert.equal(formatConnectionTrace(undefined), '—');
 });
