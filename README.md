@@ -159,6 +159,11 @@ extension/
 ```
 # Policy selection parity
 
+UI24: Tools can probe 1–16 known policies against a custom HTTP/HTTPS URL.
+The request is runtime-bound and transient: profile settings and permanent test
+URLs are unchanged. Results show independent success/latency without raw server
+errors, and closing Tools drops late results. Policy-list reads never probe.
+
 UI23: Tools exposes bounded download/upload throughput with policy selection,
 byte/rate progress, Cancel (including a pending start), and recent-task
 observation. Failed polling stops after three attempts; status retries never

@@ -22,6 +22,16 @@
   </header>
 
   <main>
+    <section class="panel wide" aria-label="Custom URL policy probe">
+      <div class="panel-head"><h2>Custom URL policy probe</h2></div>
+      <p>Probe 1–16 known policies without changing the profile test URL.</p>
+      <form id="policy-probe-form" class="form-grid">
+        <label>Probe URL<input id="policy-probe-url" type="url" placeholder="https://example.test/mock" required></label>
+        <label>Policies<select id="policy-probe-policies" multiple size="6"></select></label>
+        <button id="policy-probe-start" type="submit" disabled>Probe selected policies</button>
+      </form>
+      <p id="policy-probe-error" role="alert"></p><div id="policy-probe-results" aria-live="polite"></div>
+    </section>
     <section class="panel wide" aria-label="Policy throughput test">
       <div class="panel-head"><h2>Policy throughput test</h2><button id="throughput-reload">Reload recent tests</button></div>
       <p>Measure bounded transfer throughput using the configured Testing URL. Tests continue in Core when this page closes.</p>

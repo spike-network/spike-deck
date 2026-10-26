@@ -11,6 +11,7 @@ import { routeContext } from './lib/route-context.js';
 import { chronological, downloadJournal } from './lib/journal-export.js';
 import { PanelObservation } from './lib/panels.js';
 import { ThroughputSession } from './lib/throughput.js';
+import { policyProbeRequest } from './lib/policy-probe.js';
 
 await initializeI18n();
 
@@ -26,6 +27,12 @@ let logRead = null;
 let readinessSequence = 0;
 let connectionsSequence = 0;
 let connectionSnapshot = { live: [], recent: [] };
+let probePolicies = [];
+let probeNamespace = '';
+let probeBusy = false;
+let probeGeneration = 0;
+let probeLive = true;
+let probeCatalogRead = 0;
 
 function adoptEventNamespace(namespace) {
   if (!namespace || namespace === eventNamespace) return;
@@ -33,6 +40,13 @@ function adoptEventNamespace(namespace) {
     frozenLogs = null; frozenEvents = null;
   }
   eventNamespace = namespace;
+  if (probeNamespace && probeNamespace !== namespace) {
+    probeNamespace = ''; probeGeneration++; probeCatalogRead++; probeBusy = false;
+    byId('policy-probe-start').disabled = true;
+    byId('policy-probe-policies').disabled = byId('policy-probe-url').disabled = false;
+    byId('policy-probe-results').replaceChildren();
+    byId('policy-probe-error').textContent = t('Runtime identity unavailable. Reload the policy list before probing.');
+  }
   panels.runtime(namespace);
   clearedLogSequence = 0;
   clearedEventSequence = 0;
@@ -138,14 +152,67 @@ function renderTransfer() {
 }
 
 async function loadTransferPolicies() {
+  if (probeBusy) return;
+  const read = ++probeCatalogRead;
   try {
-    const result = await SpikeApiClient.getPolicies(instance);
+    let namespace = '';
+    const result = await SpikeApiClient.getPolicies(instance, { onRuntime: value => { namespace = value || ''; } });
+    if (!probeLive || read !== probeCatalogRead || probeBusy) return;
     const selected = byId('throughput-policy').value || 'DIRECT';
-    const names = [...new Set(['DIRECT', ...(result.policies || []).filter(item => item.type.toLowerCase() !== 'reject').map(item => item.name), selected])];
+    probePolicies = [...new Set(['DIRECT', ...(result.policies || []).filter(item => item.type.toLowerCase() !== 'reject').map(item => item.name)])];
+    probeNamespace = namespace; probeGeneration++;
+    const previouslySelected = new Set(Array.from(byId('policy-probe-policies').selectedOptions || [], option => option.value));
+    byId('policy-probe-policies').replaceChildren(...probePolicies.map(name => {
+      const option = text('option', name, undefined, true); option.value = name; option.selected = previouslySelected.has(name); return option;
+    }));
+    byId('policy-probe-results').replaceChildren();
+    byId('policy-probe-error').textContent = namespace ? '' : t('Runtime identity unavailable. Reload the policy list before probing.');
+    byId('policy-probe-start').disabled = !namespace;
+    const names = [...new Set([...probePolicies, selected])];
     byId('throughput-policy').replaceChildren(...names.map(name => { const option = text('option', name, undefined, true); option.value = name; return option; }));
     byId('throughput-policy').value = selected;
     byId('throughput-policy-error').textContent = '';
-  } catch { byId('throughput-policy-error').textContent = t('Unable to load throughput policies. Refresh the status list to retry.'); }
+  } catch {
+    if (!probeLive || read !== probeCatalogRead || probeBusy) return;
+    byId('throughput-policy-error').textContent = t('Unable to load throughput policies. Refresh the status list to retry.');
+    byId('policy-probe-error').textContent = t('Unable to load probe policies. Refresh the status list to retry.');
+    byId('policy-probe-start').disabled = true;
+  }
+}
+
+async function runPolicyProbe(event) {
+  event.preventDefault();
+  if (!probeLive || probeBusy || !probeNamespace) return;
+  let body;
+  try { body = policyProbeRequest(Array.from(byId('policy-probe-policies').selectedOptions || [], option => option.value), byId('policy-probe-url').value, probePolicies); }
+  catch (error) { byId('policy-probe-error').textContent = t(error.message); return; }
+  const generation = ++probeGeneration, namespace = probeNamespace;
+  probeBusy = true; byId('policy-probe-start').disabled = true;
+  byId('policy-probe-policies').disabled = byId('policy-probe-url').disabled = true;
+  byId('policy-probe-error').textContent = ''; byId('policy-probe-results').replaceChildren(text('p', t('Probing policies…')));
+  try {
+    let received;
+    const result = await SpikeApiClient.probePolicies(instance, body, { runtimeNamespace: namespace, onRuntime: value => { received = value; } });
+    if (!probeLive || generation !== probeGeneration) return;
+    if (received !== namespace || !Array.isArray(result.results) || result.error) throw new Error('Probe failed');
+    const rows = body.policy_names.map(name => {
+      const value = result.results.find(row => row.policy === name);
+      const row = document.createElement('tr');
+      row.append(text('td', name, undefined, true), text('td', t(!value ? 'No result' : value.ok ? 'OK' : 'Failed')),
+        text('td', value?.ok && Number.isFinite(value.latency_ms) ? `${value.latency_ms} ms` : '—'));
+      return row;
+    });
+    byId('policy-probe-results').replaceChildren(makeTable(['Policy', 'Status', 'Latency'], rows));
+  } catch {
+    if (!probeLive || generation !== probeGeneration) return;
+    byId('policy-probe-results').replaceChildren();
+    byId('policy-probe-error').textContent = t('Policy probe failed. Check the URL, policy selection and runtime, then retry.');
+  } finally {
+    if (probeLive && generation === probeGeneration) {
+      probeBusy = false; byId('policy-probe-start').disabled = !probeNamespace;
+      byId('policy-probe-policies').disabled = byId('policy-probe-url').disabled = false;
+    }
+  }
 }
 
 function renderPanels() {
@@ -503,6 +570,7 @@ byId('panels-refresh').addEventListener('click', () => panels.load());
 byId('throughput-form').addEventListener('submit', event => { event.preventDefault(); return transfer.start(byId('throughput-direction').value, byId('throughput-policy').value); });
 byId('throughput-cancel').addEventListener('click', () => transfer.cancel());
 byId('throughput-reload').addEventListener('click', () => transfer.load());
+byId('policy-probe-form').addEventListener('submit', runPolicyProbe);
 byId('readiness-refresh').addEventListener('click', loadReadiness);
 byId('connections-filter').addEventListener('input', renderConnections);
 byId('connections-state').addEventListener('change', renderConnections);
@@ -610,6 +678,7 @@ try {
   window.addEventListener('pagehide', () => {
     panels.retire();
     transfer.dispose();
+    probeLive = false; probeGeneration++;
     window.clearInterval(timer);
     document.removeEventListener('visibilitychange', refreshLogs);
   }, { once: true });
