@@ -159,6 +159,12 @@ extension/
 ```
 # Policy selection parity
 
+UI20: Tools logs/events can freeze observation, clear only the visible journal,
+select time order and export filtered records as JSONL/Text. Streams and bounded
+background caches continue while paused; clear floors are independent per
+journal and reset with runtime namespaces. Exports keep original record fields,
+use chronological order, and report browser download failures safely.
+
 UI15: route diagnostics accept all optional source/destination ports and IPs,
 URL/User-Agent and process name/path/cgroup. Local validation rejects invalid
 metadata before a request; blank fields are omitted and error messages never

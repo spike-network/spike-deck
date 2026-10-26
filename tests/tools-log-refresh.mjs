@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { chronological } from '../lib/journal-export.js';
 
 const nodes = new Map();
 const node = () => ({ value: '', dataset: {}, classList: { add() {}, remove() {} },
@@ -33,6 +34,7 @@ const context = vm.createContext({ document, console,
 });
 const source = fs.readFileSync(new URL('../tools.js', import.meta.url), 'utf8')
   .replace(/^import[\s\S]*?;\n/gm, '');
+context.chronological = chronological;
 await vm.runInContext(`(async () => { ${source} })()`, context);
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 assert.match(nodes.get('logs-output').textContent, /log-100/);

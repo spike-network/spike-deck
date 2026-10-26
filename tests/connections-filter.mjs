@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { chronological } from '../lib/journal-export.js';
 import { connectionDetailFields } from '../lib/connection-trace.js';
 
 const instance = { id: 'mock-instance', baseUrl: 'https://example.test', secret: 'mock-secret' };
@@ -28,6 +29,7 @@ const context = vm.createContext({ document, console,
   filterRuntimeLogs: entries => entries, sortRuntimeLogs: entries => entries, formatRuntimeLogs: () => '',
 });
 const source = fs.readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
+context.chronological = chronological;
 await vm.runInContext(`(async () => { ${source} })()`, context);
 const content = () => JSON.stringify(nodes.get('connections'));
 const query = nodes.get('connections-filter');

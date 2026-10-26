@@ -8,6 +8,7 @@ import {
 } from './lib/runtime-logs.js';
 import { formatConnectionTrace, connectionDetailFields } from './lib/connection-trace.js';
 import { routeContext } from './lib/route-context.js';
+import { chronological, downloadJournal } from './lib/journal-export.js';
 
 await initializeI18n();
 
@@ -16,6 +17,9 @@ let logEntries = [];
 let eventEntries = [];
 let eventNamespace = '';
 let clearedLogSequence = 0;
+let clearedEventSequence = 0;
+let frozenLogs = null;
+let frozenEvents = null;
 let logRead = null;
 let readinessSequence = 0;
 let connectionsSequence = 0;
@@ -23,8 +27,12 @@ let connectionSnapshot = { live: [], recent: [] };
 
 function adoptEventNamespace(namespace) {
   if (!namespace || namespace === eventNamespace) return;
+  if (eventNamespace || logEntries.length || eventEntries.length || clearedLogSequence || clearedEventSequence) {
+    frozenLogs = null; frozenEvents = null;
+  }
   eventNamespace = namespace;
   clearedLogSequence = 0;
+  clearedEventSequence = 0;
   logEntries = [];
   eventEntries = [];
   renderLogs();
@@ -205,18 +213,26 @@ async function loadEvents() {
   const data = await SpikeApiClient.getEvents(instance, 500);
   if (namespace !== eventNamespace && data.event_namespace !== eventNamespace) return;
   adoptEventNamespace(data.event_namespace);
-  eventEntries = (data.events || []).filter((entry) => entry.kind !== 'log').reverse();
-  renderEvents();
+  eventEntries = (data.events || []).filter((entry) => entry.kind !== 'log' && entry.sequence > clearedEventSequence).reverse();
+  if (frozenEvents === null) renderEvents();
+}
+
+function visibleEvents() {
+  const keyword = (byId('events-filter').value || '').trim().toLowerCase();
+  const severity = byId('events-severity').value || 'all';
+  return chronological((frozenEvents ?? eventEntries).filter((entry) => {
+    if (severity !== 'all' && entry.severity !== severity) return false;
+    return !keyword || [entry.category, entry.kind, entry.summary].join(' ').toLowerCase().includes(keyword);
+  }), byId('events-sort').value === 'asc');
 }
 
 function renderEvents() {
-  const keyword = (byId('events-filter').value || '').trim().toLowerCase();
-  const severity = byId('events-severity').value;
-  const filtered = eventEntries.filter((entry) => {
-    if (severity !== 'all' && entry.severity !== severity) return false;
-    return !keyword || [entry.category, entry.kind, entry.summary].join(' ').toLowerCase().includes(keyword);
-  });
-  byId('events-filter-count').textContent = `${filtered.length} / ${eventEntries.length}`;
+  const filtered = visibleEvents();
+  const source = frozenEvents ?? eventEntries;
+  byId('events-filter-count').textContent = `${filtered.length} / ${source.length}`;
+  byId('events-pause').textContent = t(frozenEvents ? '继续观察' : '暂停观察');
+  byId('events-view-clear').disabled = !source.length;
+  byId('events-export-jsonl').disabled = byId('events-export-text').disabled = !filtered.length;
   byId('events').replaceChildren(filtered.length
     ? makeTable(['Time', 'Severity', 'Category', 'Event', 'Kind', 'Action'], filtered.map(eventRow))
     : text('p', '暂无匹配事件'));
@@ -232,22 +248,30 @@ function mergeLogEntries(entries) {
   logEntries = Array.from(bySequence.values())
     .sort((left, right) => Number(left.sequence) - Number(right.sequence))
     .slice(-200);
-  renderLogs();
+  if (frozenLogs === null) renderLogs();
 }
 
-function renderLogs() {
+function visibleLogs() {
   const includeKeyword = byId('logs-filter').value;
   const excludeKeyword = byId('logs-filter-exclude').value;
   const direction = byId('logs-sort').value;
-  const filtered = filterRuntimeLogs(logEntries, includeKeyword, excludeKeyword);
-  const visibleEntries = sortRuntimeLogs(filtered, direction);
+  const filtered = filterRuntimeLogs(frozenLogs ?? logEntries, includeKeyword, excludeKeyword);
+  return sortRuntimeLogs(filtered, direction);
+}
+
+function renderLogs() {
+  const visibleEntries = visibleLogs();
+  const source = frozenLogs ?? logEntries;
   byId('logs-output').textContent = visibleEntries.length
     ? formatRuntimeLogs(visibleEntries)
-    : logEntries.length
+    : source.length
       ? t('无匹配日志')
       : t('暂无运行日志');
-  byId('logs-filter-count').textContent = `${visibleEntries.length} / ${logEntries.length}`;
-  byId('logs-filter-clear').disabled = !includeKeyword && !excludeKeyword;
+  byId('logs-filter-count').textContent = `${visibleEntries.length} / ${source.length}`;
+  byId('logs-filter-clear').disabled = !byId('logs-filter').value && !byId('logs-filter-exclude').value;
+  byId('logs-pause').textContent = t(frozenLogs ? '继续观察' : '暂停观察');
+  byId('logs-view-clear').disabled = !source.length;
+  byId('logs-export-jsonl').disabled = byId('logs-export-text').disabled = !visibleEntries.length;
 }
 
 function setLogStreamState(status) {
@@ -342,6 +366,23 @@ byId('logs-refresh').addEventListener('click', () => loadLogs().catch(handleErro
 byId('events-refresh').addEventListener('click', () => loadEvents().catch(handleError));
 byId('events-filter').addEventListener('input', renderEvents);
 byId('events-severity').addEventListener('change', renderEvents);
+byId('events-sort').addEventListener('change', renderEvents);
+byId('logs-pause').addEventListener('click', () => { frozenLogs = frozenLogs ? null : logEntries.slice(); renderLogs(); });
+byId('events-pause').addEventListener('click', () => { frozenEvents = frozenEvents ? null : eventEntries.slice(); renderEvents(); });
+for (const [kind, visible] of [['logs', visibleLogs], ['events', visibleEvents]]) {
+  for (const [format, json] of [['jsonl', true], ['text', false]]) {
+    byId(`${kind}-export-${format}`).addEventListener('click', () => {
+      try { downloadJournal(visible(), json, `spike-${kind}`); }
+      catch { showNotice(t('无法导出选定的记录。')); }
+    });
+  }
+}
+byId('events-view-clear').addEventListener('click', () => {
+  clearedEventSequence = Math.max(clearedEventSequence, ...(frozenEvents ?? eventEntries).map(entry=>Number(entry.sequence)));
+  eventEntries = eventEntries.filter(entry=>entry.sequence > clearedEventSequence);
+  if (frozenEvents) frozenEvents = [];
+  renderEvents();
+});
 byId('logs-filter').addEventListener('input', renderLogs);
 byId('logs-filter-exclude').addEventListener('input', renderLogs);
 byId('logs-sort').addEventListener('change', renderLogs);
@@ -353,8 +394,9 @@ byId('logs-filter-clear').addEventListener('click', () => {
   input.focus();
 });
 byId('logs-view-clear').addEventListener('click', () => {
-  clearedLogSequence = Math.max(clearedLogSequence, ...logEntries.map((entry) => Number(entry.sequence)));
-  logEntries = [];
+  clearedLogSequence = Math.max(clearedLogSequence, ...(frozenLogs ?? logEntries).map((entry) => Number(entry.sequence)));
+  logEntries = logEntries.filter(entry=>entry.sequence > clearedLogSequence);
+  if (frozenLogs) frozenLogs = [];
   renderLogs();
   showNotice(t('当前视图日志已清空'));
 });
