@@ -28,6 +28,7 @@ let logRead = null;
 let readinessSequence = 0;
 let connectionsSequence = 0;
 let connectionSnapshot = { live: [], recent: [] };
+const openConnectionDetails = new Set();
 let probePolicies = [];
 let probeNamespace = '';
 let probeBusy = false;
@@ -290,6 +291,10 @@ function connectionRow(row, live) {
       if (index === 4) {
         cell.append(text('span', value, undefined, true));
         const details = document.createElement('details');
+        details.open = openConnectionDetails.has(row.id);
+        details.addEventListener('toggle', () => {
+          if (details.open) openConnectionDetails.add(row.id); else openConnectionDetails.delete(row.id);
+        });
         details.append(text('summary', 'Details'));
         const fields = document.createElement('dl');
         for (const field of connectionDetailFields(row, t, live)) {
@@ -321,6 +326,8 @@ async function loadConnections() {
   const data = await SpikeApiClient.getConnections(target);
   if (instance !== target || sequence !== connectionsSequence) return;
   connectionSnapshot = { live: data.live || [], recent: data.recent || [] };
+  const ids = new Set([...connectionSnapshot.live, ...connectionSnapshot.recent].map(row => row.id));
+  for (const id of openConnectionDetails) if (!ids.has(id)) openConnectionDetails.delete(id);
   renderConnections();
 }
 
