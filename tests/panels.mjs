@@ -63,6 +63,22 @@ data = [record('mock / name', 'mock-script')]; await panels.load();
 hold = new Promise(resolve => { release = resolve; }); const retired = panels.refresh('mock / name');
 panels.retire(); const before = updates; release(); await retired; assert.equal(updates, before);
 
+{
+  const timers = [], originalSet = globalThis.setTimeout, originalClear = globalThis.clearTimeout;
+  globalThis.setTimeout = callback => timers.push(callback); globalThis.clearTimeout = () => {};
+  try {
+    let refreshing = true, polled = 0, quiet = true;
+    const observed = new PanelObservation({
+      async read(onRuntime) { polled++; onRuntime('mock-poll'); return { ok: true, revision: 1, panels: [{ ...record('busy', 'mock-script'), refreshing }] }; },
+      async refresh() { throw new Error('unexpected refresh'); }
+    }, () => { if (polled > 1 && observed.loading) quiet = false; });
+    await observed.load(); assert.equal(timers.length, 1, 'a refreshing panel schedules another read');
+    refreshing = false; timers.shift()(); await new Promise(resolve => originalSet(resolve, 0));
+    assert.equal(polled, 2); assert.equal(observed.panels[0].refreshing, false); assert.equal(timers.length, 0);
+    assert.ok(quiet, 'background reads do not show the loading state');
+  } finally { globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }
+}
+
 const oldFetch = globalThis.fetch;
 const calls = [];
 try {
