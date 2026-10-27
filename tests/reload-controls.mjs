@@ -42,7 +42,7 @@ const get = (id) => document.getElementById(id),
 const originalFetch = globalThis.fetch;
 let revision = 7,
   apiNamespace = "mock-runtime",
-  logNamespace = "mock-runtime",
+  logNamespace = null,
   failReload = false,
   hold,
   release,
@@ -152,10 +152,28 @@ const wait = async (condition) => {
 try {
   await vm.runInContext(`(async()=>{${source}})()`, context);
   assert.equal(calls.length, 0, "opening Tools performs no preview or reload");
+  let adopted;
+  hold = { promise: new Promise((resolve) => (adopted = resolve)), resolve: () => adopted() };
+  const adopting = get("reload-preview").listeners.click();
+  await wait(() => release != null);
+  logNamespace = "mock-runtime";
+  timers[0]();
+  await settle();
+  release();
+  hold = null;
+  release = null;
+  await adopting;
+  assert.match(
+    get("reload-preview-output").textContent,
+    /Invalid candidate/,
+    "adopting the first runtime identity keeps an in-flight preview",
+  );
+  assert.equal(get("reload-operation-error").textContent, "");
+  const previews = calls.filter((call) => call.path === "/spike/reload/preview").length;
   const first = get("reload-preview").listeners.click();
   get("reload-preview").listeners.click();
   await first;
-  assert.equal(calls.filter((call) => call.path === "/spike/reload/preview").length, 1);
+  assert.equal(calls.filter((call) => call.path === "/spike/reload/preview").length, previews + 1);
   assert.match(get("reload-preview-output").textContent, /Invalid candidate/);
   assert.doesNotMatch(get("reload-preview-output").textContent, /mock-secret/);
   await get("reload-apply").listeners.click();

@@ -42,11 +42,12 @@ let reloadGeneration = 0;
 
 function adoptEventNamespace(namespace) {
   if (!namespace || namespace === eventNamespace) return;
+  const previous = eventNamespace;
   if (eventNamespace || logEntries.length || eventEntries.length || frozenLogs?.length || frozenEvents?.length || clearedLogSequence || clearedEventSequence) {
     frozenLogs = null; frozenEvents = null;
   }
   eventNamespace = namespace;
-  if ((reloadNamespace && reloadNamespace !== namespace) || reloadBusy) {
+  if ((reloadNamespace && reloadNamespace !== namespace) || (reloadBusy && previous)) {
     reloadGeneration++;
     reloadBusy = false;
     reloadUnconfirmed = false;
