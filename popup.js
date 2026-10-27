@@ -3162,7 +3162,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Initial load
   void syncModuleUpdate();
   void syncProviderRefreshTask();
-  void loadDashboard().then(() => applyEventAction(window.location?.hash));
+  void loadDashboard()
+    .catch((error) => console.warn(`Unable to load dashboard: ${error.message}`))
+    .then(() => applyEventAction(window.location?.hash));
   void refreshTraffic();
   trafficTimer = setInterval(() => {
     void refreshTraffic();

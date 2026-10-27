@@ -38,5 +38,6 @@ providerFailure = true;
 route('#event-providers');
 await new Promise(resolve => setTimeout(resolve, 0));
 assert.deepEqual(notices, ['无法打开外部资源，请重试。']);
-assert.match(popup, /loadDashboard\(\)\.then\(\(\) => applyEventAction\(window.location\?\.hash\)\)/);
+assert.match(popup, /loadDashboard\(\)\s*\.catch\([^\n]*\)\s*\.then\(\(\) => applyEventAction\(window.location\?\.hash\)\)/,
+  'a failed dashboard load still applies the event destination');
 console.log('Actual event row links and popup dispatcher cover all fixed destinations and non-executable fallbacks');
