@@ -34,6 +34,7 @@ let probeBusy = false;
 let probeGeneration = 0;
 let probeLive = true;
 let probeCatalogRead = 0;
+let probeCatalogDeferred = false;
 let reloadLive = true;
 let reloadBusy = false;
 let reloadUnconfirmed = false;
@@ -59,11 +60,14 @@ function adoptEventNamespace(namespace) {
     updateReloadControls();
   }
   if (probeNamespace && probeNamespace !== namespace) {
-    probeNamespace = ''; probeGeneration++; probeCatalogRead++; probeBusy = false;
+    probeNamespace = ''; probeGeneration++; probeBusy = false;
     byId('policy-probe-start').disabled = true;
     byId('policy-probe-policies').disabled = byId('policy-probe-url').disabled = false;
     byId('policy-probe-results').replaceChildren();
     byId('policy-probe-error').textContent = t('Runtime identity unavailable. Reload the policy list before probing.');
+  } else if (probeNamespace === namespace && !probeBusy) {
+    byId('policy-probe-start').disabled = false;
+    byId('policy-probe-error').textContent = '';
   }
   panels.runtime(namespace);
   clearedLogSequence = 0;
@@ -170,12 +174,14 @@ function renderTransfer() {
 }
 
 async function loadTransferPolicies() {
-  if (probeBusy) return;
+  if (probeBusy) { probeCatalogDeferred = true; return; }
   const read = ++probeCatalogRead;
   try {
     let namespace = '';
     const result = await SpikeApiClient.getPolicies(instance, { onRuntime: value => { namespace = value || ''; } });
-    if (!probeLive || read !== probeCatalogRead || probeBusy) return;
+    if (!probeLive || read !== probeCatalogRead) return;
+    if (probeBusy) { probeCatalogDeferred = true; return; }
+    const usable = namespace && (!eventNamespace || namespace === eventNamespace);
     const selected = byId('throughput-policy').value || 'DIRECT';
     probePolicies = [...new Set(['DIRECT', ...(result.policies || []).filter(item => item.type.toLowerCase() !== 'reject').map(item => item.name)])];
     probeNamespace = namespace; probeGeneration++;
@@ -184,14 +190,15 @@ async function loadTransferPolicies() {
       const option = text('option', name, undefined, true); option.value = name; option.selected = previouslySelected.has(name); return option;
     }));
     byId('policy-probe-results').replaceChildren();
-    byId('policy-probe-error').textContent = namespace ? '' : t('Runtime identity unavailable. Reload the policy list before probing.');
-    byId('policy-probe-start').disabled = !namespace;
+    byId('policy-probe-error').textContent = usable ? '' : t('Runtime identity unavailable. Reload the policy list before probing.');
+    byId('policy-probe-start').disabled = !usable;
     const names = [...new Set([...probePolicies, selected])];
     byId('throughput-policy').replaceChildren(...names.map(name => { const option = text('option', name, undefined, true); option.value = name; return option; }));
     byId('throughput-policy').value = selected;
     byId('throughput-policy-error').textContent = '';
   } catch {
-    if (!probeLive || read !== probeCatalogRead || probeBusy) return;
+    if (!probeLive || read !== probeCatalogRead) return;
+    if (probeBusy) { probeCatalogDeferred = true; return; }
     byId('throughput-policy-error').textContent = t('Unable to load throughput policies. Refresh the status list to retry.');
     byId('policy-probe-error').textContent = t('Unable to load probe policies. Refresh the status list to retry.');
     byId('policy-probe-start').disabled = true;
@@ -200,7 +207,7 @@ async function loadTransferPolicies() {
 
 async function runPolicyProbe(event) {
   event.preventDefault();
-  if (!probeLive || probeBusy || !probeNamespace) return;
+  if (!probeLive || probeBusy || !probeNamespace || (eventNamespace && probeNamespace !== eventNamespace)) return;
   let body;
   try { body = policyProbeRequest(Array.from(byId('policy-probe-policies').selectedOptions || [], option => option.value), byId('policy-probe-url').value, probePolicies); }
   catch (error) { byId('policy-probe-error').textContent = t(error.message); return; }
@@ -229,6 +236,7 @@ async function runPolicyProbe(event) {
     if (probeLive && generation === probeGeneration) {
       probeBusy = false; byId('policy-probe-start').disabled = !probeNamespace;
       byId('policy-probe-policies').disabled = byId('policy-probe-url').disabled = false;
+      if (probeCatalogDeferred) { probeCatalogDeferred = false; void loadTransferPolicies(); }
     }
   }
 }

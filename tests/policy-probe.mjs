@@ -26,7 +26,7 @@ try {
 } finally { globalThis.fetch = originalFetch; }
 
 const nodes = new Map(), pagehide = [], calls = [];
-let namespace = 'mock-runtime', hold, release, fail = false, listHold;
+let namespace = 'mock-runtime', hold, release, fail = false, listHold, catalogReads = 0;
 const node = tag => ({ tag, value: '', selectedOptions: [], dataset: {}, style: {}, attrs: {}, children: [], listeners: {},
   classList: { add() {}, remove() {} }, addEventListener(type, callback) { this.listeners[type] = callback; },
   setAttribute(key, value) { this.attrs[key] = value; }, append(...values) { this.children.push(...values); }, replaceChildren(...values) { this.children = values; } });
@@ -35,7 +35,7 @@ const document = { hidden: true, addEventListener() {}, removeEventListener() {}
 const api = new Proxy({}, { get: (_, method) => async (_instance, ...args) => {
   if (method === 'getReadiness') return { status: 'ready', checks: [] };
   if (method === 'getEvents' || method === 'getLogs') return { event_namespace: namespace };
-  if (method === 'getPolicies') { args[0]?.onRuntime?.(namespace); if (listHold) await listHold; return { policies: names.map(name => ({ name, type: 'proxy' })) }; }
+  if (method === 'getPolicies') { catalogReads++; args[0]?.onRuntime?.(namespace); if (listHold) await listHold; return { policies: names.map(name => ({ name, type: 'proxy' })) }; }
   if (method === 'probePolicies') {
     calls.push({ body: structuredClone(args[0]), namespace: args[1].runtimeNamespace });
     const observed = namespace; if (hold) await hold;
@@ -78,8 +78,16 @@ try {
   hold = new Promise(resolve => { release = resolve; }); const withOldCatalog = submit();
   releaseCatalog(); listHold = null; await readingCatalog;
   assert.equal(nodes.get('policy-probe-start').disabled, true, 'a late catalog read cannot unlock or retire an active probe');
-  release(); hold = null; await withOldCatalog;
+  const reads = catalogReads; release(); hold = null; await withOldCatalog;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(catalogReads, reads + 1, 'a catalog read skipped during a probe runs after it');
   assert.equal(nodes.get('policy-probe-start').disabled, false);
+  namespace = 'mock-third'; listHold = new Promise(resolve => { releaseCatalog = resolve; });
+  const adopting = nodes.get('refresh-all').listeners.click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(nodes.get('policy-probe-start').disabled, true);
+  releaseCatalog(); listHold = null; await adopting;
+  assert.equal(nodes.get('policy-probe-start').disabled, false, 'a catalog read from the adopted runtime stays valid');
   hold = new Promise(resolve => { release = resolve; }); const closing = submit(); pagehide.forEach(callback => callback()); release(); hold = null; await closing;
   assert.doesNotMatch(output(), /0 ms/);
   for (const key of ['Custom URL policy probe', 'Probe URL', 'Probe selected policies', 'Select between 1 and 16 known policies.',
