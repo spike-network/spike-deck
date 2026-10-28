@@ -119,7 +119,7 @@ const api = new Proxy({}, { get: (_, method) => async (_instance, ...args) => {
 const source = readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
 const context = vm.createContext({ document, console, ThroughputSession, PanelObservation, chronological, filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs,
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => ({ id: 'mock-instance', baseUrl: 'https://example.test' }) },
-  initializeI18n: async () => {}, t: value => value, window: { setInterval() {}, clearInterval() {}, setTimeout() {}, confirm: () => data.acceptConfirm,
+  initializeI18n: async () => {}, t: value => value, confirmAction: async () => data.acceptConfirm, window: { setInterval() {}, clearInterval() {}, setTimeout() {},
     addEventListener(type, callback) { if (type === 'pagehide') pagehide.push(callback); } },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } } });
 const descendants = root => [root, ...root.children.flatMap(descendants)];
@@ -143,8 +143,8 @@ try {
   assert.ok(descendants(output).some(node => node.tag === 'progress' && node.attrs['aria-label'] === 'Transferred bytes'));
   assert.ok(descendants(output).some(node => node.dataset.i18nIgnore === '' && node.textContent === 'Mock Policy'));
   const stop = descendants(output).find(node => node.textContent === 'Stop observing');
-  data.acceptConfirm = false; stop.listeners.click(); assert.ok(descendants(output).some(node => node.tag === 'progress'));
-  data.acceptConfirm = true; stop.listeners.click(); assert.ok(!descendants(output).some(node => node.tag === 'progress'));
+  data.acceptConfirm = false; await stop.listeners.click(); assert.ok(descendants(output).some(node => node.tag === 'progress'));
+  data.acceptConfirm = true; await stop.listeners.click(); assert.ok(!descendants(output).some(node => node.tag === 'progress'));
   for (const key of ['Policy throughput test', 'Start throughput test', 'Cancel throughput test', 'Download', 'Upload', 'Queued', 'Running', 'Completed', 'Cancelled',
     'Transferred bytes', 'Recent throughput tests', 'Check task status', 'Stop observing', 'Cancellation is unconfirmed. Check task status before retrying.',
     'Start result is unconfirmed. Check recent tasks before starting again.']) assert.ok(ZH_MESSAGES[key], key);

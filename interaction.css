@@ -1,5 +1,25 @@
 /* Interaction and accessibility refinements. This layer does not own theme colors. */
 
+.confirm-dialog {
+  box-sizing: border-box;
+  width: min(30rem, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--sd-line);
+  border-radius: var(--sd-radius);
+  background: var(--sd-surface);
+  color: var(--sd-text);
+  font: inherit;
+}
+.confirm-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.confirm-dialog h2 { margin: 0; font-size: 18px; }
+.confirm-dialog p { margin: 12px 0; overflow-wrap: anywhere; }
+.confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.confirm-dialog button { padding: 8px 12px; border: 1px solid var(--sd-line); border-radius: 6px; background: var(--sd-surface); color: var(--sd-text); font: inherit; }
+.confirm-dialog button.danger { color: var(--sd-danger); border-color: var(--sd-danger); background: var(--sd-danger-soft); }
+
 html.i18n-pending {
   visibility: hidden;
 }

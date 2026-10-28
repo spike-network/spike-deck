@@ -1,4 +1,5 @@
 import { StorageManager } from "./lib/storage.js";
+import { confirmAction } from "./lib/confirm-dialog.js";
 import { initializeOptionsTabs } from "./lib/options-tabs.js";
 import { SpikeApiClient } from "./lib/spike-client.js";
 import { canSendSecret, ensureHostPermission } from "./lib/permissions.js";
@@ -456,7 +457,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   btnDeleteInst.addEventListener("click", async () => {
     if (!editingId) return;
-    if (confirm(t("确定要删除该 Spike 实例吗？"))) {
+    const targetId = editingId;
+    if (await confirmAction("删除实例", "确定要删除该 Spike 实例吗？")) {
+      if (editingId !== targetId) return;
       try {
         await StorageManager.deleteInstance(editingId);
         editingId = null;

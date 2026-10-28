@@ -43,6 +43,9 @@ const {
 assert.equal(resolvePreferredLanguage("zh-Hans"), "zh-CN");
 assert.equal(resolvePreferredLanguage("zh-TW"), "zh-CN");
 assert.equal(resolvePreferredLanguage("en-GB"), "en");
+assert.equal(translateForLanguage("Terminate connection", "zh-CN"), "终止连接");
+assert.equal(translateForLanguage("删除实例", "en"), "Delete instance");
+assert.equal(translateForLanguage("取消", "en"), "Cancel");
 assert.equal(translateForLanguage("外部资源", "en"), "Resources");
 assert.equal(translateForLanguage("首个健康", "en"), "First available");
 assert.equal(translateForLanguage("运行日志", "en"), "Runtime logs");

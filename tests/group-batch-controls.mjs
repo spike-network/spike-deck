@@ -220,7 +220,7 @@ try {
   await settle(() => controller.session.paused);
   assert.equal(ui("start").disabled, true);
   assert.ok(!controller.session.message.includes("mock-secret"));
-  ui("forget").click();
+  await ui("forget").click();
   assert.equal(controller.session.ready, false);
   failStart = false;
   ui("reload").click();
@@ -233,7 +233,7 @@ try {
     false,
     "bound batch must not retry through the legacy start endpoint",
   );
-  ui("forget").click();
+  await ui("forget").click();
   legacy = false;
   ui("reload").click();
   await settle(() => controller.session.ready);
@@ -286,3 +286,29 @@ try {
   await refreshGroupTestState("mock-instance");
   globalThis.fetch = originalFetch;
 }
+
+let decide;
+let forgotten = 0;
+const pendingController = new GroupBatchControls({
+  document,
+  names: () => [],
+  changed() {},
+  confirm: () => new Promise((resolve) => { decide = resolve; }),
+});
+const originalSession = { forget: () => { forgotten++; } };
+pendingController.session = originalSession;
+const forget = document.getElementById("group-batch-forget");
+const cancelled = forget.click();
+assert.equal(forgotten, 0, "confirmation must be awaited");
+decide(false);
+await cancelled;
+assert.equal(forgotten, 0, "a resolved false Promise must not forget the batch");
+const accepted = forget.click();
+decide(true);
+await accepted;
+assert.equal(forgotten, 1);
+const retired = forget.click();
+pendingController.session = { forget: () => { forgotten += 100; } };
+decide(true);
+await retired;
+assert.equal(forgotten, 1, "a pending confirmation cannot forget a replacement batch");

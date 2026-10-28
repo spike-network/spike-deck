@@ -1,4 +1,5 @@
 import { SpikeApiClient } from './lib/spike-client.js';
+import { confirmAction } from './lib/confirm-dialog.js';
 import { StorageManager } from './lib/storage.js';
 import { initializeI18n, t } from './lib/i18n.js';
 import {
@@ -145,7 +146,7 @@ function renderTransfer() {
   }
   if (transfer.uncertain) {
     const dismiss = text('button', t('Forget unconfirmed start'));
-    dismiss.addEventListener('click', () => { if (window.confirm(t('Forget the unconfirmed start? This does not cancel or confirm any Core task.'))) transfer.dismissUnconfirmed(); }); rows.push(dismiss);
+    dismiss.addEventListener('click', async () => { if (await confirmAction('Forget unconfirmed start', 'Forget the unconfirmed start? This does not cancel or confirm any Core task.')) transfer.dismissUnconfirmed(); }); rows.push(dismiss);
   }
   if (transfer.task) {
     const task = transfer.task;
@@ -158,7 +159,7 @@ function renderTransfer() {
     const check = text('button', t('Check task status')); check.disabled = transfer.polling || transfer.starting || transfer.cancelling;
     check.addEventListener('click', () => transfer.check()); rows.push(check);
     const stop = text('button', t('Stop observing')); stop.disabled = transfer.starting || transfer.cancelling;
-    stop.addEventListener('click', () => { if (window.confirm(t('Stop observing this task? It may continue in Core.'))) transfer.stopObserving(); }); rows.push(stop);
+    stop.addEventListener('click', async () => { if (await confirmAction('Stop observing', 'Stop observing this task? It may continue in Core.')) transfer.stopObserving(); }); rows.push(stop);
   }
   if (transfer.reading) rows.push(text('p', t('Reading throughput tasks…')));
   byId('throughput-result').replaceChildren(...rows);
@@ -310,8 +311,10 @@ function connectionRow(row, live) {
   if (live) {
     const button = text('button', 'Kill');
     button.addEventListener('click', async () => {
-      if (!window.confirm(t(`Terminate connection #${row.id}?`))) return;
-      await SpikeApiClient.killConnection(instance, row.id);
+      const targetInstance = instance;
+      if (!(await confirmAction('Terminate connection', `Terminate connection #${row.id}?`))) return;
+      if (instance !== targetInstance) return;
+      await SpikeApiClient.killConnection(targetInstance, row.id);
       await loadConnections();
     });
     action.append(button);
