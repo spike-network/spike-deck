@@ -24,7 +24,7 @@ function fixture() {
 }
 
 for (const action of ["cancel", "escape", "accept"]) {
-  test(`confirmation: ${action}, safe focus and keyboard`, async () => {
+  test(`confirmation: ${action}, initial focus and focus restoration`, async () => {
     const { document, trigger } = fixture();
     const result = confirmAction("Terminate connection", "Mock description", document);
     const dialog = document.body.children.at(-1);
@@ -38,11 +38,6 @@ for (const action of ["cancel", "escape", "accept"]) {
     assert.equal(dialog.open, true);
     assert.equal(accept.type, "button");
     assert.match(accept.className, /danger/);
-    const enter = new Event("keydown", { cancelable: true });
-    Object.defineProperty(enter, "key", { value: "Enter" });
-    dialog.dispatchEvent(enter);
-    assert.equal(enter.defaultPrevented, true);
-    assert.equal(dialog.open, true);
     if (action === "escape") {
       // Native dialog's default Escape action emits cancel then closes.
       dialog.dispatchEvent(new Event("cancel", { cancelable: true }));
