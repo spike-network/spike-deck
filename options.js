@@ -451,7 +451,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     await loadData();
-    showTestResult("success", "✅ 实例保存成功！");
+    showTestResult("success", "实例保存成功");
     chrome.runtime.sendMessage({ type: "UPDATE_PROXY_SETTING" });
   });
 
