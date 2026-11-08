@@ -62,7 +62,7 @@ function adoptEventNamespace(namespace) {
     updateReloadControls();
   }
   if (probeNamespace && probeNamespace !== namespace) {
-    probeNamespace = ''; probeGeneration++; probeBusy = false;
+    probeNamespace = ''; probeGeneration++; probeBusy = false; probeCatalogDeferred = false;
     byId('policy-probe-start').disabled = true;
     byId('policy-probe-policies').disabled = byId('policy-probe-url').disabled = false;
     byId('policy-probe-results').replaceChildren();

@@ -67,10 +67,13 @@ try {
   assert.doesNotMatch(nodes.get('policy-probe-error').textContent, /mock-secret/); assert.equal(output(), ''); fail = false;
   hold = new Promise(resolve => { release = resolve; }); const running = submit();
   assert.equal(nodes.get('policy-probe-start').disabled, true); const count = calls.length; await submit(); assert.equal(calls.length, count);
+  await nodes.get('refresh-all').listeners.click();
   namespace = 'mock-next'; await nodes.get('events-refresh').listeners.click();
   release(); hold = null; await running;
   assert.equal(output(), ''); assert.equal(nodes.get('policy-probe-start').disabled, true, 'a runtime change requires a new catalog read');
   await nodes.get('refresh-all').listeners.click(); assert.equal(nodes.get('policy-probe-start').disabled, false);
+  const adopted = catalogReads; await submit(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(catalogReads, adopted, 'a runtime change drops a catalog read deferred by the retired probe'); assert.match(output(), /0 ms/);
   let releaseCatalog;
   listHold = new Promise(resolve => { releaseCatalog = resolve; });
   const readingCatalog = nodes.get('refresh-all').listeners.click();
