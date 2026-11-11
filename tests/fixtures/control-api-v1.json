@@ -13,6 +13,7 @@
     "http_capture": 1,
     "module_update_tasks": 1,
     "installed_module_source_edit": 1,
+    "module_detail": 1,
     "ip_rewrite_metrics": 1,
     "mitm_state": 1,
     "operational_event_metadata": 1,
