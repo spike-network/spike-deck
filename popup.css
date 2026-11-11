@@ -1518,6 +1518,35 @@ input:checked + .slider::before {
   min-height: 20px;
 }
 
+/* Avoid toggle: hidden until hover or focus unless the member is avoided. */
+.avoid-toggle {
+  margin: 0 4px 0 0;
+  padding: 1px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  visibility: hidden;
+}
+
+.member-item:hover .avoid-toggle,
+.member-item:focus-within .avoid-toggle,
+.avoid-toggle.avoided {
+  visibility: visible;
+}
+
+.avoid-toggle.avoided {
+  color: var(--sd-warning);
+}
+
+.avoid-toggle:hover,
+.avoid-toggle:focus-visible {
+  background: var(--card-hover);
+}
+
 /* Latency Badge */
 .latency-badge {
   font-size: 13px;

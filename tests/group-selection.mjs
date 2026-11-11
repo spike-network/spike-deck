@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 import {
   groupMemberAction,
+  groupMemberAvoidance,
   groupSelectionBasisLabel,
   shouldCollapseGroupAfterSelection,
   splitSelectedSummary,
@@ -30,6 +31,13 @@ for (const kind of ["url-test", "fallback", "load-balance", "smart", "subnet"]) 
 }
 assert.equal(groupMemberAction({ kind: "other", selected: "A" }, "B"), "select");
 assert.equal(groupMemberAction({ kind: "mock-future", selected: "A" }, "B"), "none");
+for (const kind of ["url-test", "fallback", "load-balance", "smart"]) {
+  assert.deepEqual(groupMemberAvoidance({ kind }, { name: "A", avoided: true }), { avoided: true }, kind);
+  assert.deepEqual(groupMemberAvoidance({ kind }, undefined), { avoided: false }, kind);
+}
+for (const kind of ["select", "subnet", "other"]) {
+  assert.equal(groupMemberAvoidance({ kind }, { name: "A", avoided: true }), null, kind);
+}
 assert.equal(shouldCollapseGroupAfterSelection(true, { altKey: false }), true);
 assert.equal(shouldCollapseGroupAfterSelection(true, { altKey: true }), false);
 assert.equal(shouldCollapseGroupAfterSelection(false, { altKey: false }), false);

@@ -19,6 +19,7 @@ import {
 import { installPopupInteractions } from "./lib/popup-interactions.js";
 import {
   groupMemberAction,
+  groupMemberAvoidance,
   isDirectGroupProbeResult,
   shouldCollapseGroupAfterSelection,
   splitSelectedSummary,
@@ -2710,6 +2711,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
         applyLatencyBadge(latencyBadge, latencyInfo, { member });
 
+        const avoidance = groupMemberAvoidance(group, memberInfo);
+        const avoidToggle = avoidance
+          ? el(
+              "button",
+              {
+                type: "button",
+                className: `avoid-toggle${avoidance.avoided ? " avoided" : ""}`,
+                title: avoidance.avoided ? "取消在自动策略组中避开" : "在自动策略组中避开",
+                "aria-pressed": avoidance.avoided,
+                onClick: async (e) => {
+                  e.stopPropagation();
+                  await toggleAvoidance(group.name, member, !avoidance.avoided);
+                },
+                onKeydown: (e) => e.stopPropagation(),
+              },
+              avoidance.avoided ? "已避开" : "避开",
+            )
+          : null;
+
         // On automatic groups, re-clicking the pinned member clears the override.
         const activateMember = async (event) => {
           const currentGroup = currentGroupsData.find((candidate) => candidate.name === group.name);
@@ -2740,7 +2760,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             onClick: activateMember,
           },
           el("div", { className: "member-left" }, checkMark, memberNameEl, typeTag),
-          el("div", { className: "member-right" }, latencyBadge),
+          el("div", { className: "member-right" }, avoidToggle, latencyBadge),
         );
         attachKeyboardActivate(memberItem, activateMember);
 
@@ -2860,6 +2880,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       document
         .querySelector(`.group-card[data-group="${CSS.escape(groupName)}"]`)
         ?.classList.remove("selection-busy");
+    }
+  }
+
+  async function toggleAvoidance(groupName, memberName, avoid) {
+    const scope = captureInstanceRequest();
+    if (!scope.instance) return;
+    try {
+      await SpikeApiClient.setPolicyAvoidance(scope.instance, memberName, avoid);
+      if (!scope.isCurrent()) return;
+      await refreshGroupsSelectionState(groupName);
+    } catch (err) {
+      if (!scope.isCurrent()) return;
+      showToast(`更新避开状态失败: ${err.message || err}`, "error");
     }
   }
 
