@@ -10,6 +10,9 @@ test('tunnels show their detected protocol in place of CONNECT', () => {
   assert.equal(connectionMethod({ kind: 'http', protocol: 'HTTP', http: { method: 'POST', url: 'http://example.test/' } }), 'POST');
   assert.equal(connectionMethod({ kind: 'tun-udp-session', protocol: 'QUIC' }), 'QUIC');
   assert.equal(connectionMethod({ kind: 'tun-tcp' }), 'tun-tcp');
+  assert.equal(connectionMethod({ ...tunnel, protocol: 'TCP', application: 'SSH' }), 'SSH');
+  assert.equal(connectionMethod({ kind: 'tun-tcp', protocol: 'TCP', application: 'IMAP' }), 'IMAP');
+  assert.equal(connectionMethod({ kind: 'http', application: 'HTTP/2', http: { method: 'GET', url: 'http://example.test/' } }), 'GET');
 });
 
 test('formats rule, DNS, selected route, and underlying route', () => {
