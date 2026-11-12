@@ -7,7 +7,7 @@ import {
   formatRuntimeLogs,
   sortRuntimeLogs
 } from './lib/runtime-logs.js';
-import { formatConnectionTrace, connectionDetailFields } from './lib/connection-trace.js';
+import { formatConnectionTrace, connectionDetailFields, connectionMethod } from './lib/connection-trace.js';
 import { routeContext } from './lib/route-context.js';
 import { chronological, downloadJournal } from './lib/journal-export.js';
 import { PanelObservation } from './lib/panels.js';
@@ -285,6 +285,7 @@ function connectionRow(row, live) {
     `${row.host || '—'}:${row.port || '—'}`,
     row.policy,
     formatConnectionTrace(row.decision_trace),
+    connectionMethod(row),
     row.kind
   ]
     .forEach((value, index) => {
@@ -339,7 +340,7 @@ function renderConnections() {
   const state = byId('connections-state').value || 'all';
   const matches = (row, live) => {
     if (state === 'live' && !live || state === 'recent' && live || state === 'failed' && (live || row.ok !== false)) return false;
-    return !query || [row.id, row.host, row.port, row.peer, row.policy, row.kind].join(' ').toLocaleLowerCase().includes(query);
+    return !query || [row.id, row.host, row.port, row.peer, row.policy, connectionMethod(row), row.kind].join(' ').toLocaleLowerCase().includes(query);
   };
   const rows = [
     ...connectionSnapshot.live.filter(row => matches(row, true)).map(row => connectionRow(row, true)),
@@ -347,7 +348,7 @@ function renderConnections() {
   ];
   byId('connections-count').textContent = `${rows.length} / ${connectionSnapshot.live.length + connectionSnapshot.recent.length}`;
   byId('connections').replaceChildren(rows.length
-    ? makeTable(['ID', 'Peer', 'Target', 'Policy', 'Decision', 'Kind', 'Status', 'Action'], rows)
+    ? makeTable(['ID', 'Peer', 'Target', 'Policy', 'Decision', 'Method', 'Kind', 'Status', 'Action'], rows)
     : text('p', connectionSnapshot.live.length + connectionSnapshot.recent.length ? '暂无匹配连接' : '暂无连接'));
 }
 

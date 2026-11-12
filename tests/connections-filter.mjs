@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { chronological } from '../lib/journal-export.js';
 import { PanelObservation } from '../lib/panels.js';
 import { ThroughputSession } from '../lib/throughput.js';
-import { connectionDetailFields } from '../lib/connection-trace.js';
+import { connectionDetailFields, connectionMethod } from '../lib/connection-trace.js';
 
 const instance = { id: 'mock-instance', baseUrl: 'https://example.test', secret: 'mock-secret' };
 const live = [{ id: 11, host: 'alpha.example.test', peer: '192.0.2.1:4000', port: 443, policy: 'Mock Alpha', kind: 'tcp', ok: true,
@@ -27,7 +27,7 @@ const context = vm.createContext({ document, console,
   window: { confirm: () => true, setInterval() {}, clearInterval() {}, setTimeout() {}, addEventListener() {} },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } },
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => instance },
-  initializeI18n: async () => {}, t: value => value, formatConnectionTrace: () => '', connectionDetailFields,
+  initializeI18n: async () => {}, t: value => value, formatConnectionTrace: () => '', connectionDetailFields, connectionMethod,
   filterRuntimeLogs: entries => entries, sortRuntimeLogs: entries => entries, formatRuntimeLogs: () => '',
 });
 const source = fs.readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');

@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { formatConnectionTrace, connectionDetailFields } from '../lib/connection-trace.js';
+import { formatConnectionTrace, connectionDetailFields, connectionMethod } from '../lib/connection-trace.js';
+
+test('tunnels show their detected protocol in place of CONNECT', () => {
+  const tunnel = { kind: 'connect', http: { method: 'CONNECT', url: 'example.test:443' } };
+  assert.equal(connectionMethod({ ...tunnel, protocol: 'HTTPS' }), 'HTTPS');
+  assert.equal(connectionMethod({ ...tunnel, protocol: 'TCP' }), 'TCP');
+  assert.equal(connectionMethod(tunnel), 'CONNECT');
+  assert.equal(connectionMethod({ kind: 'http', protocol: 'HTTP', http: { method: 'POST', url: 'http://example.test/' } }), 'POST');
+  assert.equal(connectionMethod({ kind: 'tun-udp-session', protocol: 'QUIC' }), 'QUIC');
+  assert.equal(connectionMethod({ kind: 'tun-tcp' }), 'tun-tcp');
+});
 
 test('formats rule, DNS, selected route, and underlying route', () => {
   assert.equal(
