@@ -27,7 +27,7 @@ const context = vm.createContext({ document, console,
   window: { confirm: () => true, setInterval() {}, clearInterval() {}, setTimeout() {}, addEventListener() {} },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } },
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => instance },
-  initializeI18n: async () => {}, t: value => value, formatConnectionTrace: () => '', connectionDetailFields, connectionMethod,
+  initializeI18n: async () => {}, t: value => value, confirmAction: async () => true, formatConnectionTrace: () => '', connectionDetailFields, connectionMethod,
   filterRuntimeLogs: entries => entries, sortRuntimeLogs: entries => entries, formatRuntimeLogs: () => '',
 });
 const source = fs.readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
