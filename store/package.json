@@ -10,7 +10,8 @@
     "check:group-health": "node group-health-check.mjs",
     "check:proxy-control": "node proxy-control-check.mjs",
     "check:provider-state": "node provider-state-check.mjs",
-    "check:module-state": "node module-state-check.mjs"
+    "check:module-state": "node module-state-check.mjs",
+    "check:connection-details": "node connection-details-check.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0",

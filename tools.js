@@ -30,6 +30,7 @@ let readinessSequence = 0;
 let connectionsSequence = 0;
 let connectionSnapshot = { live: [], recent: [] };
 const openConnectionDetails = new Set();
+let connectionDisclosures = new Map();
 let probePolicies = [];
 let probeNamespace = '';
 let probeBusy = false;
@@ -294,9 +295,7 @@ function connectionRow(row, live) {
         cell.append(text('span', value, undefined, true));
         const details = document.createElement('details');
         details.open = openConnectionDetails.has(row.id);
-        details.addEventListener('toggle', () => {
-          if (details.open) openConnectionDetails.add(row.id); else openConnectionDetails.delete(row.id);
-        });
+        connectionDisclosures.set(row.id, details);
         details.append(text('summary', 'Details'));
         const fields = document.createElement('dl');
         for (const field of connectionDetailFields(row, t, live)) {
@@ -330,12 +329,16 @@ async function loadConnections() {
   const data = await SpikeApiClient.getConnections(target);
   if (instance !== target || sequence !== connectionsSequence) return;
   connectionSnapshot = { live: data.live || [], recent: data.recent || [] };
-  const ids = new Set([...connectionSnapshot.live, ...connectionSnapshot.recent].map(row => row.id));
-  for (const id of openConnectionDetails) if (!ids.has(id)) openConnectionDetails.delete(id);
   renderConnections();
 }
 
 function renderConnections() {
+  for (const [id, details] of connectionDisclosures) {
+    if (details.open) openConnectionDetails.add(id); else openConnectionDetails.delete(id);
+  }
+  const ids = new Set([...connectionSnapshot.live, ...connectionSnapshot.recent].map(row => row.id));
+  for (const id of openConnectionDetails) if (!ids.has(id)) openConnectionDetails.delete(id);
+  connectionDisclosures = new Map();
   const query = byId('connections-filter').value.trim().toLocaleLowerCase();
   const state = byId('connections-state').value || 'all';
   const matches = (row, live) => {
