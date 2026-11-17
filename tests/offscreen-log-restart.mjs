@@ -20,6 +20,7 @@ globalThis.chrome = {
   runtime: {
     sendMessage: async (message) => { messages.push(message); },
     onMessage: { addListener: (listener) => { listeners.message = listener; } },
+    onConnect: { addListener: (listener) => { listeners.connect = listener; } },
   },
 };
 globalThis.setTimeout = (callback, delay) => { const id = {}; timers.set(id, { callback, delay }); return id; };
@@ -50,6 +51,11 @@ const entries = () => messages.filter((message) => message.type === 'SPIKE_LOG_S
 try {
   await import('../offscreen.js');
   await settle();
+  listeners.connect({
+    name: 'spike-log-stream',
+    postMessage: (message) => { messages.push(message); },
+    onDisconnect: { addListener() {} },
+  });
   await runTimer();
   hello(streams[0], 'boot-a');
   log(streams[0], 'boot-a', 100000);

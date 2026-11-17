@@ -6,8 +6,11 @@ import { SpikeApiClient } from './lib/spike-client.js';
  * Maintains sub-minute timers:
  * 1. Spike proxy health check (default 5s, runs continuously regardless of window visibility).
  * 2. Traffic rate badge update (default 1s, background only samples when Chrome window is visible).
- * 3. Runtime log SSE with bounded reconnect backoff and sequence resume.
+ * 3. Runtime log SSE with bounded reconnect backoff and sequence resume. It
+ *    runs only while a page holds a log stream port open.
  */
+
+const LOG_STREAM_PORT = 'spike-log-stream';
 
 const DEFAULT_HEALTH_CHECK_INTERVAL_SEC = 5;
 const DEFAULT_TRAFFIC_REFRESH_INTERVAL_SEC = 1;
@@ -25,23 +28,31 @@ let logAfter = 0;
 let logNamespace = '';
 let logInstanceId = null;
 let logGapDetected = false;
+const logPorts = new Set();
+let lastLogState = null;
+
+function postToLogPort(port, message) {
+  try {
+    port.postMessage(message);
+  } catch {
+    logPorts.delete(port);
+  }
+}
 
 function publishLogState(status, namespaceKnown = false) {
-  chrome.runtime.sendMessage({
+  lastLogState = {
     type: 'SPIKE_LOG_STREAM_STATE',
     instanceId: logInstanceId,
     status,
     after: logAfter,
     eventNamespace: namespaceKnown ? logNamespace : undefined
-  }).catch(() => {});
+  };
+  for (const port of logPorts) postToLogPort(port, lastLogState);
 }
 
 function publishLogEntry(entry) {
-  chrome.runtime.sendMessage({
-    type: 'SPIKE_LOG_STREAM_ENTRY',
-    instanceId: logInstanceId,
-    entry
-  }).catch(() => {});
+  const message = { type: 'SPIKE_LOG_STREAM_ENTRY', instanceId: logInstanceId, entry };
+  for (const port of logPorts) postToLogPort(port, message);
 }
 
 function clearLogRetry() {
@@ -138,11 +149,35 @@ async function startLogStream(expectedGeneration = null) {
   }
 }
 
+function stopLogStream() {
+  logGeneration += 1;
+  logAbort?.abort();
+  logAbort = null;
+  clearLogRetry();
+  lastLogState = null;
+}
+
 function restartLogStreamSoon() {
+  if (logPorts.size === 0) return;
   const generation = ++logGeneration;
   logAbort?.abort();
   clearLogRetry();
   logRetryTimer = setTimeout(() => void startLogStream(generation), 100);
+}
+
+// The sequence cursor survives a stop, so a page that reconnects resumes
+// where the last one left off and reads older entries from the journal.
+if (chrome.runtime?.onConnect?.addListener) {
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== LOG_STREAM_PORT) return;
+    logPorts.add(port);
+    port.onDisconnect.addListener(() => {
+      logPorts.delete(port);
+      if (logPorts.size === 0) stopLogStream();
+    });
+    if (logPorts.size === 1) restartLogStreamSoon();
+    else if (lastLogState) postToLogPort(port, lastLogState);
+  });
 }
 
 function sendHealthTick() {

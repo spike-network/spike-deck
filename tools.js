@@ -531,14 +531,58 @@ function setLogStreamState(status) {
   node.dataset.state = status || 'connecting';
 }
 
-chrome.runtime.onMessage.addListener((message) => {
+function handleLogStreamMessage(message) {
   if (!instance || message?.instanceId !== instance.id) return;
   if (message.type === 'SPIKE_LOG_STREAM_ENTRY') mergeLogEntries([message.entry]);
   if (message.type === 'SPIKE_LOG_STREAM_STATE') {
     adoptEventNamespace(message.eventNamespace);
     setLogStreamState(message.status);
   }
-});
+}
+
+const LOG_STREAM_RETRY_MS = 3000;
+let logStreamPort = null;
+let logStreamTimer = null;
+let logStreamRetired = false;
+
+function retryLogStream() {
+  setLogStreamState('retrying');
+  if (logStreamTimer) window.clearTimeout(logStreamTimer);
+  if (!logStreamRetired) logStreamTimer = window.setTimeout(connectLogStream, LOG_STREAM_RETRY_MS);
+}
+
+// The offscreen document streams logs only while this port is open. It
+// answers a new port with the stream state; silence means the document was
+// not ready to accept the port, so the page asks again.
+function connectLogStream() {
+  if (logStreamRetired) return;
+  void chrome.runtime.sendMessage({ type: 'ENSURE_LOG_STREAM' }).then((stream) => {
+    if (!stream?.ok || !chrome.runtime.connect) throw new Error('log stream unavailable');
+    if (logStreamRetired) return;
+    const port = chrome.runtime.connect({ name: 'spike-log-stream' });
+    logStreamPort = port;
+    let heard = false;
+    const abandon = () => {
+      if (logStreamPort !== port) return;
+      logStreamPort = null;
+      try { port.disconnect(); } catch { /* already closed */ }
+      retryLogStream();
+    };
+    port.onMessage.addListener((message) => {
+      heard = true;
+      handleLogStreamMessage(message);
+    });
+    port.onDisconnect.addListener(abandon);
+    window.setTimeout(() => { if (!heard) abandon(); }, LOG_STREAM_RETRY_MS);
+  }).catch(retryLogStream);
+}
+
+function retireLogStream() {
+  logStreamRetired = true;
+  if (logStreamTimer) window.clearTimeout(logStreamTimer);
+  try { logStreamPort?.disconnect(); } catch { /* already closed */ }
+  logStreamPort = null;
+}
 
 async function loadDnsCache() {
   const data = await SpikeApiClient.getDnsCache(instance);
@@ -767,9 +811,7 @@ try {
   if (!instance) throw new Error('请先在 SpikeDeck 设置中添加并选择实例');
   updateReloadControls();
   byId('instance-label').textContent = `${instance.name} · ${instance.baseUrl}`;
-  void chrome.runtime.sendMessage({ type: 'ENSURE_LOG_STREAM' }).then((stream) => {
-    if (!stream?.ok) setLogStreamState('retrying');
-  }).catch(() => setLogStreamState('retrying'));
+  connectLogStream();
   const refreshLogs = () => {
     if (!document.hidden) void loadLogs().catch(() => setLogStreamState('retrying'));
   };
@@ -777,6 +819,7 @@ try {
   document.addEventListener('visibilitychange', refreshLogs);
   window.addEventListener('pagehide', () => {
     panels.retire();
+    retireLogStream();
     transfer.dispose();
     probeLive = false; probeGeneration++;
     reloadLive = false; reloadGeneration++;
