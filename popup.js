@@ -390,6 +390,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   let providerObservations = new Map();
   let providerFlashTimer = null;
   const providerRefreshOperations = new Set();
+
+  // The header button's "testing" class (used by CSS) and the task hub's
+  // provider row are one piece of state; always change them together.
+  function setProviderRefreshIndicator(running) {
+    btnRefreshProviders.classList.toggle("testing", running);
+    popupInteractions.setTaskRunning("providers", running);
+  }
   let providerRefreshTask = null;
   let providerRefreshPollTimer = null;
   let handledProviderTaskState = "";
@@ -805,7 +812,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     providerRefreshTask = task;
     const running = task?.status === "running";
 
-    btnRefreshProviders.classList.toggle("testing", running || providersRefreshing);
+    setProviderRefreshIndicator(running || providersRefreshing);
 
     if (running) {
       clearProvidersPanelNotice();
@@ -872,7 +879,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     btnProvidersRefreshAll.disabled = !activeInstance || !currentProviders.some(provider => providerRefreshState(provider) === "idle");
     btnProvidersRefreshAll.textContent = "全部更新";
     btnProvidersRefreshAll.classList.toggle("testing", headerBusy);
-    btnRefreshProviders.classList.toggle("testing", headerBusy);
+    setProviderRefreshIndicator(headerBusy);
 
     if (count === 0) {
       providersList.replaceChildren(
@@ -1008,7 +1015,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       status: "running",
     };
 
-    btnRefreshProviders.classList.add("testing");
+    setProviderRefreshIndicator(true);
     clearProvidersPanelNotice();
     renderProvidersList();
     scheduleProviderRefreshPoll();
@@ -1035,7 +1042,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!operation.isCurrent()) return;
       providerRefreshTask = null;
 
-      btnRefreshProviders.classList.remove("testing");
+      setProviderRefreshIndicator(false);
       showProvidersPanelNotice(
         `无法启动更新：${err.message || "未知错误"}；当前运行配置未改变。`,
         "error",
@@ -1510,7 +1517,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     badgeDnsDelay.textContent = "DNS: —";
     badgeDnsDelay.title = "";
     proxyListeners.replaceChildren(el("span", { className: "proxy-listener-empty" }, "-"));
-    btnRefreshProviders.classList.remove("testing");
+    setProviderRefreshIndicator(false);
     renderOutboundMode(null, [], "切换实例中…");
     chrome.runtime.sendMessage({ type: "UPDATE_PROXY_SETTING" });
     void loadDashboard();
@@ -2323,10 +2330,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
+  // The hub's module row is true only while the "updating" notice is shown.
   function showModulesNotice(message, state) {
+    popupInteractions.setTaskRunning("modules", false);
     modulesPanelNotice.hidden = false;
     modulesPanelNotice.className = `providers-panel-notice ${state || ""}`;
     modulesPanelNotice.textContent = message;
+  }
+
+  function showModulesUpdating() {
+    showModulesNotice("正在更新模块…", "");
+    popupInteractions.setTaskRunning("modules", true);
+  }
+
+  function hideModulesNotice() {
+    popupInteractions.setTaskRunning("modules", false);
+    modulesPanelNotice.hidden = true;
   }
 
   async function runModuleUpdate(body) {
@@ -2335,7 +2354,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const epoch = ++moduleEpoch;
     moduleBusy = true;
     updateModuleControls();
-    showModulesNotice("正在更新模块…", "");
+    showModulesUpdating();
     try {
       const response = await chrome.runtime.sendMessage({
         type: "START_MODULE_UPDATE",
@@ -2373,7 +2392,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     moduleInstallPending = null;
     currentModules = [];
     modulesPanelCount.textContent = "";
-    modulesPanelNotice.hidden = true;
+    hideModulesNotice();
     moduleTaskActions.hidden = true;
     delete moduleTaskDismiss.dataset.armed;
     moduleTaskDismiss.textContent = "清除未知结果";
@@ -2437,9 +2456,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       moduleTaskDismiss.textContent = "清除未知结果";
     }
     updateModuleControls();
-    if (!task) { modulesPanelNotice.hidden = true; return; }
+    if (!task) { hideModulesNotice(); return; }
     if (["submitting", "running"].includes(task.status)) {
-      showModulesNotice("正在更新模块…", "");
+      showModulesUpdating();
       if (!state.error) scheduleModulePoll();
       return;
     }
