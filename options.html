@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SpikeDeck 设置</title>
+    <title data-i18n="options.title">SpikeDeck 设置</title>
     <link rel="stylesheet" href="options.css" />
     <link rel="stylesheet" href="interaction.css" />
     <link rel="stylesheet" href="theme.css" />
@@ -15,14 +15,14 @@
         <div class="brand">
           <img src="icons/icon48.png" alt="Logo" class="logo" />
           <div>
-            <h1>SpikeDeck 设置</h1>
-            <p class="subtitle">管理多个 Spike 实例与浏览器代理托管配置</p>
+            <h1 data-i18n="options.title">SpikeDeck 设置</h1>
+            <p class="subtitle" data-i18n="options.subtitle">管理多个 Spike 实例与浏览器代理托管配置</p>
           </div>
         </div>
       </header>
 
       <main class="options-main">
-        <div class="options-tabs" role="tablist" aria-label="设置分类">
+        <div class="options-tabs" role="tablist" aria-label="设置分类" data-i18n-aria-label="options.tabs.label">
           <button
             id="tab-global"
             class="options-tab"
@@ -30,6 +30,7 @@
             aria-controls="options-global"
             aria-selected="true"
             tabindex="0"
+            data-i18n="options.tabs.global"
           >
             全局选项
           </button>
@@ -40,6 +41,7 @@
             aria-controls="options-instances"
             aria-selected="false"
             tabindex="-1"
+            data-i18n="options.tabs.instances"
           >
             实例管理
           </button>
@@ -48,25 +50,25 @@
           <!-- Global Preferences Panel -->
           <section class="panel preferences-panel">
             <div class="panel-header">
-              <h2>全局偏好</h2>
+              <h2 data-i18n="options.prefs.title">全局偏好</h2>
             </div>
 
             <div class="preference-form">
               <label class="theme-switcher"
-                >外观
-                <select data-spike-theme-control aria-label="外观">
-                  <option value="system">跟随系统</option>
-                  <option value="light">浅色</option>
-                  <option value="dark">深色</option>
+                ><span data-i18n="options.prefs.theme">外观</span>
+                <select data-spike-theme-control aria-label="外观" data-i18n-aria-label="options.prefs.theme">
+                  <option value="system" data-i18n="options.prefs.theme.system">跟随系统</option>
+                  <option value="light" data-i18n="options.prefs.theme.light">浅色</option>
+                  <option value="dark" data-i18n="options.prefs.theme.dark">深色</option>
                 </select>
               </label>
               <div class="form-group">
-                <label for="pref-language">界面语言</label>
+                <label for="pref-language" data-i18n="options.prefs.language">界面语言</label>
                 <select id="pref-language" class="select-input">
                   <option value="zh-CN">中文</option>
                   <option value="en">English</option>
                 </select>
-                <span class="help-text">首次安装时根据浏览器首选语言选择，可随时在此切换。</span>
+                <span class="help-text" data-i18n="options.prefs.language.help">首次安装时根据浏览器首选语言选择，可随时在此切换。</span>
               </div>
 
               <div class="preference-divider"></div>
@@ -74,9 +76,9 @@
               <div class="form-group">
                 <label class="checkbox-label">
                   <input type="checkbox" id="pref-control-proxy" />
-                  <span>使用 Spike 监听地址接管当前浏览器代理</span>
+                  <span data-i18n="options.prefs.proxy">使用 Spike 监听地址接管当前浏览器代理</span>
                 </label>
-                <span class="help-text">
+                <span class="help-text" data-i18n="options.prefs.proxy.help">
                   开启后自动读取当前实例的 Mixed / HTTP / SOCKS5 地址并写入 Chrome。 关闭后
                   SpikeDeck 会清除自己的代理设置，让 SwitchyOmega 等其他扩展接管。
                 </span>
@@ -88,11 +90,14 @@
               <div class="form-group">
                 <label class="checkbox-label">
                   <input type="checkbox" id="pref-popup-shortcut" checked />
-                  <span>启用 Popup 快捷键</span>
+                  <span data-i18n="options.prefs.shortcut">启用 Popup 快捷键</span>
                 </label>
                 <span class="help-text">
-                  开启后可用 <code>Ctrl+Shift+K</code>（macOS 为 <code>Command+Shift+K</code>）打开
-                  Popup。快捷键可在 <code>chrome://extensions/shortcuts</code> 中重新绑定。
+                  <span data-i18n="options.prefs.shortcut.help.before">开启后可用</span>
+                  <code>Ctrl+Shift+K</code><span data-i18n="options.prefs.shortcut.help.mac">（macOS 为</span>
+                  <code>Command+Shift+K</code><span data-i18n="options.prefs.shortcut.help.rebind">）打开 Popup。快捷键可在</span>
+                  <code>chrome://extensions/shortcuts</code>
+                  <span data-i18n="options.prefs.shortcut.help.after">中重新绑定。</span>
                 </span>
                 <span
                   class="proxy-preference-state"
@@ -106,7 +111,7 @@
 
               <div class="form-row">
                 <div class="form-group flex-1">
-                  <label for="pref-health-interval">Spike 健康检查频率 (秒)</label>
+                  <label for="pref-health-interval" data-i18n="options.prefs.healthInterval">Spike 健康检查频率 (秒)</label>
                   <input
                     type="number"
                     id="pref-health-interval"
@@ -116,13 +121,13 @@
                     step="1"
                     value="5"
                   />
-                  <span class="help-text"
+                  <span class="help-text" data-i18n="options.prefs.healthInterval.help"
                     >无论 Chrome 窗口是否在可视区域，均以此频率后台探测 Spike 存活状态（默认 5
                     秒）。</span
                   >
                 </div>
                 <div class="form-group flex-1">
-                  <label for="pref-traffic-interval">实时网速刷新频率 (秒)</label>
+                  <label for="pref-traffic-interval" data-i18n="options.prefs.trafficInterval">实时网速刷新频率 (秒)</label>
                   <input
                     type="number"
                     id="pref-traffic-interval"
@@ -132,7 +137,7 @@
                     step="1"
                     value="1"
                   />
-                  <span class="help-text"
+                  <span class="help-text" data-i18n="options.prefs.trafficInterval.help"
                     >仅当 Chrome
                     窗口处于可视/活跃状态时以此频率刷新图标网速；非可视时自动暂停以省电（默认 1
                     秒）。</span
@@ -143,14 +148,14 @@
               <div class="preference-divider"></div>
 
               <div class="form-group">
-                <label for="pref-expand-mode">策略组默认展开/收起状态</label>
+                <label for="pref-expand-mode" data-i18n="options.prefs.expandMode">策略组默认展开/收起状态</label>
                 <select id="pref-expand-mode" class="select-input">
-                  <option value="smart">智能展开 (仅自动展开前 2 个组与 select 组)</option>
-                  <option value="expand-all">默认全部展开 (Expand All)</option>
-                  <option value="collapse-all">默认全部收起 (Collapse All)</option>
-                  <option value="remember">记忆展开状态 (Remember Collapse State)</option>
+                  <option value="smart" data-i18n="options.prefs.expandMode.smart">智能展开 (仅自动展开前 2 个组与 select 组)</option>
+                  <option value="expand-all" data-i18n="options.prefs.expandMode.expandAll">默认全部展开 (Expand All)</option>
+                  <option value="collapse-all" data-i18n="options.prefs.expandMode.collapseAll">默认全部收起 (Collapse All)</option>
+                  <option value="remember" data-i18n="options.prefs.expandMode.remember">记忆展开状态 (Remember Collapse State)</option>
                 </select>
-                <span class="help-text"
+                <span class="help-text" data-i18n="options.prefs.expandMode.help"
                   >控制在 Popup
                   中打开策略组面板时，所有组卡片的默认展开状态。选择「记忆展开状态」后，会记住你在
                   Popup 中手动展开/收起的结果，以及「全部展开 / 全部收起」操作。</span
@@ -158,18 +163,18 @@
               </div>
 
               <div class="form-group margin-top-12">
-                <label for="pref-hidden-mode">隐藏策略组展示</label>
+                <label for="pref-hidden-mode" data-i18n="options.prefs.hiddenMode">隐藏策略组展示</label>
                 <select id="pref-hidden-mode" class="select-input">
-                  <option value="hide">隐藏（不显示 hidden 组）</option>
-                  <option value="smart">智能（显示被可见组选中的 hidden 组）</option>
-                  <option value="show">全部展示 (Show Hidden Groups)</option>
+                  <option value="hide" data-i18n="options.prefs.hiddenMode.hide">隐藏（不显示 hidden 组）</option>
+                  <option value="smart" data-i18n="options.prefs.hiddenMode.smart">智能（显示被可见组选中的 hidden 组）</option>
+                  <option value="show" data-i18n="options.prefs.hiddenMode.show">全部展示 (Show Hidden Groups)</option>
                 </select>
                 <span class="help-text"
-                  >隐藏：不列出
+                  ><span data-i18n="options.prefs.hiddenMode.help.before">隐藏：不列出</span>
                   <code>hidden: true</code>
-                  的组。智能：若某个 hidden
+                  <span data-i18n="options.prefs.hiddenMode.help.after">的组。智能：若某个 hidden
                   组是当前可见组的选中成员，则把它作为独立卡片列出，并沿着当前选中链路继续列出。全部展示：列出所有
-                  hidden 组。Popup 工具栏按钮可在三种形态间循环。</span
+                  hidden 组。Popup 工具栏按钮可在三种形态间循环。</span></span
                 >
               </div>
 
@@ -180,9 +185,9 @@
                     id="pref-disconnect-affected-connections"
                     checked
                   />
-                  <span>切换线路时断开旧连接</span>
+                  <span data-i18n="options.prefs.disconnect">切换线路时断开旧连接</span>
                 </label>
-                <span class="help-text"
+                <span class="help-text" data-i18n="options.prefs.disconnect.help"
                   >让刷新页面等新请求立即使用新线路；无关连接不受影响。</span
                 >
               </div>
@@ -190,9 +195,9 @@
               <div class="form-group margin-top-12">
                 <label class="checkbox-label">
                   <input type="checkbox" id="pref-collapse-after-selection" checked />
-                  <span>选择成员后自动收起策略组</span>
+                  <span data-i18n="options.prefs.collapse">选择成员后自动收起策略组</span>
                 </label>
-                <span class="help-text"
+                <span class="help-text" data-i18n="options.prefs.collapse.help"
                   >开启后，选择成员会立即收起该组；按住 Option（Windows / Linux 为
                   Alt）点击可临时保持展开。</span
                 >
@@ -205,8 +210,8 @@
             <!-- Left Panel: Instance List -->
             <section class="panel instance-list-panel">
               <div class="panel-header">
-                <h2>Spike 实例列表</h2>
-                <button id="btn-add-instance" class="btn btn-primary">+ 添加新实例</button>
+                <h2 data-i18n="options.instances.title">Spike 实例列表</h2>
+                <button id="btn-add-instance" class="btn btn-primary" data-i18n="options.instances.add">+ 添加新实例</button>
               </div>
 
               <div id="instances-container" class="instances-container">
@@ -218,18 +223,19 @@
             <div class="right-column">
               <section class="panel instance-form-panel">
                 <div class="panel-header">
-                  <h2 id="form-title">编辑实例</h2>
+                  <h2 id="form-title" data-i18n="options.form.editTitle">编辑实例</h2>
                 </div>
 
                 <form id="instance-form" class="instance-form">
                   <input type="hidden" id="inst-id" />
 
                   <div class="form-group">
-                    <label for="inst-name">实例名称 *</label>
+                    <label for="inst-name" data-i18n="options.form.name">实例名称 *</label>
                     <input
                       type="text"
                       id="inst-name"
                       placeholder="例如: 本地开发实例 / HK Edge"
+                      data-i18n-placeholder="options.form.name.placeholder"
                       required
                     />
                   </div>
@@ -237,16 +243,17 @@
                   <div class="form-group">
                     <label for="inst-url">Control API Base URL *</label>
                     <input type="url" id="inst-url" placeholder="http://127.0.0.1:9090" required />
-                    <span class="help-text">Spike 控制面 HTTP 监听地址（默认端口 9090）</span>
+                    <span class="help-text" data-i18n="options.form.url.help">Spike 控制面 HTTP 监听地址（默认端口 9090）</span>
                   </div>
 
                   <div class="form-group">
-                    <label for="inst-secret">Control Secret (密码/密钥)</label>
+                    <label for="inst-secret" data-i18n="options.form.secret">Control Secret (密码/密钥)</label>
                     <div class="secret-field">
                       <input
                         type="password"
                         id="inst-secret"
                         placeholder="未设置控制密码可留空"
+                        data-i18n-placeholder="options.form.secret.placeholder"
                         autocomplete="new-password"
                       />
                       <button
@@ -254,6 +261,8 @@
                         id="btn-toggle-secret"
                         class="btn-secret-toggle"
                         title="显示或隐藏 Secret"
+                        data-i18n-title="options.form.secret.toggle"
+                        data-i18n="options.form.secret.show"
                       >
                         显示
                       </button>
@@ -261,16 +270,17 @@
                   </div>
 
                   <div class="form-group">
-                    <label>浏览器代理端口</label>
+                    <label data-i18n="options.form.ports">浏览器代理端口</label>
                     <p class="help-text" style="margin: 0">
-                      开启 Popup 中的「浏览器代理」时，自动从 Spike Control API
-                      <code>/spike/status.listeners</code> 读取 mixed / HTTP / SOCKS
-                      监听地址，无需手工填写。
+                      <span data-i18n="options.form.ports.help.before">开启 Popup 中的「浏览器代理」时，自动从 Spike Control API</span>
+                      <code>/spike/status.listeners</code>
+                      <span data-i18n="options.form.ports.help.after">读取 mixed / HTTP / SOCKS
+                      监听地址，无需手工填写。</span>
                     </p>
                   </div>
 
                   <div class="form-actions">
-                    <button type="button" id="btn-test-conn" class="btn btn-secondary">
+                    <button type="button" id="btn-test-conn" class="btn btn-secondary" data-i18n="options.form.test">
                       ⚡ 测试连接
                     </button>
                     <div class="right-actions">
@@ -279,10 +289,11 @@
                         id="btn-delete-inst"
                         class="btn btn-danger"
                         style="display: none"
+                        data-i18n="options.form.delete"
                       >
                         删除实例
                       </button>
-                      <button type="submit" id="btn-save-inst" class="btn btn-primary">
+                      <button type="submit" id="btn-save-inst" class="btn btn-primary" data-i18n="options.form.save">
                         保存实例
                       </button>
                     </div>
@@ -293,15 +304,15 @@
 
               <section class="panel profile-export-panel" style="margin-top: 16px">
                 <div class="panel-header">
-                  <h2>当前 Profile（脱敏）</h2>
-                  <button type="button" id="btn-load-profile-export" class="btn btn-secondary">
+                  <h2 data-i18n="options.export.title">当前 Profile（脱敏）</h2>
+                  <button type="button" id="btn-load-profile-export" class="btn btn-secondary" data-i18n="options.export.load">
                     加载
                   </button>
                 </div>
-                <p class="help-text">只显示 core 返回的脱敏全文，不提供未脱敏导出。</p>
-                <p id="profile-export-status" class="help-text" role="status">尚未加载</p>
+                <p class="help-text" data-i18n="options.export.help">只显示 core 返回的脱敏全文，不提供未脱敏导出。</p>
+                <p id="profile-export-status" class="help-text" role="status" data-i18n="options.export.notLoaded">尚未加载</p>
                 <pre id="profile-export-text" class="profile-export-text" hidden></pre>
-                <button type="button" id="btn-copy-profile-export" class="btn btn-secondary">
+                <button type="button" id="btn-copy-profile-export" class="btn btn-secondary" data-i18n="options.export.copy">
                   复制
                 </button>
               </section>

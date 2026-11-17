@@ -14,6 +14,12 @@
 - **新增 `idle` 权限**：用于判断系统是否空闲或锁屏（无操作 120 秒视为空闲）。该权限不会触发安装提示。
 - **关闭代理模式时角标不再闪烁**：此前每次健康检查都会清空流量角标。
 
+### 🌐 界面语言 (Localization)
+
+- **显式文案 key**：新增 `lib/locales/en.js` 与 `lib/locales/zh-CN.js`，按 `options.form.save` 这样的 key 取文案。静态 HTML 用 `data-i18n`、`data-i18n-title`、`data-i18n-placeholder`、`data-i18n-aria-label` 标注，加载时一次性替换，切换语言时重新渲染。
+- **设置页已迁移**：设置页、确认对话框的“取消”按钮和快捷键状态改用 key，设置页不再挂文档级 MutationObserver。Popup 和工具页仍走原有的原文对照表和 observer，后续逐页迁移。
+- **测试**：每个被引用的 key 必须在所有语言中存在，任何语言都不能有多余或孤立的 key，占位符必须一致；HTML 内联的中文需与 zh-CN 文案一致；`_locales` 各语言的 key 必须与 manifest 引用一致。
+
 ---
 
 ## [1.5.8] - 2026-11-17

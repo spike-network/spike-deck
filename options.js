@@ -9,15 +9,19 @@ import {
 } from "./lib/proxy-listeners.js";
 import { describePopupShortcut } from "./lib/shortcut-state.js";
 import {
+  applyMessages,
   getCurrentLanguage,
   initializeI18n,
+  msg,
   setCurrentLanguage,
-  t,
+  setMessage,
+  setPlainText,
 } from "./lib/i18n.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   initializeOptionsTabs(document, window);
-  await initializeI18n();
+  // Every string on this page is keyed, so no document observer is needed.
+  await initializeI18n({ observe: false });
   await StorageManager.init();
 
   const instancesContainer = document.getElementById("instances-container");
@@ -112,32 +116,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     profileExportText.hidden = true;
     const active = await StorageManager.getActiveInstance();
     if (!active) {
-      profileExportStatus.textContent = "未配置实例";
+      setMessage(profileExportStatus, "options.export.noInstance");
       return;
     }
-    profileExportStatus.textContent = "正在加载…";
+    setMessage(profileExportStatus, "options.export.loading");
     try {
       const current = await SpikeApiClient.getCurrentProfile(active);
       profileExportText.textContent = current.profile || "";
       profileExportText.hidden = !current.profile;
-      profileExportStatus.textContent = current.profile
-        ? ""
-        : current.error || "空";
+      if (current.profile) setPlainText(profileExportStatus, "");
+      else if (current.error) setPlainText(profileExportStatus, current.error);
+      else setMessage(profileExportStatus, "options.export.empty");
     } catch (error) {
-      profileExportStatus.textContent = error.message || "加载失败";
+      if (error.message) setPlainText(profileExportStatus, error.message);
+      else setMessage(profileExportStatus, "options.export.failed");
     }
   });
 
   btnCopyProfileExport.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(profileExportText.textContent || "");
-      const original = btnCopyProfileExport.textContent;
-      btnCopyProfileExport.textContent = "已复制";
+      setMessage(btnCopyProfileExport, "options.export.copied");
       setTimeout(() => {
-        btnCopyProfileExport.textContent = original;
+        setMessage(btnCopyProfileExport, "options.export.copy");
       }, 1500);
     } catch {
-      profileExportText.title = "无法写入剪贴板";
+      profileExportText.setAttribute("data-i18n-title", "options.export.clipboardFailed");
+      applyMessages(profileExportText);
     }
   });
 
@@ -145,7 +150,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   btnToggleSecret.addEventListener("click", () => {
     const hidden = instSecretInput.type === "password";
     instSecretInput.type = hidden ? "text" : "password";
-    btnToggleSecret.textContent = hidden ? "隐藏" : "显示";
+    setMessage(btnToggleSecret, hidden ? "options.form.secret.hide" : "options.form.secret.show");
   });
 
   prefExpandModeSelect.addEventListener("change", async (e) => {
@@ -184,10 +189,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       popupShortcutState.className = state.kind
         ? `proxy-preference-state ${state.kind}`
         : "proxy-preference-state";
-      popupShortcutState.textContent = state.text;
+      setMessage(popupShortcutState, state.key, state.params);
     } catch (error) {
       popupShortcutState.className = "proxy-preference-state error";
-      popupShortcutState.textContent = `无法读取快捷键状态: ${error.message}`;
+      setMessage(popupShortcutState, "options.shortcut.failed", { error: error.message });
     }
   }
 
@@ -211,16 +216,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const enabled = e.target.checked;
     prefControlProxyCheckbox.disabled = true;
     proxyPreferenceState.className = "proxy-preference-state";
-    proxyPreferenceState.textContent = enabled
-      ? "正在接管浏览器代理…"
-      : "正在释放浏览器代理控制权…";
+    setMessage(proxyPreferenceState, enabled ? "options.proxy.applying" : "options.proxy.releasing");
     try {
       await StorageManager.setProxyModeEnabled(enabled);
       const response = await chrome.runtime.sendMessage({
         type: "UPDATE_PROXY_SETTING",
       });
       if (!response || !response.ok) {
-        throw new Error(response?.error || "无法更新浏览器代理设置");
+        throw new Error(response?.error || msg("options.proxy.updateUnavailable"));
       }
       prefControlProxyCheckbox.checked = await StorageManager.isProxyModeEnabled();
       if (response.superseded) await refreshProxyPreferenceState();
@@ -228,7 +231,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       prefControlProxyCheckbox.checked = await StorageManager.isProxyModeEnabled();
       proxyPreferenceState.className = "proxy-preference-state error";
-      proxyPreferenceState.textContent = `代理设置更新失败: ${err.message}`;
+      setMessage(proxyPreferenceState, "options.proxy.updateFailed", { error: err.message });
     } finally {
       prefControlProxyCheckbox.disabled = false;
     }
@@ -242,7 +245,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (instances.length === 0) {
       isCreating = true;
       editingId = null;
-      formTitle.textContent = "添加 Spike 实例";
+      setMessage(formTitle, "options.form.addFirstTitle");
       instIdInput.value = "";
       instNameInput.value = "";
       instUrlInput.value = "http://127.0.0.1:9090";
@@ -264,7 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (instances.length === 0 && !isCreating) {
       const emptyDiv = document.createElement("div");
       emptyDiv.className = "instances-empty";
-      emptyDiv.textContent = "暂无实例，请在右侧添加您的第一个 Spike 实例";
+      setMessage(emptyDiv, "options.instances.empty");
       instancesContainer.appendChild(emptyDiv);
       return;
     }
@@ -293,17 +296,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (isActive) {
         const badge = document.createElement("span");
         badge.className = "active-badge";
-        badge.textContent = "当前激活";
+        setMessage(badge, "options.instances.active");
         actionGroup.appendChild(badge);
       } else {
         const setBtn = document.createElement("button");
         setBtn.className = "btn-set-active";
-        setBtn.textContent = "设为激活";
+        setMessage(setBtn, "options.instances.setActive");
         setBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const granted = await ensureHostPermission(inst.baseUrl);
           if (!granted) {
-            showTestResult("error", "❌ 未授予访问该地址的主机权限，无法激活");
+            showTestResult("error", "options.form.permissionActivate");
             return;
           }
           await StorageManager.setActiveInstanceId(inst.id);
@@ -339,13 +342,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Render new draft card when creating a new instance
     if (isCreating) {
-      const draftName = instNameInput.value.trim() || "新 Spike 实例 (未保存)";
       const draftUrl = instUrlInput.value.trim() || "http://127.0.0.1:9090";
 
       const draftNameSpan = document.createElement("span");
       draftNameSpan.className = "instance-name";
       draftNameSpan.id = "draft-card-name";
-      draftNameSpan.textContent = draftName;
+      renderDraftName(draftNameSpan);
 
       const draftUrlSpan = document.createElement("span");
       draftUrlSpan.className = "instance-url";
@@ -359,7 +361,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const draftBadge = document.createElement("span");
       draftBadge.className = "draft-badge";
-      draftBadge.textContent = "新建中...";
+      setMessage(draftBadge, "options.instances.draftBadge");
 
       const draftCard = document.createElement("div");
       draftCard.className = "instance-card active draft-card";
@@ -376,7 +378,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     isCreating = false;
     editingId = inst.id;
-    formTitle.textContent = `编辑实例: ${inst.name}`;
+    setMessage(formTitle, "options.form.editTitleNamed", { name: inst.name });
 
     instIdInput.value = inst.id;
     instNameInput.value = inst.name;
@@ -392,7 +394,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   btnAddInstance.addEventListener("click", () => {
     isCreating = true;
     editingId = null;
-    formTitle.textContent = "添加新 Spike 实例";
+    setMessage(formTitle, "options.form.addTitle");
 
     instIdInput.value = "";
     instNameInput.value = "";
@@ -409,10 +411,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   instNameInput.addEventListener("input", () => {
     if (isCreating) {
       const el = document.getElementById("draft-card-name");
-      if (el)
-        el.textContent = instNameInput.value.trim() || "新 Spike 实例 (未保存)";
+      if (el) renderDraftName(el);
     }
   });
+
+  function renderDraftName(element) {
+    const name = instNameInput.value.trim();
+    if (name) setPlainText(element, name);
+    else setMessage(element, "options.instances.draftName");
+  }
 
   instUrlInput.addEventListener("input", () => {
     if (isCreating) {
@@ -432,13 +439,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     if (formData.secret && !canSendSecret(formData.baseUrl)) {
-      showTestResult("error", "❌ 远程实例需使用 HTTPS 才能发送 Control Secret（请启用 http-api-tls）");
+      showTestResult("error", "options.form.httpsRequired");
       return;
     }
 
     const granted = await ensureHostPermission(formData.baseUrl);
     if (!granted) {
-      showTestResult("error", "❌ 未授予访问该地址的主机权限，无法保存实例");
+      showTestResult("error", "options.form.permissionSave");
       return;
     }
 
@@ -451,14 +458,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     await loadData();
-    showTestResult("success", "实例保存成功");
+    showTestResult("success", "options.form.saved");
     chrome.runtime.sendMessage({ type: "UPDATE_PROXY_SETTING" });
   });
 
   btnDeleteInst.addEventListener("click", async () => {
     if (!editingId) return;
     const targetId = editingId;
-    if (await confirmAction("删除实例", "确定要删除该 Spike 实例吗？")) {
+    if (await confirmAction(msg("options.form.delete"), msg("options.form.deleteConfirm"))) {
       if (editingId !== targetId) return;
       try {
         await StorageManager.deleteInstance(editingId);
@@ -478,12 +485,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       secret: instSecretInput.value.trim(),
     };
 
-    showTestResult("info", "正在测试连接...");
+    showTestResult("info", "options.form.testing");
 
     try {
       const granted = await ensureHostPermission(tempInstance.baseUrl);
       if (!granted) {
-        showTestResult("error", "❌ 未授予访问该地址的主机权限，无法连接");
+        showTestResult("error", "options.form.permissionConnect");
         return;
       }
       const status = await SpikeApiClient.getStatus(tempInstance);
@@ -492,19 +499,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
       const listenerSummary = listeners.length
         ? listeners.map((item) => `${item.label} ${item.address}`).join(", ")
-        : "未暴露 listeners（请升级 Spike）";
-      showTestResult(
-        "success",
-        `✅ 连接成功！Profile: ${status.profile} (组 ${status.groups}, 规则 ${status.rules}) · 代理监听: ${listenerSummary}`,
-      );
+        : msg("options.form.noListeners");
+      showTestResult("success", "options.form.testOk", {
+        profile: status.profile,
+        groups: status.groups,
+        rules: status.rules,
+        listeners: listenerSummary,
+      });
     } catch (err) {
-      showTestResult("error", `❌ 连接失败: ${err.message}`);
+      showTestResult("error", "options.form.testFailed", { error: err.message });
     }
   });
 
-  function showTestResult(type, message) {
+  function showTestResult(type, key, params) {
     testResultEl.className = `test-result ${type}`;
-    testResultEl.textContent = message;
+    setMessage(testResultEl, key, params);
     testResultEl.style.display = "block";
   }
 
@@ -520,34 +529,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: "GET_PROXY_SETTING_STATE",
       });
       if (!state || !state.ok)
-        throw new Error(state?.error || "无法读取 Chrome 代理状态");
+        throw new Error(state?.error || msg("options.proxy.stateUnavailable"));
       renderProxyPreferenceState(state, enabled);
     } catch (err) {
       proxyPreferenceState.className = "proxy-preference-state error";
-      proxyPreferenceState.textContent = `无法读取代理控制状态: ${err.message}`;
+      setMessage(proxyPreferenceState, "options.proxy.stateFailed", { error: err.message });
     }
   }
 
   function renderProxyPreferenceState(state, enabled) {
     if (enabled && state.releasedForUnhealthy) {
       proxyPreferenceState.className = "proxy-preference-state warning";
-      proxyPreferenceState.textContent =
-        "Spike 不可达，已交回代理控制；恢复后将自动接管。";
+      setMessage(proxyPreferenceState, "options.proxy.released");
       return;
     }
     if (enabled && state.controlledBySpikeDeck) {
       proxyPreferenceState.className = "proxy-preference-state success";
-      proxyPreferenceState.textContent = "SpikeDeck 正在控制当前浏览器代理。";
+      setMessage(proxyPreferenceState, "options.proxy.controlled");
       return;
     }
     if (enabled && state.levelOfControl === "controlled_by_other_extensions") {
       proxyPreferenceState.className = "proxy-preference-state warning";
-      proxyPreferenceState.textContent = "当前代理设置由其他扩展控制。";
+      setMessage(proxyPreferenceState, "options.proxy.otherExtension");
       return;
     }
     proxyPreferenceState.className = "proxy-preference-state";
-    proxyPreferenceState.textContent =
-      "SpikeDeck 未接管代理；其他代理扩展可正常工作。";
+    setMessage(proxyPreferenceState, "options.proxy.notManaged");
   }
 
   loadData();
