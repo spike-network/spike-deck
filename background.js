@@ -4,6 +4,7 @@ import { SpikeApiClient } from './lib/spike-client.js';
 import { getProxyControlState, invalidateProxyIntent, reconcileProxyIntent } from './lib/proxy-control.js';
 import { badgeTraffic, trafficTitle } from './lib/format-rate.js';
 import { initializeI18n } from './lib/i18n.js';
+import { GROUP_TEST_TERMINAL_STATUSES, PROVIDER_REFRESH_ITEM_STATUSES } from './lib/control-api-contract.js';
 
 void initializeI18n();
 
@@ -18,7 +19,7 @@ const GROUP_TEST_ALARM_PREFIX = 'group-test-reconcile:';
 const OPEN_POPUP_COMMAND = 'open-popup';
 const TRAFFIC_RATE_ALARM = 'traffic-rate';
 const HEALTH_OFFSCREEN_PATH = 'offscreen.html';
-const terminalGroupTestStatuses = new Set(['completed', 'cancelled', 'failed']);
+const terminalGroupTestStatuses = new Set(GROUP_TEST_TERMINAL_STATUSES);
 const groupTestPollTimers = new Map();
 const groupTestOperations = new Map();
 let trafficWatchPorts = 0;
@@ -735,7 +736,7 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
 
 function normalizeProviderRefreshResults(results) {
   if (!Array.isArray(results)) return [];
-  const validStatuses = new Set(['pending', 'running', 'succeeded', 'failed', 'skipped']);
+  const validStatuses = new Set(PROVIDER_REFRESH_ITEM_STATUSES);
   return results.flatMap((result) => {
     const providerId = typeof result?.provider_id === 'string'
       ? result.provider_id

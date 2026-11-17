@@ -10,6 +10,7 @@ import {
   visiblePolicyGroups,
 } from "./lib/hidden-groups.js";
 import { initializeI18n } from "./lib/i18n.js";
+import { GROUP_TEST_TERMINAL_STATUSES, OUTBOUND_MODES } from "./lib/control-api-contract.js";
 import { GroupBatchControls } from "./lib/group-batch-controls.js";
 import {
   ingestPersistedMemberInfo,
@@ -34,7 +35,7 @@ import {
 // Group/member-scoped current health; task samples only fill legacy metadata gaps.
 const leafProbeResults = new Map();
 let currentGroupsData = [];
-const terminalGroupTestStatuses = new Set(["completed", "cancelled", "failed"]);
+const terminalGroupTestStatuses = new Set(GROUP_TEST_TERMINAL_STATUSES);
 const cancellingGroupTests = new Map();
 const submittingGroupTests = new Map();
 const groupTestTaskVersions = new Map();
@@ -1730,7 +1731,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function switchOutboundMode(mode) {
     const scope = captureInstanceRequest();
-    if (!scope.instance || outboundOperation?.isCurrent() || !["rule", "direct", "global"].includes(mode)) return;
+    if (!scope.instance || outboundOperation?.isCurrent() || !OUTBOUND_MODES.includes(mode)) return;
     const policy =
       outboundPolicySelect.value ||
       currentOutbound?.global_policy ||
