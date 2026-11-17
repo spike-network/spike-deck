@@ -4,22 +4,22 @@ import { SpikeApiClient } from './lib/spike-client.js';
 /**
  * Offscreen document for SpikeDeck.
  * Maintains sub-minute timers:
- * 1. Spike proxy health check (default 5s, runs continuously regardless of window visibility).
- * 2. Traffic rate badge update (default 1s, background only samples when Chrome window is visible).
+ * 1. Spike proxy health check (default 5s) and
+ * 2. traffic rate badge update (default 1s). The service worker decides
+ *    when each runs and at what period (lib/background-timers.js) and sends
+ *    the plan here; a paused timer sends nothing, so the worker can sleep.
  * 3. Runtime log SSE with bounded reconnect backoff and sequence resume. It
  *    runs only while a page holds a log stream port open.
  */
 
 const LOG_STREAM_PORT = 'spike-log-stream';
-
-const DEFAULT_HEALTH_CHECK_INTERVAL_SEC = 5;
-const DEFAULT_TRAFFIC_REFRESH_INTERVAL_SEC = 1;
-
-let healthIntervalMs = DEFAULT_HEALTH_CHECK_INTERVAL_SEC * 1000;
-let trafficIntervalMs = DEFAULT_TRAFFIC_REFRESH_INTERVAL_SEC * 1000;
+const MIN_TIMER_MS = 1000;
+const MAX_TIMER_MS = 300000;
 
 let healthTimer = null;
 let trafficTimer = null;
+let healthPeriodMs = null;
+let trafficPeriodMs = null;
 let logAbort = null;
 let logGeneration = 0;
 let logRetryTimer = null;
@@ -188,62 +188,51 @@ function sendTrafficTick() {
   chrome.runtime.sendMessage({ type: 'SPIKE_TRAFFIC_TICK' }).catch(() => {});
 }
 
-function restartTimers() {
-  if (healthTimer) clearInterval(healthTimer);
-  if (trafficTimer) clearInterval(trafficTimer);
-
-  healthTimer = setInterval(sendHealthTick, healthIntervalMs);
-  trafficTimer = setInterval(sendTrafficTick, trafficIntervalMs);
+function timerPeriod(value) {
+  const ms = Number(value);
+  if (value === null || !Number.isFinite(ms)) return null;
+  return Math.max(MIN_TIMER_MS, Math.min(MAX_TIMER_MS, Math.round(ms)));
 }
 
-async function loadConfigAndStart() {
-  try {
-    const data = await chrome.storage.local.get(['healthCheckInterval', 'trafficRefreshInterval']);
-    const hSec = Number(data.healthCheckInterval);
-    const tSec = Number(data.trafficRefreshInterval);
-    healthIntervalMs = Math.max(1, (Number.isFinite(hSec) && hSec > 0 ? hSec : DEFAULT_HEALTH_CHECK_INTERVAL_SEC)) * 1000;
-    trafficIntervalMs = Math.max(1, (Number.isFinite(tSec) && tSec > 0 ? tSec : DEFAULT_TRAFFIC_REFRESH_INTERVAL_SEC)) * 1000;
-  } catch {
-    healthIntervalMs = DEFAULT_HEALTH_CHECK_INTERVAL_SEC * 1000;
-    trafficIntervalMs = DEFAULT_TRAFFIC_REFRESH_INTERVAL_SEC * 1000;
+// Only a changed period restarts a timer, so repeated plans do not reset it.
+function applyTimerPlan(plan) {
+  const health = timerPeriod(plan?.health);
+  const traffic = timerPeriod(plan?.traffic);
+  if (health !== healthPeriodMs) {
+    if (healthTimer) clearInterval(healthTimer);
+    healthTimer = health ? setInterval(sendHealthTick, health) : null;
+    healthPeriodMs = health;
   }
-
-  sendHealthTick();
-  sendTrafficTick();
-  restartTimers();
-  restartLogStreamSoon();
+  if (traffic !== trafficPeriodMs) {
+    if (trafficTimer) clearInterval(trafficTimer);
+    trafficTimer = traffic ? setInterval(sendTrafficTick, traffic) : null;
+    trafficPeriodMs = traffic;
+  }
 }
 
-// React when preferences change in storage
+async function requestTimerPlan() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'SPIKE_TIMER_PLAN_REQUEST' });
+    if (response?.ok && response.plan) applyTimerPlan(response.plan);
+  } catch {
+    // The worker re-sends the plan from its periodic alarm.
+  }
+}
+
 if (chrome.storage?.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    let changed = false;
-    if (changes.healthCheckInterval) {
-      const hSec = Number(changes.healthCheckInterval.newValue);
-      healthIntervalMs = Math.max(1, (Number.isFinite(hSec) && hSec > 0 ? hSec : DEFAULT_HEALTH_CHECK_INTERVAL_SEC)) * 1000;
-      changed = true;
-    }
-    if (changes.trafficRefreshInterval) {
-      const tSec = Number(changes.trafficRefreshInterval.newValue);
-      trafficIntervalMs = Math.max(1, (Number.isFinite(tSec) && tSec > 0 ? tSec : DEFAULT_TRAFFIC_REFRESH_INTERVAL_SEC)) * 1000;
-      changed = true;
-    }
-    if (changed) {
-      restartTimers();
-    }
     if (changes.instances || changes.activeInstanceId) restartLogStreamSoon();
   });
 }
 
-// Listen for direct restart or configuration requests
 if (chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === 'RESTART_OFFSCREEN_TIMERS') {
-      void loadConfigAndStart();
-    }
+    if (message?.type === 'SPIKE_TIMER_PLAN') applyTimerPlan(message.plan);
+    if (message?.type === 'RESTART_OFFSCREEN_TIMERS') void requestTimerPlan();
     if (message?.type === 'RESTART_LOG_STREAM') restartLogStreamSoon();
   });
 }
 
-void loadConfigAndStart();
+void requestTimerPlan();
+restartLogStreamSoon();

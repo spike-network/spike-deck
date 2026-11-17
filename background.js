@@ -5,6 +5,13 @@ import { getProxyControlState, invalidateProxyIntent, reconcileProxyIntent } fro
 import { badgeTraffic, trafficTitle } from './lib/format-rate.js';
 import { initializeI18n } from './lib/i18n.js';
 import { GROUP_TEST_TERMINAL_STATUSES, PROVIDER_REFRESH_ITEM_STATUSES } from './lib/control-api-contract.js';
+import {
+  IDLE_DETECTION_SECONDS,
+  MAX_BACKOFF_MS,
+  UNREACHABLE_GRACE_FAILURES,
+  nextFailureCount,
+  timerPlan
+} from './lib/background-timers.js';
 
 void initializeI18n();
 
@@ -25,11 +32,127 @@ const groupTestOperations = new Map();
 let trafficWatchPorts = 0;
 let isWindowFocused = true;
 
+// Inputs to the offscreen timer plan (lib/background-timers.js). Storage-backed
+// facts are reloaded when the worker wakes and when the settings change.
+const timerFacts = {
+  idleState: 'active',
+  proxyEnabled: false,
+  hasInstance: false,
+  healthIntervalMs: 5000,
+  trafficIntervalMs: 1000,
+  failures: 0
+};
+let timerFactsLoad = null;
+let publishedTimerPlan = null;
+
 chrome.storage.onChanged?.addListener((changes, area) => {
-  if (area !== 'local' || !['enableProxyMode', 'activeInstanceId', 'instances'].some((key) => key in changes)) return;
+  if (area !== 'local') return;
+  const intent = ['enableProxyMode', 'activeInstanceId', 'instances'].some((key) => key in changes);
+  const intervals = ['healthCheckInterval', 'trafficRefreshInterval'].some((key) => key in changes);
+  if (intent || intervals) {
+    // A settings change is a user action: retry at the configured interval.
+    timerFacts.failures = 0;
+    void refreshTimerPlan();
+  }
+  if (!intent) return;
   invalidateProxyIntent();
   void reconcileProxyWithHealth().catch((error) => console.warn('Proxy intent reconciliation failed:', error));
 });
+
+async function queryIdleState() {
+  if (!chrome.idle?.queryState) return 'active';
+  try {
+    return await chrome.idle.queryState(IDLE_DETECTION_SECONDS);
+  } catch {
+    return 'active';
+  }
+}
+
+async function loadTimerFacts() {
+  const [proxyEnabled, instance, healthSeconds, trafficSeconds, idleState] = await Promise.all([
+    StorageManager.isProxyModeEnabled(),
+    StorageManager.getActiveInstance(),
+    StorageManager.getHealthCheckInterval(),
+    StorageManager.getTrafficRefreshInterval(),
+    queryIdleState(),
+    updateWindowFocusState()
+  ]);
+  Object.assign(timerFacts, {
+    proxyEnabled: Boolean(proxyEnabled),
+    hasInstance: Boolean(instance),
+    healthIntervalMs: healthSeconds * 1000,
+    trafficIntervalMs: trafficSeconds * 1000,
+    idleState
+  });
+}
+
+function ensureTimerFacts() {
+  timerFactsLoad ??= loadTimerFacts().catch((error) => {
+    timerFactsLoad = null;
+    console.warn('Unable to read timer settings:', error?.message || error);
+  });
+  return timerFactsLoad;
+}
+
+function currentTimerPlan() {
+  return timerPlan({ ...timerFacts, windowFocused: isWindowFocused, watchingPorts: trafficWatchPorts });
+}
+
+// Sends the plan to the offscreen document when it changed. `force` re-sends
+// it anyway so a recreated document picks it up.
+function publishTimerPlan({ force = false } = {}) {
+  const plan = currentTimerPlan();
+  const key = `${plan.health}:${plan.traffic}`;
+  if (!force && key === publishedTimerPlan) return plan;
+  publishedTimerPlan = key;
+  try {
+    const sent = chrome.runtime.sendMessage?.({ type: 'SPIKE_TIMER_PLAN', plan });
+    if (sent?.catch) void sent.catch(() => { publishedTimerPlan = null; });
+  } catch {
+    publishedTimerPlan = null;
+  }
+  return plan;
+}
+
+async function refreshTimerPlan(options) {
+  timerFactsLoad = null;
+  await ensureTimerFacts();
+  return publishTimerPlan(options);
+}
+
+// Consecutive unreachable probes from either timer back both off; any success
+// returns them to the configured intervals.
+function recordReachability(ok) {
+  const before = timerFacts.failures;
+  timerFacts.failures = nextFailureCount(before, ok);
+  if (!ok && timerFacts.failures === UNREACHABLE_GRACE_FAILURES) {
+    console.warn(`Spike unreachable; health and badge checks back off to at most ${MAX_BACKOFF_MS / 1000}s until it answers`);
+  } else if (ok && before >= UNREACHABLE_GRACE_FAILURES) {
+    console.info('Spike reachable again; checks resume at the configured intervals');
+  }
+  if (before !== timerFacts.failures) publishTimerPlan();
+}
+
+// Someone is back (unlocked, input, focus, popup): drop any backoff and check
+// now instead of waiting for the next tick.
+async function resumeTimersNow() {
+  timerFacts.failures = 0;
+  await ensureTimerFacts();
+  const plan = publishTimerPlan();
+  if (plan.health !== null) void reconcileProxyWithHealth().catch(() => {});
+  if (plan.traffic !== null) void refreshTrafficBadgeFromActiveInstance();
+}
+
+if (chrome.idle?.onStateChanged) {
+  chrome.idle.setDetectionInterval?.(IDLE_DETECTION_SECONDS);
+  chrome.idle.onStateChanged.addListener((state) => {
+    timerFacts.idleState = state;
+    if (state === 'active') void resumeTimersNow();
+    else publishTimerPlan();
+  });
+}
+
+void ensureTimerFacts().then(() => publishTimerPlan());
 
 async function updateWindowFocusState() {
   if (!chrome.windows?.getLastFocused) return;
@@ -46,8 +169,10 @@ if (chrome.windows?.onFocusChanged) {
     const wasFocused = isWindowFocused;
     isWindowFocused = (windowId !== chrome.windows.WINDOW_ID_NONE);
     if (!wasFocused && isWindowFocused && trafficWatchPorts === 0) {
-      void refreshTrafficBadgeFromActiveInstance();
+      void resumeTimersNow();
+      return;
     }
+    publishTimerPlan();
   });
 }
 
@@ -85,12 +210,11 @@ chrome.runtime.onStartup.addListener(async () => {
 if (chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === TRAFFIC_RATE_ALARM) {
-      void ensureOffscreenDocument();
-      void reconcileProxyWithHealth();
-      if (trafficWatchPorts > 0) return;
-      if (isWindowFocused) {
-        void refreshTrafficBadgeFromActiveInstance();
-      }
+      // Safety net for the offscreen timers, bound by the same plan.
+      void ensureOffscreenDocument().then(() => refreshTimerPlan({ force: true })).then((plan) => {
+        if (plan.health !== null) void reconcileProxyWithHealth();
+        if (plan.traffic !== null) void refreshTrafficBadgeFromActiveInstance();
+      });
       return;
     }
     if (!alarm.name.startsWith(GROUP_TEST_ALARM_PREFIX)) return;
@@ -103,14 +227,19 @@ if (chrome.runtime?.onConnect?.addListener) {
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'traffic-watch') return;
     trafficWatchPorts += 1;
+    // Opening the popup is a user action; it samples traffic itself.
+    timerFacts.failures = 0;
+    publishTimerPlan();
     port.onMessage.addListener((message) => {
       if (message?.type === 'TRAFFIC_SAMPLE') {
         applyTrafficBadge(message.traffic, message.error);
+        recordReachability(!message.error);
         void onTrafficSampleHealth(message);
       }
     });
     port.onDisconnect.addListener(() => {
       trafficWatchPorts = Math.max(0, trafficWatchPorts - 1);
+      publishTimerPlan();
     });
   });
 }
@@ -225,21 +354,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
+  if (message.type === 'SPIKE_TIMER_PLAN_REQUEST') {
+    ensureTimerFacts().then(() => {
+      const plan = currentTimerPlan();
+      publishedTimerPlan = `${plan.health}:${plan.traffic}`;
+      sendResponse({ ok: true, plan });
+    });
+    return true;
+  }
   if (message.type === 'TRAFFIC_SAMPLE') {
     applyTrafficBadge(message.traffic, message.error);
+    recordReachability(!message.error);
     void onTrafficSampleHealth(message);
     sendResponse({ ok: true });
     return false;
   }
   if (message.type === 'SPIKE_HEALTH_TICK') {
-    void reconcileProxyWithHealth();
+    // A tick can race a plan change; the plan in this worker decides.
+    void ensureTimerFacts().then(() => {
+      if (currentTimerPlan().health !== null) void reconcileProxyWithHealth();
+    });
     sendResponse({ ok: true });
     return false;
   }
   if (message.type === 'SPIKE_TRAFFIC_TICK') {
-    if (isWindowFocused && trafficWatchPorts === 0) {
-      void refreshTrafficBadgeFromActiveInstance();
-    }
+    void ensureTimerFacts().then(() => {
+      if (currentTimerPlan().traffic !== null) void refreshTrafficBadgeFromActiveInstance();
+    });
     sendResponse({ ok: true });
     return false;
   }
@@ -901,6 +1042,7 @@ async function onTrafficSampleHealth(message) {
 
 async function reconcileProxyWithHealth() {
   const result = await reconcileProxyIntent();
+  if (result.healthy === true || result.healthy === false) recordReachability(result.healthy);
   if (result.healthy) void ensureOffscreenDocument().catch((error) => console.warn('Health offscreen unavailable:', error));
   if (result.action === 'released') {
     chrome.runtime.sendMessage({ type: 'PROXY_HEALTH_CHANGED', releasedForUnhealthy: true }).catch(() => {});
@@ -921,8 +1063,10 @@ async function refreshTrafficBadgeFromActiveInstance() {
       return;
     }
     const metrics = await SpikeApiClient.getMetrics(instance);
+    recordReachability(true);
     applyTrafficBadge(metrics?.traffic);
   } catch (error) {
+    recordReachability(false);
     applyTrafficBadge(null, error?.message || 'unreachable');
   }
 }
@@ -933,7 +1077,9 @@ function applyTrafficBadge(traffic, error) {
     if (titleApi) titleApi({ title });
   };
   if (error || !traffic) {
-    setTitle(error ? `SpikeDeck · ${error}` : 'SpikeDeck');
+    const retry = timerFacts.failures >= UNREACHABLE_GRACE_FAILURES ? currentTimerPlan().traffic : null;
+    const suffix = retry ? ` · retrying every ${Math.round(retry / 1000)}s` : '';
+    setTitle(error ? `SpikeDeck · ${error}${suffix}` : 'SpikeDeck');
     void restoreProxyBadgeIfNeeded(Boolean(error));
     return;
   }
