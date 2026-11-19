@@ -19,6 +19,7 @@
     "operational_event_metadata": 1,
     "panels": 1,
     "network_context": 1,
+    "refresh_model": 1,
     "policy_traffic_metrics": 1,
     "provider_refresh_tasks": 3,
     "provider_refresh_independent": 1,
