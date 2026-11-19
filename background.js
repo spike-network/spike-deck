@@ -1,3 +1,4 @@
+import { errorDetails } from "./lib/core-error.js";
 import { StorageManager } from './lib/storage.js';
 import { dismissUnknownModuleUpdate, getModuleUpdateState, startModuleUpdate } from './lib/module-update.js';
 import { SpikeApiClient } from './lib/spike-client.js';
@@ -292,7 +293,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     startProviderRefreshTask(message.instanceId, message.providerId, message.providerIds).then((task) => {
       sendResponse({ ok: true, task });
     }).catch(err => {
-      sendResponse({ ok: false, error: safeProviderRefreshError(err) });
+      sendResponse({ ok: false, error: safeProviderRefreshError(err.coreMessage ?? err), ...errorDetails(err) });
     });
     return true;
   }
@@ -300,7 +301,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     getProviderRefreshState(message.instanceId).then(({ task, failures }) => {
       sendResponse({ ok: true, task, failures });
     }).catch(err => {
-      sendResponse({ ok: false, error: safeProviderRefreshError(err) });
+      sendResponse({ ok: false, error: safeProviderRefreshError(err.coreMessage ?? err), ...errorDetails(err) });
     });
     return true;
   }
@@ -308,7 +309,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     dismissProviderRefreshTask(message.instanceId, message.taskId).then((state) => {
       sendResponse({ ok: true, ...state });
     }).catch(err => {
-      sendResponse({ ok: false, error: safeProviderRefreshError(err) });
+      sendResponse({ ok: false, error: safeProviderRefreshError(err.coreMessage ?? err), ...errorDetails(err) });
     });
     return true;
   }
@@ -316,7 +317,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     startGroupTestTask(message.instanceId, message.groupName, message.memberName, message.runtimeNamespace).then((result) => {
       sendResponse({ ok: true, ...result });
     }).catch(err => {
-      sendResponse({ ok: false, error: safeGroupTestError(err) });
+      sendResponse({ ok: false, error: safeGroupTestError(err.coreMessage ?? err), ...errorDetails(err) });
     });
     return true;
   }
@@ -324,7 +325,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     refreshGroupTestState(message.instanceId).then((tasks) => {
       sendResponse({ ok: true, tasks });
     }).catch(err => {
-      sendResponse({ ok: false, error: safeGroupTestError(err) });
+      sendResponse({ ok: false, error: safeGroupTestError(err.coreMessage ?? err), ...errorDetails(err) });
     });
     return true;
   }
@@ -332,7 +333,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     cancelGroupTestTask(message.instanceId, message.taskId, message.runtimeNamespace).then((result) => {
       sendResponse({ ok: true, ...result });
     }).catch(err => {
-      sendResponse({ ok: false, error: safeGroupTestError(err) });
+      sendResponse({ ok: false, error: safeGroupTestError(err.coreMessage ?? err), ...errorDetails(err) });
     });
     return true;
   }
@@ -340,7 +341,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     startModuleUpdate(message.instanceId, message.body).then((task) => {
       sendResponse({ ok: true, task });
     }).catch(err => {
-      sendResponse({ ok: false, error: err.message || String(err) });
+      sendResponse({ ok: false, error: err.coreMessage ?? err.message ?? String(err), ...errorDetails(err) });
     });
     return true;
   }
@@ -789,6 +790,7 @@ function providerRefreshOutcome(state, task) {
         if (result.status === 'failed') {
           failures[result.providerId] = {
             failedAtUnix: task.finishedAtUnix || Math.floor(Date.now() / 1000),
+            error_code: result.error_code,
             error: safeProviderRefreshError(result.error || task.error || '外部资源更新失败')
           };
         } else if (result.status === 'succeeded') {
@@ -807,6 +809,8 @@ function providerRefreshOutcome(state, task) {
         // one source; the task-level error still reports aggregate failures.
         failures[task.providerId] = {
           failedAtUnix: task.finishedAtUnix || Math.floor(Date.now() / 1000),
+          error_code: task.error_code,
+          error_args: task.error_args,
           error: safeProviderRefreshError(task.error || '外部资源更新失败')
         };
       }
@@ -841,6 +845,8 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
         status: 'failed',
         finishedAtUnix: Math.floor(Number(coreTask.completed_at_unix_ms || Date.now()) / 1000),
         error: safeProviderRefreshError(coreTask.error || '外部资源更新失败'),
+        error_code: coreTask.error_code,
+        error_args: coreTask.error_args,
         revision: Number(coreTask.revision) || null,
         providerResults
       };
@@ -888,6 +894,7 @@ function normalizeProviderRefreshResults(results) {
       providerId,
       status,
       joined: result.joined === true,
+      error_code: result.error_code,
       error: status === 'failed'
         ? safeProviderRefreshError(result.error || '外部资源更新失败')
         : null

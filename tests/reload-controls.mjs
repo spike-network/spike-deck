@@ -1,3 +1,5 @@
+import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -68,7 +70,7 @@ globalThis.fetch = async (input, options) => {
         ok: false,
         classification: "invalid",
         current_revision: revision,
-        errors: [{ code: "mock-unknown", message: "mock-secret" }],
+        errors: [{ code: "mock.unknown", message: "Mock preview detail" }],
       };
     else {
       assert.equal(path, "/spike/reload");
@@ -101,7 +103,7 @@ const api = new Proxy(
     },
   },
 );
-const context = vm.createContext({
+const context = vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy,
   document,
   console,
   PanelObservation,
@@ -175,7 +177,7 @@ try {
   await first;
   assert.equal(calls.filter((call) => call.path === "/spike/reload/preview").length, previews + 1);
   assert.match(get("reload-preview-output").textContent, /Invalid candidate/);
-  assert.doesNotMatch(get("reload-preview-output").textContent, /mock-secret/);
+  assert.match(get("reload-preview-output").textContent, /Mock preview detail/);
   await get("reload-apply").listeners.click();
   await settle();
   assert.match(get("reload-result-output").textContent, /"Reloaded revision": 8/);
@@ -237,7 +239,7 @@ try {
           ok: false,
           classification: "invalid",
           current_revision: 7,
-          errors: [{ code: "revision_exhausted", message: "mock-secret" }],
+          errors: [{ code: "revision_exhausted", message: "Mock revision detail" }],
         },
         true,
       ),

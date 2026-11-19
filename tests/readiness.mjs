@@ -1,3 +1,5 @@
+import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
@@ -48,7 +50,7 @@ const api = new Proxy({}, { get: (_, key) => key === 'getReadiness' ? async () =
   if (failure) throw failure;
   return current;
 } : async () => ({}) });
-const context = vm.createContext({ document, console, window: { setInterval() {}, clearInterval() {}, setTimeout() {}, addEventListener() {} },
+const context = vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy, document, console, window: { setInterval() {}, clearInterval() {}, setTimeout() {}, addEventListener() {} },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } },
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => instance },
   initializeI18n: async () => {}, t: value => value,

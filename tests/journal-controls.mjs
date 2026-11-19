@@ -1,3 +1,5 @@
+import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -27,7 +29,7 @@ async function harness(namespace='mock-runtime') {
     assert.ok(key.startsWith('get'),'observation controls must not mutate the runtime');
     return {};
   }});
-  const context=vm.createContext({document,console,PanelObservation,ThroughputSession,chronological,filterRuntimeLogs,formatRuntimeLogs,sortRuntimeLogs,
+  const context=vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy,document,console,PanelObservation,ThroughputSession,chronological,filterRuntimeLogs,formatRuntimeLogs,sortRuntimeLogs,
     downloadJournal:(rows,json,name)=>{if(data.failExport)throw new Error('mock-secret');data.exports.push({rows:JSON.parse(JSON.stringify(rows)),json,name});},
     window:{setInterval(){},clearInterval(){},setTimeout(){},addEventListener(){}},
     chrome:{runtime:{onMessage:{addListener(){}},sendMessage:async()=>{throw new Error('mock stream unavailable');}}},

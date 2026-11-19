@@ -1,3 +1,4 @@
+import { requestErrorText } from "./lib/core-error.js";
 import { StorageManager } from "./lib/storage.js";
 import { confirmAction } from "./lib/confirm-dialog.js";
 import { initializeOptionsTabs } from "./lib/options-tabs.js";
@@ -125,10 +126,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       profileExportText.textContent = current.profile || "";
       profileExportText.hidden = !current.profile;
       if (current.profile) setPlainText(profileExportStatus, "");
-      else if (current.error) setPlainText(profileExportStatus, current.error);
+      else if (current.error) setPlainText(profileExportStatus, requestErrorText(current));
       else setMessage(profileExportStatus, "options.export.empty");
     } catch (error) {
-      if (error.message) setPlainText(profileExportStatus, error.message);
+      if (requestErrorText(error)) setPlainText(profileExportStatus, requestErrorText(error));
       else setMessage(profileExportStatus, "options.export.failed");
     }
   });
@@ -192,7 +193,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setMessage(popupShortcutState, state.key, state.params);
     } catch (error) {
       popupShortcutState.className = "proxy-preference-state error";
-      setMessage(popupShortcutState, "options.shortcut.failed", { error: error.message });
+      setMessage(popupShortcutState, "options.shortcut.failed", { error: requestErrorText(error) });
     }
   }
 
@@ -231,7 +232,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       prefControlProxyCheckbox.checked = await StorageManager.isProxyModeEnabled();
       proxyPreferenceState.className = "proxy-preference-state error";
-      setMessage(proxyPreferenceState, "options.proxy.updateFailed", { error: err.message });
+      setMessage(proxyPreferenceState, "options.proxy.updateFailed", { error: requestErrorText(err) });
     } finally {
       prefControlProxyCheckbox.disabled = false;
     }
@@ -474,7 +475,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadData();
         chrome.runtime.sendMessage({ type: "UPDATE_PROXY_SETTING" });
       } catch (err) {
-        alert(err.message);
+        alert(requestErrorText(err));
       }
     }
   });
@@ -507,7 +508,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         listeners: listenerSummary,
       });
     } catch (err) {
-      showTestResult("error", "options.form.testFailed", { error: err.message });
+      showTestResult("error", "options.form.testFailed", { error: requestErrorText(err) });
     }
   });
 
@@ -533,7 +534,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderProxyPreferenceState(state, enabled);
     } catch (err) {
       proxyPreferenceState.className = "proxy-preference-state error";
-      setMessage(proxyPreferenceState, "options.proxy.stateFailed", { error: err.message });
+      setMessage(proxyPreferenceState, "options.proxy.stateFailed", { error: requestErrorText(err) });
     }
   }
 

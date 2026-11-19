@@ -1,3 +1,5 @@
+import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
@@ -117,7 +119,7 @@ const api = new Proxy({}, { get: (_, method) => async (_instance, ...args) => {
   assert.ok(method.startsWith('get')); return {};
 } });
 const source = readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
-const context = vm.createContext({ document, console, ThroughputSession, PanelObservation, chronological, filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs,
+const context = vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy, document, console, ThroughputSession, PanelObservation, chronological, filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs,
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => ({ id: 'mock-instance', baseUrl: 'https://example.test' }) },
   initializeI18n: async () => {}, t: value => value, confirmAction: async () => data.acceptConfirm, window: { setInterval() {}, clearInterval() {}, setTimeout() {},
     addEventListener(type, callback) { if (type === 'pagehide') pagehide.push(callback); } },

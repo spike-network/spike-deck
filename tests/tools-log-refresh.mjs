@@ -1,3 +1,5 @@
+import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -25,7 +27,7 @@ const api = new Proxy({}, { get: (_, key) => key === 'getLogs' ? async () => {
   if (fail) throw new Error('offline');
   return { event_namespace: namespace, entries: [{ sequence, message: `log-${sequence}` }] };
 } : async () => ({}) });
-const context = vm.createContext({ document, console,
+const context = vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy, document, console,
   window: { setInterval(fn) { timers.push(fn); return 1; }, clearInterval() {},
     setTimeout() {}, addEventListener() {} },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('stream unavailable'); } } },

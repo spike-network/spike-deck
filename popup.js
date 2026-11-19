@@ -1,3 +1,4 @@
+import { coreError, requestErrorText, statusError } from "./lib/core-error.js";
 import { StorageManager } from "./lib/storage.js";
 import { SpikeApiClient } from "./lib/spike-client.js";
 import { activeTabTarget, summarizeCurrentSite } from "./lib/current-site.js";
@@ -762,7 +763,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           el(
             "div",
             { className: "providers-empty error" },
-            `加载失败: ${err.message || "未知错误"}`,
+            `加载失败: ${requestErrorText(err) || "未知错误"}`,
           ),
         );
         btnProvidersRefreshAll.disabled = true;
@@ -839,9 +840,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         handledProviderTaskState = stateKey;
         const progress = providerTaskProgress(task);
         showProvidersPanelNotice(
-          progress.failed > 0
+          statusError(task) || (progress.failed > 0
             ? `更新失败：${progress.failed} 个资源未更新。`
-            : "外部资源更新失败。",
+            : "外部资源更新失败。"),
           "error",
         );
       } else if (task.status === "unknown" && isProvidersPanelOpen()) {
@@ -900,7 +901,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const statusClass = `provider-status status-${displayStatus}`;
       const typeLabel = providerTypeLabel(provider.type);
       const statusLabel = providerStatusLabel(displayStatus);
-      const refreshError = provider.last_refresh_error || "";
+      const taskItem = providerRefreshTask?.providerResults?.find(item => item.providerId === provider.id);
+      const refreshError = (taskItem?.status === "failed" && statusError(taskItem)) || provider.last_refresh_error || "";
       const safeSource = safeProviderSource(provider);
       const sourceTitle = [
         safeSource,
@@ -1030,7 +1032,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       if (!operation.isCurrent()) return;
       if (!response?.ok || !response.task) {
-        throw new Error(response?.error || "无法启动外部资源更新");
+        throw new Error(requestErrorText(response) || "无法启动外部资源更新");
       }
       providerRefreshTask = response.task;
 
@@ -1045,7 +1047,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       setProviderRefreshIndicator(false);
       showProvidersPanelNotice(
-        `无法启动更新：${err.message || "未知错误"}；当前运行配置未改变。`,
+        `无法启动更新：${requestErrorText(err) || "未知错误"}；当前运行配置未改变。`,
         "error",
       );
       renderProvidersList();
@@ -1073,6 +1075,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateAllLatencyBadgesDOM();
     if (terminalGroupTestStatuses.has(task.status)) {
       finishGroupTestTask(task.id);
+      if (task.status === "failed" && previous?.status !== "failed") {
+        const reason = statusError(task);
+        if (reason) showToast(reason, "error");
+      }
     }
     if (groupTaskHealthChanged(previous, task) || probeSnapshotsDirty) void refreshProbeSnapshots();
   }
@@ -1427,7 +1433,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       else renderProxyControlState(response, toggleProxy.checked);
     } catch (err) {
       toggleProxy.checked = await StorageManager.isProxyModeEnabled();
-      setProxyControlDot("blocked", `代理控制失败: ${err.message}`);
+      setProxyControlDot("blocked", `代理控制失败: ${requestErrorText(err)}`);
     } finally {
       toggleProxy.disabled = false;
       proxyToggleWrapper.classList.remove("busy");
@@ -1474,7 +1480,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       if (generation !== instanceGeneration) return;
       renderInstanceSelector();
-      showToast(error.message || "未知错误", "error");
+      showToast(requestErrorText(error) || "未知错误", "error");
       void loadDashboard();
       return;
     }
@@ -1597,7 +1603,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
     } catch (error) {
       if (!scope.isCurrent()) return;
-      currentSiteResult.textContent = `检查失败：${error.message || "未知错误"}`;
+      currentSiteResult.textContent = `检查失败：${requestErrorText(error) || "未知错误"}`;
     } finally {
       if (currentSiteOperation === scope) {
         currentSiteOperation = null;
@@ -1711,7 +1717,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await chrome.tabs.create({ url });
       }
     } catch (err) {
-      showToast(`无法打开控制台: ${err.message || "未知错误"}`, "error");
+      showToast(`无法打开控制台: ${requestErrorText(err) || "未知错误"}`, "error");
     }
   }
 
@@ -1761,7 +1767,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
     } catch (err) {
       if (!scope.isCurrent()) return;
-      errorMessage = `切换失败: ${err.message || "未知错误"}`;
+      errorMessage = `切换失败: ${requestErrorText(err) || "未知错误"}`;
     } finally {
       if (outboundOperation === scope) {
         outboundOperation = null;
@@ -1938,7 +1944,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         el(
           "p",
           { style: { fontSize: "11px", color: "var(--text-dim)" } },
-          err.message || "未知错误",
+          requestErrorText(err) || "未知错误",
         ),
         retryBtn,
       );
@@ -2086,7 +2092,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!state || !state.ok) throw new Error(state?.error || "无法读取 Chrome 代理状态");
       renderProxyControlState(state, enabled);
     } catch (err) {
-      setProxyControlDot("blocked", `代理状态未知: ${err.message}`);
+      setProxyControlDot("blocked", `代理状态未知: ${requestErrorText(err)}`);
     }
   }
 
@@ -2228,7 +2234,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast(`已切换到 ${name}`, "success");
     } catch (error) {
       if (!isCurrent()) return;
-      showToast(`切换 Profile 失败: ${error.message || "未知错误"}`, "error");
+      showToast(`切换 Profile 失败: ${requestErrorText(error) || "未知错误"}`, "error");
       profileSelect.value = currentProfileStem || "";
     } finally {
       if (isCurrent()) {
@@ -2244,7 +2250,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!load.isCurrent()) return;
       if (result?.error) {
         badgeDnsDelay.textContent = "DNS: err";
-        badgeDnsDelay.title = result.error;
+        badgeDnsDelay.title = requestErrorText(result);
         return;
       }
       badgeDnsDelay.textContent = `DNS: ${result?.delay ?? "—"} ms`;
@@ -2252,7 +2258,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       if (!load.isCurrent()) return;
       badgeDnsDelay.textContent = "DNS: —";
-      badgeDnsDelay.title = error.message || "";
+      badgeDnsDelay.title = requestErrorText(error) || "";
     }
   }
 
@@ -2277,7 +2283,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!scope.isCurrent() || read !== moduleListRead) return;
       currentModules = [];
       modulesList.replaceChildren(
-        el("div", { className: "providers-empty error" }, error.message || "加载失败"),
+        el("div", { className: "providers-empty error" }, requestErrorText(error) || "加载失败"),
       );
     }
   }
@@ -2363,13 +2369,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         body,
       });
       if (!scope.isCurrent() || epoch !== moduleEpoch) return false;
-      if (!response?.ok) throw new Error(response?.error || "模块更新失败");
+      if (!response?.ok) throw new Error(requestErrorText(response) || "模块更新失败");
       if (body.url && response.task) moduleInstallPending = { ...body, id: response.task.id, taskNamespace: response.task.taskNamespace };
       applyModuleState({ task: response.task });
       return response.task?.status === "succeeded";
     } catch (error) {
       if (!scope.isCurrent() || epoch !== moduleEpoch) return false;
-      showModulesNotice(error.message || "模块更新失败", "error");
+      showModulesNotice(requestErrorText(error) || "模块更新失败", "error");
       return false;
     } finally {
       if (scope.isCurrent() && epoch === moduleEpoch) void syncModuleUpdate();
@@ -2470,7 +2476,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     if (task.status !== "succeeded") {
-      showModulesNotice(task.error, "error");
+      showModulesNotice(statusError(task), "error");
     } else {
       showModulesNotice("模块已更新", "");
       if (moduleInstallPending?.id === task.id && moduleInstallPending.taskNamespace === task.taskNamespace) {
@@ -2506,7 +2512,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!scope.isCurrent() || epoch !== moduleEpoch) return;
       if (!response?.ok) throw new Error(response?.error || "模块任务状态已改变，请重新检查");
     } catch (error) {
-      if (scope.isCurrent() && epoch === moduleEpoch) showModulesNotice(error.message, "error");
+      if (scope.isCurrent() && epoch === moduleEpoch) showModulesNotice(requestErrorText(error), "error");
     } finally {
       if (scope.isCurrent() && epoch === moduleEpoch) void syncModuleUpdate();
     }
@@ -2912,7 +2918,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       await refreshGroupsSelectionState(groupName);
     } catch (err) {
       if (!scope.isCurrent()) return;
-      showToast(`更新避开状态失败: ${err.message || err}`, "error");
+      showToast(`更新避开状态失败: ${requestErrorText(err) || err}`, "error");
     }
   }
 
@@ -2959,7 +2965,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (err) {
       if (!scope.isCurrent()) return;
-      showToast(`切换节点失败: ${err.message || err}`, "error");
+      showToast(`切换节点失败: ${requestErrorText(err) || err}`, "error");
       try {
         await refreshGroupsSelectionState(groupName);
       } catch {
@@ -3003,7 +3009,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (err) {
       if (!scope.isCurrent()) return;
-      showToast(`恢复自动选择失败: ${err.message || err}`, "error");
+      showToast(`恢复自动选择失败: ${requestErrorText(err) || err}`, "error");
     } finally {
       finishGroupSelection(groupName, scope, groupCard);
     }
@@ -3028,13 +3034,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           taskId,
         });
         if (!scope.isCurrent()) return;
-        if (!result?.ok) throw new Error(result?.error || "Unable to cancel group test");
+        if (!result?.ok) throw new Error(requestErrorText(result) || "Unable to cancel group test");
         applyGroupTestState(result.tasks);
       }
       showToast("已请求取消测速任务", "success");
     } catch (err) {
       if (!scope.isCurrent()) return;
-      showToast(`取消测速失败: ${err.message || err}`, "error");
+      showToast(`取消测速失败: ${requestErrorText(err) || err}`, "error");
       await restoreRecentGroupTests();
     } finally {
       if (cancellingGroupTests.get(groupName) === scope) {
@@ -3068,7 +3074,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         memberName: targetMember,
       });
       if (!scope.isCurrent()) return;
-      if (!result?.ok) throw new Error(result?.error || "Unable to start group test");
+      if (!result?.ok) throw new Error(requestErrorText(result) || "Unable to start group test");
       if (result.mode === "async") {
         activeGroupTests.set(result.task.id, {
           groupName,
@@ -3084,7 +3090,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       if (!scope.isCurrent()) return;
       console.error(`Group test failed: ${err.message}`);
-      showToast(`无法启动测速: ${err.message || err}`, "error");
+      showToast(`无法启动测速: ${requestErrorText(err) || err}`, "error");
       updateAllLatencyBadgesDOM();
     } finally {
       if (submittingGroupTests.get(operationKey) === scope) {
@@ -3144,6 +3150,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    * Paint a member latency badge: spinner / result text / empty (hover flash).
    */
   function applyLatencyBadge(badgeEl, latInfo, { member = "", pending = false } = {}) {
+    badgeEl.removeAttribute("data-i18n-ignore");
     if (pending) {
       badgeEl.className = "latency-badge lat-testing";
       badgeEl.title = "正在测速...";
@@ -3156,11 +3163,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       latInfo?.udpOk === true
         ? ` · UDP ${typeof latInfo.udpMs === "number" ? `${latInfo.udpMs}ms` : "ok"}`
         : latInfo?.udpOk === false
-          ? ` · UDP ${latInfo.udpErr || "failed"}`
+          ? ` · UDP ${coreError(latInfo.udp_error_code, undefined, latInfo.udpErr) || t("failed")}`
           : "";
     if (hasLatencyResult(latInfo) && !latInfo.ok) {
       // Failure reason only in native tooltip; badge shows a red "F".
-      badgeEl.title = `${latInfo.err || "Timeout"}${udpSummary}`;
+      if (latInfo.err || latInfo.udpErr) badgeEl.setAttribute("data-i18n-ignore", "");
+      badgeEl.title = `${coreError(latInfo.error_code, undefined, latInfo.err) || t("Timeout")}${udpSummary}`;
     } else if (subGroupTarget) {
       const subSel = subGroupTarget.override_member || subGroupTarget.selected;
       badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ""} - 点击测试`;

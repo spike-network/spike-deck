@@ -1,3 +1,5 @@
+import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -13,7 +15,7 @@ const node = () => ({value:'',dataset:{},children:[],classList:{add(){},remove()
 const document = {hidden:true,getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},
   createElement:node,addEventListener(){},removeEventListener(){}};
 const requests=[];
-const context = vm.createContext({document,console,URL,routeContext,
+const context = vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy,document,console,URL,routeContext,
   window:{setInterval(){},clearInterval(){},setTimeout(){},addEventListener(){}},
   chrome:{runtime:{onMessage:{addListener(){}},sendMessage:async()=>{throw new Error('mock stream unavailable');}}},
   StorageManager:{init:async()=>{},getActiveInstance:async()=>({baseUrl:'https://example.test',secret:'mock-secret'})},

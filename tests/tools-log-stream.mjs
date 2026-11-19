@@ -1,3 +1,5 @@
+import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -30,7 +32,7 @@ const makePort = (options) => {
 const api = new Proxy({}, { get: (_, key) => key === 'getLogs'
   ? async () => ({ event_namespace: 'boot-a', entries: [] })
   : async () => ({}) });
-const context = vm.createContext({ document, console,
+const context = vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy, document, console,
   window: { setInterval() { return 1; }, clearInterval() {}, clearTimeout() {},
     setTimeout(fn, delay) { timeouts.push({ fn, delay }); return timeouts.length; },
     addEventListener(name, fn) { windowListeners[name] = fn; } },

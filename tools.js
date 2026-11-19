@@ -13,6 +13,8 @@ import { chronological, downloadJournal } from './lib/journal-export.js';
 import { PanelObservation } from './lib/panels.js';
 import { ThroughputSession } from './lib/throughput.js';
 import { policyProbeRequest } from './lib/policy-probe.js';
+import { coreError, requestErrorText, statusError } from './lib/core-error.js';
+import { isRejectPolicy } from './lib/group-selection.js';
 import { reloadView, reloadStatusView } from './lib/reload-view.js';
 
 await initializeI18n();
@@ -143,7 +145,7 @@ function renderTransfer() {
   const rows = [];
   if (transfer.starting) rows.push(text('p', t(transfer.cancelRequested ? 'Cancellation will be sent when the task starts.' : 'Starting throughput test…')));
   if (transfer.error || transfer.uncertain) {
-    const error = text('p', t(transfer.error || 'Start result is unconfirmed. Check recent tasks before starting again.')); error.role = 'alert'; rows.push(error);
+    const error = text('p', transfer.detail || t(transfer.error || 'Start result is unconfirmed. Check recent tasks before starting again.'), undefined, !!transfer.detail); error.role = 'alert'; rows.push(error);
   }
   if (transfer.uncertain) {
     const dismiss = text('button', t('Forget unconfirmed start'));
@@ -155,7 +157,7 @@ function renderTransfer() {
     rows.push(text('p', task.policy, undefined, true));
     const progress = document.createElement('progress'); progress.max = Math.max(1, task.byte_limit); progress.value = Math.min(task.bytes, task.byte_limit);
     progress.setAttribute('aria-label', t('Transferred bytes')); rows.push(progress);
-    if (task.status === 'failed') rows.push(text('p', t('Throughput test failed. Check the policy and configured Testing URL.')));
+    if (task.status === 'failed') rows.push(text('p', statusError(task) || t('Throughput test failed. Check the policy and configured Testing URL.'), undefined, true));
     if (task.cancel_requested && ['queued', 'running'].includes(task.status)) rows.push(text('p', t('Cancellation requested')));
     const check = text('button', t('Check task status')); check.disabled = transfer.polling || transfer.starting || transfer.cancelling;
     check.addEventListener('click', () => transfer.check()); rows.push(check);
@@ -186,7 +188,7 @@ async function loadTransferPolicies() {
     if (probeBusy) { probeCatalogDeferred = true; return; }
     const usable = namespace && (!eventNamespace || namespace === eventNamespace);
     const selected = byId('throughput-policy').value || 'DIRECT';
-    probePolicies = [...new Set(['DIRECT', ...(result.policies || []).filter(item => item.type.toLowerCase() !== 'reject').map(item => item.name)])];
+    probePolicies = [...new Set(['DIRECT', ...(result.policies || []).filter(item => !isRejectPolicy(item.name)).map(item => item.name)])];
     probeNamespace = namespace; probeGeneration++;
     const previouslySelected = new Set(Array.from(byId('policy-probe-policies').selectedOptions || [], option => option.value));
     byId('policy-probe-policies').replaceChildren(...probePolicies.map(name => {
@@ -196,7 +198,14 @@ async function loadTransferPolicies() {
     byId('policy-probe-error').textContent = usable ? '' : t('Runtime identity unavailable. Reload the policy list before probing.');
     byId('policy-probe-start').disabled = !usable;
     const names = [...new Set([...probePolicies, selected])];
-    byId('throughput-policy').replaceChildren(...names.map(name => { const option = text('option', name, undefined, true); option.value = name; return option; }));
+    byId('throughput-policy').replaceChildren(...names.map(name => {
+      const capability = result.policies?.find(item => item.name === name)?.test_capabilities;
+      const reason = capability?.throughput === false
+        ? coreError(capability.unsupported_code, undefined, capability.unsupported_reason) : '';
+      const option = text('option', reason ? name + ' — ' + reason : name, undefined, true);
+      option.value = name;
+      return option;
+    }));
     byId('throughput-policy').value = selected;
     byId('throughput-policy-error').textContent = '';
   } catch {
@@ -222,19 +231,23 @@ async function runPolicyProbe(event) {
     let received;
     const result = await SpikeApiClient.probePolicies(instance, body, { runtimeNamespace: namespace, onRuntime: value => { received = value; } });
     if (!probeLive || generation !== probeGeneration) return;
-    if (received !== namespace || !Array.isArray(result.results) || result.error) throw new Error('Probe failed');
+    if (received !== namespace || !Array.isArray(result.results) || result.error) {
+      if (received === namespace && result.code) throw Object.assign(new Error(result.error), result);
+      throw new Error();
+    }
     const rows = body.policy_names.map(name => {
       const value = result.results.find(row => row.policy === name);
       const row = document.createElement('tr');
-      row.append(text('td', name, undefined, true), text('td', t(!value ? 'No result' : value.ok ? 'OK' : 'Failed')),
+      row.append(text('td', name, undefined, true), text('td', !value ? t('No result') : value.ok ? t('OK') :
+        [t('Failed'), value.error_code && statusError(value)].filter(Boolean).join(' · '), undefined, true),
         text('td', value?.ok && Number.isFinite(value.latency_ms) ? `${value.latency_ms} ms` : '—'));
       return row;
     });
     byId('policy-probe-results').replaceChildren(makeTable(['Policy', 'Status', 'Latency'], rows));
-  } catch {
+  } catch (error) {
     if (!probeLive || generation !== probeGeneration) return;
     byId('policy-probe-results').replaceChildren();
-    byId('policy-probe-error').textContent = t('Policy probe failed. Check the URL, policy selection and runtime, then retry.');
+    byId('policy-probe-error').textContent = (error?.code && requestErrorText(error)) || t('Policy probe failed. Check the URL, policy selection and runtime, then retry.');
   } finally {
     if (probeLive && generation === probeGeneration) {
       probeBusy = false; byId('policy-probe-start').disabled = !probeNamespace;
@@ -306,7 +319,7 @@ function connectionRow(row, live) {
       }
       tr.append(cell);
     });
-  tr.append(text('td', row.ok === false ? row.error || 'failed' : live ? 'live' : 'finished'));
+  tr.append(text('td', row.ok === false ? statusError(row) || t('failed') : t(live ? 'live' : 'finished'), undefined, true));
   const action = document.createElement('td');
   if (live) {
     const button = text('button', 'Kill');
@@ -628,7 +641,7 @@ async function loadScripts() {
 }
 
 function handleError(error) {
-  showNotice(error instanceof Error ? error.message : String(error));
+  showNotice(requestErrorText(error) || String(error));
 }
 
 async function loadAll() {
@@ -745,12 +758,13 @@ async function runReload(mode) {
         ? 'Profile reloaded. Restart-required changes remain pending.' : 'Profile reloaded.');
       void loadAll();
     }
-  } catch {
+  } catch (error) {
     if (current()) {
       byId('reload-operation-status').textContent = '';
       byId('reload-operation-error').textContent = t(reloadUnconfirmed
         ? 'Reload result is unconfirmed. Check runtime status before trying again.'
-        : 'Unable to read reload information. Check runtime status and configuration.');
+        : 'Unable to read reload information. Check runtime status and configuration.')
+        + (error?.status ? '\n' + requestErrorText(error) : '');
     }
   } finally {
     if (current()) { reloadBusy = false; updateReloadControls(); }
