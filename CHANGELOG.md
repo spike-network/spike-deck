@@ -19,6 +19,10 @@
 - **新增 `idle` 权限**：用于判断系统是否空闲或锁屏（无操作 120 秒视为空闲）。该权限不会触发安装提示。
 - **关闭代理模式时角标不再闪烁**：此前每次健康检查都会清空流量角标。
 
+### 🔌 连接 (Connections)
+
+- **工具页连接列表增量刷新**：Core 声明 `features.refresh_model` 时，工具页改用 `GET /spike/connections/changes` 的游标只取变化，并通过 `GET /spike/refresh/stream` 在连接变化后立即更新，另有 30 秒兜底轮询；没有记录变化时不重绘表格，已展开的详情保持不动。旧版 Core 行为不变。流量角标（1 秒）和健康检查（5 秒）不受影响。
+
 ### 🌐 界面语言 (Localization)
 
 - **显式文案 key**：新增 `lib/locales/en.js` 与 `lib/locales/zh-CN.js`，按 `options.form.save` 这样的 key 取文案。静态 HTML 用 `data-i18n`、`data-i18n-title`、`data-i18n-placeholder`、`data-i18n-aria-label` 标注，加载时一次性替换，切换语言时重新渲染。

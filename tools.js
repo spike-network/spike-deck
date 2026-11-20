@@ -15,6 +15,7 @@ import { ThroughputSession } from './lib/throughput.js';
 import { policyProbeRequest } from './lib/policy-probe.js';
 import { coreError, requestErrorText, statusError } from './lib/core-error.js';
 import { isRejectPolicy } from './lib/group-selection.js';
+import { ConnectionMirror } from './lib/connection-mirror.js';
 import { reloadView, reloadStatusView } from './lib/reload-view.js';
 
 await initializeI18n();
@@ -33,6 +34,9 @@ let logRead = null;
 let readinessSequence = 0;
 let connectionsSequence = 0;
 let connectionSnapshot = { live: [], recent: [] };
+// Incremental connection list, used only when Core advertises features.refresh_model.
+let connectionMirror = null;
+let connectionsIncremental = null;
 const openConnectionDetails = new Set();
 let connectionDisclosures = new Map();
 let probePolicies = [];
@@ -339,13 +343,102 @@ function connectionRow(row, live) {
   return tr;
 }
 
+async function useIncrementalConnections(target) {
+  if (connectionsIncremental !== null) return connectionsIncremental;
+  try {
+    const flag = (await SpikeApiClient.getApiInfo(target))?.features?.refresh_model;
+    connectionsIncremental = Number.isInteger(flag) && flag >= 1;
+    if (connectionsIncremental) connectionMirror ??= new ConnectionMirror();
+  } catch {
+    connectionsIncremental = false;
+  }
+  return connectionsIncremental;
+}
+
 async function loadConnections() {
   const target = instance;
   const sequence = ++connectionsSequence;
+  if (await useIncrementalConnections(target)) {
+    try {
+      const changes = await SpikeApiClient.getConnectionsChanges(target, connectionMirror.cursor);
+      if (instance !== target || sequence !== connectionsSequence) return;
+      // A refresh that changed no record keeps the rendered table, and its
+      // open details, as they are.
+      const changed = connectionMirror.apply(changes);
+      if (!changed && connectionSnapshot.sequence !== undefined) return;
+      connectionSnapshot = connectionMirror.snapshot();
+      renderConnections();
+      return;
+    } catch (error) {
+      // The cursor may belong to a failed read; start from a full copy next time.
+      connectionMirror.reset();
+      throw error;
+    }
+  }
   const data = await SpikeApiClient.getConnections(target);
   if (instance !== target || sequence !== connectionsSequence) return;
   connectionSnapshot = { live: data.live || [], recent: data.recent || [] };
   renderConnections();
+}
+
+const CONNECTIONS_FALLBACK_POLL_MS = 30000;
+let stopConnections = () => {};
+let pageGone = false;
+
+// Core announces connection changes; the page fetches the change feed when a
+// newer revision arrives, plus a slow poll in case an announcement is missed.
+// Older Core versions are not followed, as before.
+async function followConnections() {
+  const target = instance;
+  if (!(await useIncrementalConnections(target))) return () => {};
+  const controller = new AbortController();
+  let running = false;
+  let again = false;
+  const refresh = async () => {
+    if (document.hidden) return;
+    if (running) { again = true; return; }
+    running = true;
+    try {
+      do {
+        again = false;
+        await loadConnections();
+      } while (again && !controller.signal.aborted);
+    } catch { /* the next announcement or poll retries */ }
+    running = false;
+  };
+  const stream = async () => {
+    let delay = 1000;
+    while (!controller.signal.aborted && instance === target) {
+      let first = true;
+      try {
+        await SpikeApiClient.streamRefresh(target, {
+          signal: controller.signal,
+          onOpen: () => { delay = 1000; },
+          onMessage: (message) => {
+            if (message.event !== 'refresh') return;
+            const revision = Number(message.data?.connections);
+            if (!Number.isSafeInteger(revision)) return;
+            // Another Core process restarts revisions, so the first event of a
+            // connection is always compared by inequality.
+            if (first ? revision !== connectionMirror.revision : revision > connectionMirror.revision) void refresh();
+            first = false;
+          }
+        });
+      } catch { /* retried below */ }
+      if (controller.signal.aborted) return;
+      await new Promise((resolve) => window.setTimeout(resolve, delay));
+      delay = Math.min(30000, delay * 2);
+    }
+  };
+  const timer = window.setInterval(() => void refresh(), CONNECTIONS_FALLBACK_POLL_MS);
+  const onVisible = () => void refresh();
+  document.addEventListener('visibilitychange', onVisible);
+  void stream();
+  return () => {
+    controller.abort();
+    window.clearInterval(timer);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
 }
 
 function renderConnections() {
@@ -835,6 +928,8 @@ try {
   const timer = window.setInterval(refreshLogs, 3000);
   document.addEventListener('visibilitychange', refreshLogs);
   window.addEventListener('pagehide', () => {
+    pageGone = true;
+    stopConnections();
     panels.retire();
     retireLogStream();
     transfer.dispose();
@@ -844,6 +939,7 @@ try {
     document.removeEventListener('visibilitychange', refreshLogs);
   }, { once: true });
   await loadAll();
+  void followConnections().then((stop) => { stopConnections = stop; if (pageGone) stop(); });
 } catch (error) {
   handleError(error);
   byId('instance-label').textContent = msg("tools.activeInstanceUnavailable");
