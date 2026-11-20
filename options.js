@@ -22,7 +22,7 @@ import {
 document.addEventListener("DOMContentLoaded", async () => {
   initializeOptionsTabs(document, window);
   // Every string on this page is keyed, so no document observer is needed.
-  await initializeI18n({ observe: false });
+  await initializeI18n();
   await StorageManager.init();
 
   const instancesContainer = document.getElementById("instances-container");

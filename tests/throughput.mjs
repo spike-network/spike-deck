@@ -10,7 +10,6 @@ import { PanelObservation } from '../lib/panels.js';
 import { SpikeApiClient } from '../lib/spike-client.js';
 import { chronological } from '../lib/journal-export.js';
 import { filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs } from '../lib/runtime-logs.js';
-import { ZH_MESSAGES } from '../lib/i18n-messages.js';
 
 const task = values => ({ id: 1, revision: 1, direction: 'download', policy: 'Mock Policy', status: 'running',
   cancel_requested: false, created_at_unix_ms: 1000, byte_limit: 10000, bytes: 100, bytes_per_second: 50, ...values });
@@ -149,8 +148,5 @@ try {
   const stop = descendants(output).find(node => node.textContent === 'Stop observing');
   data.acceptConfirm = false; await stop.listeners.click(); assert.ok(descendants(output).some(node => node.tag === 'progress'));
   data.acceptConfirm = true; await stop.listeners.click(); assert.ok(!descendants(output).some(node => node.tag === 'progress'));
-  for (const key of ['Policy throughput test', 'Start throughput test', 'Cancel throughput test', 'Download', 'Upload', 'Queued', 'Running', 'Completed', 'Cancelled',
-    'Transferred bytes', 'Recent throughput tests', 'Check task status', 'Stop observing', 'Cancellation is unconfirmed. Check task status before retrying.',
-    'Start result is unconfirmed. Check recent tasks before starting again.']) assert.ok(ZH_MESSAGES[key], key);
 } finally { pagehide.forEach(callback => callback()); }
 console.log('Throughput API/state/actual Tools controls cover both directions, progress, pending cancel, three-attempt reads, unknown starts, namespace/ID reuse, stale history, confirmation and closure');

@@ -37,7 +37,7 @@
       <p data-i18n="tools.measureBoundedTransferThroughput">使用配置中 Testing 的 URL 进行有界吞吐测试。关闭此页后，测试仍在 Core 中继续。</p>
       <form id="throughput-form" class="form-grid">
         <label><span data-i18n="tools.direction">方向</span><select id="throughput-direction"><option value="download" data-i18n="tools.download">下载</option><option value="upload" data-i18n="tools.upload">上传</option></select></label>
-        <label><span data-i18n="common.policy">策略</span><select id="throughput-policy"><option data-i18n-ignore>DIRECT</option></select></label>
+        <label><span data-i18n="common.policy">策略</span><select id="throughput-policy"><option>DIRECT</option></select></label>
         <button id="throughput-start" type="submit" disabled data-i18n="tools.startThroughputTest">开始吞吐测试</button>
         <button id="throughput-cancel" type="button" disabled data-i18n="tools.cancelThroughputTest">取消吞吐测试</button>
       </form>
@@ -79,7 +79,7 @@
         <span id="logs-filter-count" class="muted" aria-live="polite">0 / 0</span>
         <button id="logs-filter-clear" type="button" data-i18n="tools.resetFilters">重置筛选</button>
       </div>
-      <pre id="logs-output" class="runtime-logs" data-i18n-ignore></pre>
+      <pre id="logs-output" class="runtime-logs"></pre>
     </section>
 
     <section class="panel wide">

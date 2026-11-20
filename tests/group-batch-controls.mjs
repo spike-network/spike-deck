@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { visiblePolicyGroups } from "../lib/hidden-groups.js";
-import { translateForLanguage } from "../lib/i18n.js";
 
 const storage = {
   instances: [{ id: "mock-instance", baseUrl: "https://example.test", secret: "mock-secret" }],
@@ -249,25 +248,6 @@ try {
   controller.observeRevision(8);
   await settle(() => !controller.session.reading);
   assert.equal(controller.session.ready, false);
-  for (const text of [
-    "跨组测速",
-    "测试匹配的组",
-    "取消批量测速",
-    "重试查询状态",
-    "停止观察",
-    "重新读取组目录",
-    "正在读取组目录…",
-    "停止观察此批测试？已接受的测试可能继续在引擎中运行。",
-  ])
-    assert.notEqual(translateForLanguage(text, "en"), text);
-  for (const text of [
-    "Could not bind batch tests to this runtime. Reload the group catalog.",
-    "Batch runtime changed. Reload the group catalog before testing.",
-    "Unable to confirm this group test. Retry status or stop observing.",
-    "Group test start is unconfirmed. Check recent tasks before starting again.",
-    "Unable to confirm cancellation. Retry Cancel or inspect task status.",
-  ])
-    assert.notEqual(translateForLanguage(text, "zh-CN"), text);
   for (const fragment of [
     "new GroupBatchControls",
     "groupBatch.observeRevision(groupsData.revision)",

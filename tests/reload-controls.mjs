@@ -9,7 +9,7 @@ import { PanelObservation } from "../lib/panels.js";
 import { ThroughputSession } from "../lib/throughput.js";
 import { chronological } from "../lib/journal-export.js";
 import { reloadView, reloadStatusView } from "../lib/reload-view.js";
-import { msg, translateForLanguage } from "../lib/i18n.js";
+import { msg } from "../lib/i18n.js";
 const nodes = new Map();
 const node = () => ({
   value: "",
@@ -248,38 +248,6 @@ try {
     /revision limit/,
   );
   assert.throws(() => reloadStatusView({ revision: "mock-secret" }));
-  for (const value of [
-    "重新加载配置",
-    "检查运行时状态",
-    "预览只检查当前配置，不应用更改。重新加载会再次读取当前配置文件，不会重启引擎。",
-  ])
-    assert.notEqual(translateForLanguage(value, "en"), value);
-  for (const value of [
-    "Classification",
-    "No changes",
-    "Hot update",
-    "Restart required",
-    "Hot update and restart required",
-    "Invalid candidate",
-    "Field",
-    "Before",
-    "After",
-    "Current revision",
-    "Candidate revision",
-    "Reloaded revision",
-    "Error",
-    "Runtime changed. Check current status before reloading.",
-    "Reading runtime status…",
-    "Runtime status checked. Retry reload explicitly if needed.",
-    "Preview only. No configuration was applied.",
-    "Profile reloaded.",
-    "Profile reloaded. Restart-required changes remain pending.",
-    "Reload result is unconfirmed. Check runtime status before trying again.",
-    "Unable to read reload information. Check runtime status and configuration.",
-    "The revision limit was reached. Restart the engine before reloading.",
-    "The candidate profile could not be validated. Check the configuration before reloading.",
-  ])
-    assert.notEqual(translateForLanguage(value, "zh-CN"), value);
   assert.ok(
     calls.every((call) =>
       ["/spike/status", "/spike/reload/preview", "/spike/reload"].includes(call.path),

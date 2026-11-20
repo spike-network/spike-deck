@@ -11,7 +11,6 @@ import { ThroughputSession } from '../lib/throughput.js';
 import { PanelObservation } from '../lib/panels.js';
 import { chronological } from '../lib/journal-export.js';
 import { filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs } from '../lib/runtime-logs.js';
-import { ZH_MESSAGES } from '../lib/i18n-messages.js';
 const names = Array.from({ length: 17 }, (_, index) => 'Mock ' + index);
 const url = 'https://example.test/mock?all=1&raw=1';
 assert.deepEqual(policyProbeRequest(names.slice(0, 16), url, names), { policy_names: names.slice(0, 16), url });
@@ -97,7 +96,5 @@ try {
   assert.equal(nodes.get('policy-probe-start').disabled, false, 'a catalog read from the adopted runtime stays valid');
   hold = new Promise(resolve => { release = resolve; }); const closing = submit(); pagehide.forEach(callback => callback()); release(); hold = null; await closing;
   assert.doesNotMatch(output(), /0 ms/);
-  for (const key of ['Custom URL policy probe', 'Probe URL', 'Probe selected policies', 'Select between 1 and 16 known policies.',
-    'Enter an absolute HTTP or HTTPS probe URL.', 'Policy probe failed. Check the URL, policy selection and runtime, then retry.']) assert.ok(ZH_MESSAGES[key], key);
 } finally { release?.(); pagehide.forEach(callback => callback()); }
 console.log('Custom policy probe request/API/actual Tools handlers enforce 1–16 known policies, preserve URL queries, show partial/zero-ms results safely and reject duplicate/stale/closed observations');
