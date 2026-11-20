@@ -13,6 +13,7 @@ const event = (key) => ({
 let beforeWrite = async () => {};
 const writes = [];
 globalThis.chrome = {
+  i18n: { getUILanguage: () => 'zh-CN' },
   action: { async setBadgeText() {}, async setBadgeBackgroundColor() {}, async setTitle() {} },
   storage: {
     local: {

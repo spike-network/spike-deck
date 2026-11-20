@@ -12,6 +12,7 @@ const storage = {
 };
 
 globalThis.chrome = {
+  i18n: { getUILanguage: () => 'zh-CN' },
   action: {
     setBadgeBackgroundColor() {},
     setBadgeText() {},

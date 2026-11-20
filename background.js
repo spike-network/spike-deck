@@ -4,7 +4,7 @@ import { dismissUnknownModuleUpdate, getModuleUpdateState, startModuleUpdate } f
 import { SpikeApiClient } from './lib/spike-client.js';
 import { getProxyControlState, invalidateProxyIntent, reconcileProxyIntent } from './lib/proxy-control.js';
 import { badgeTraffic, trafficTitle } from './lib/format-rate.js';
-import { initializeI18n } from './lib/i18n.js';
+import { initializeI18n, msg } from './lib/i18n.js';
 import { GROUP_TEST_TERMINAL_STATUSES, PROVIDER_REFRESH_ITEM_STATUSES } from './lib/control-api-contract.js';
 import {
   IDLE_DETECTION_SECONDS,
@@ -347,7 +347,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === 'GET_MODULE_UPDATE') {
     getModuleUpdateState(message.instanceId).then((state) => sendResponse({ ok: true, ...state }))
-      .catch(() => sendResponse({ ok: false, error: '暂时无法查询模块任务，正在重试' }));
+      .catch(() => sendResponse({ ok: false, error: msg("common.moduleTaskQueryFailed") }));
     return true;
   }
   if (message.type === 'DISMISS_UNKNOWN_MODULE_UPDATE') {
@@ -791,7 +791,7 @@ function providerRefreshOutcome(state, task) {
           failures[result.providerId] = {
             failedAtUnix: task.finishedAtUnix || Math.floor(Date.now() / 1000),
             error_code: result.error_code,
-            error: safeProviderRefreshError(result.error || task.error || '外部资源更新失败')
+            error: safeProviderRefreshError(result.error || task.error || msg("common.resourceUpdateFailed"))
           };
         } else if (result.status === 'succeeded') {
           delete failures[result.providerId];
@@ -811,7 +811,7 @@ function providerRefreshOutcome(state, task) {
           failedAtUnix: task.finishedAtUnix || Math.floor(Date.now() / 1000),
           error_code: task.error_code,
           error_args: task.error_args,
-          error: safeProviderRefreshError(task.error || '外部资源更新失败')
+          error: safeProviderRefreshError(task.error || msg("common.resourceUpdateFailed"))
         };
       }
     }
@@ -832,7 +832,7 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
         ...task,
         status: 'unknown',
         finishedAtUnix: Math.floor(Date.now() / 1000),
-        error: 'Core 已重启，无法确认此前更新任务的结果；请检查当前资源状态'
+        error: msg("background.coreRestartedSoEarlier")
       };
     }
     const providerResults = normalizeProviderRefreshResults(coreTask.provider_results);
@@ -844,7 +844,7 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
         ...task,
         status: 'failed',
         finishedAtUnix: Math.floor(Number(coreTask.completed_at_unix_ms || Date.now()) / 1000),
-        error: safeProviderRefreshError(coreTask.error || '外部资源更新失败'),
+        error: safeProviderRefreshError(coreTask.error || msg("common.resourceUpdateFailed")),
         error_code: coreTask.error_code,
         error_args: coreTask.error_args,
         revision: Number(coreTask.revision) || null,
@@ -874,7 +874,7 @@ async function reconcileCoreProviderRefreshTask(instance, task) {
         ...task,
         status: 'failed',
         finishedAtUnix: Math.floor(Date.now() / 1000),
-        error: 'Core 已不再保留此更新任务；请重新读取资源状态后再重试'
+        error: msg("background.coreNoLongerRetains")
       };
     }
     return task;
@@ -896,7 +896,7 @@ function normalizeProviderRefreshResults(results) {
       joined: result.joined === true,
       error_code: result.error_code,
       error: status === 'failed'
-        ? safeProviderRefreshError(result.error || '外部资源更新失败')
+        ? safeProviderRefreshError(result.error || msg("common.resourceUpdateFailed"))
         : null
     }];
   });
@@ -937,7 +937,7 @@ async function reconcileProviderRefreshTask(instance, task, requestError = null)
         finishedAtUnix: Math.floor(Date.now() / 1000),
         error: requestError
           ? safeProviderRefreshError(requestError)
-          : '外部资源更新失败；当前运行配置未改变'
+          : msg("background.resourceUpdateFailedActive")
       };
     }
   } catch {
@@ -959,7 +959,7 @@ async function reconcileProviderRefreshTask(instance, task, requestError = null)
       finishedAtUnix: Math.floor(Date.now() / 1000),
       error: requestError
         ? safeProviderRefreshError(requestError)
-        : '无法确认更新结果；请重新读取资源状态后再重试'
+        : msg("background.unableConfirmUpdateResult")
     };
   }
   return task;
@@ -977,7 +977,7 @@ async function reconcilePersistedProviderRefreshTasks() {
 }
 
 function safeProviderRefreshError(error) {
-  const raw = String(error?.message || error || '未知错误');
+  const raw = String(error?.message || error || msg("common.unknownError"));
   const redacted = raw.replace(/https?:\/\/[^\s"'<>]+/gi, (value) => {
     try {
       const url = new URL(value);
