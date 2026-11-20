@@ -1,7 +1,9 @@
+import "./helpers/lang-zh-cn.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { activeTabTarget, summarizeCurrentSite } from "../lib/current-site.js";
+import { msg } from "../lib/i18n.js";
 
 assert.deepEqual(activeTabTarget({ url: "https://www.example.test/path" }), {
   host: "www.example.test",
@@ -64,7 +66,7 @@ assert.equal(summarize({ policy_chain: ["Legacy", "Edge"] }).expectedPolicy, "Le
 const html = readFileSync(new URL("../popup.html", import.meta.url), "utf8");
 const css = readFileSync(new URL("../popup.css", import.meta.url), "utf8");
 const source = readFileSync(new URL("../popup.js", import.meta.url), "utf8");
-assert.match(source, /summary\.resolutionError \? "预期（解析失败）："/);
+assert.match(source, /summary\.resolutionError \? msg\("popup\.expectedResolutionFailed"\) : msg\("popup\.expected"\)/);
 assert.match(source, /el\("span", \{ className: "current-site-warning" \}, summary\.resolutionError\)/);
 assert.match(html, /id="current-site-panel"[^>]*\bhidden\b/);
 assert.match(css, /\.current-site-panel\[hidden\]\s*\{\s*display: none;/);
@@ -108,6 +110,7 @@ for (const route of [nativeRoute, { ...nativeRoute, ok: false, resolution: {
     activeTabTarget,
     summarizeCurrentSite,
     el: (tag, attributes, text) => ({ tag, attributes, text }),
+    msg,
   });
   await inspect();
   assert.equal(checkButton.disabled, false);

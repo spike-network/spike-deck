@@ -10,7 +10,7 @@ import {
   nextHiddenGroupsMode,
   visiblePolicyGroups,
 } from "./lib/hidden-groups.js";
-import { initializeI18n } from "./lib/i18n.js";
+import { initializeI18n, msg, onLanguageChange } from "./lib/i18n.js";
 import { GROUP_TEST_TERMINAL_STATUSES, OUTBOUND_MODES } from "./lib/control-api-contract.js";
 import { GroupBatchControls } from "./lib/group-batch-controls.js";
 import {
@@ -297,6 +297,9 @@ function hasLatencyResult(latInfo) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   await initializeI18n();
+  // Text built in script is not re-translated in place; a language switch made
+  // on another page reloads the popup so every label is rendered again.
+  onLanguageChange(() => window.location.reload());
   await StorageManager.init();
   const instances = await StorageManager.getInstances();
   let activeInstance = await StorageManager.getActiveInstance();
@@ -477,16 +480,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function providerStatusLabel(status) {
-    if (status === "ready") return "就绪";
-    if (status === "missing") return "缺失";
-    if (status === "stale") return "已过期";
-    if (status === "refreshing") return "更新中…";
-    if (status === "update_failed") return "更新失败";
-    if (status === "refresh_succeeded") return "已更新";
-    if (status === "queued") return "等待中…";
-    if (status === "skipped") return "已跳过";
-    if (status === "unknown") return "待确认";
-    return status || "未知";
+    if (status === "ready") return msg("common.ready");
+    if (status === "missing") return msg("popup.missing");
+    if (status === "stale") return msg("common.stale");
+    if (status === "refreshing") return msg("popup.updating");
+    if (status === "update_failed") return msg("common.updateFailed");
+    if (status === "refresh_succeeded") return msg("popup.updated");
+    if (status === "queued") return msg("popup.waiting");
+    if (status === "skipped") return msg("popup.skipped");
+    if (status === "unknown") return msg("popup.pendingConfirmation");
+    return status || msg("common.unknown");
   }
 
   function safeProviderSource(provider) {
@@ -502,12 +505,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function providerDisplayName(provider) {
-    return provider?.group || safeProviderSource(provider) || provider?.id || "未命名资源";
+    return provider?.group || safeProviderSource(provider) || provider?.id || msg("popup.unnamedResource");
   }
 
   function formatProviderInterval(seconds) {
     const value = Number(seconds) || 0;
-    if (value <= 0) return "手动";
+    if (value <= 0) return msg("popup.manual");
     if (value < 60) return `${value}s`;
     if (value < 3600) return `${Math.round(value / 60)}m`;
     if (value < 86400) return `${Math.round(value / 3600)}h`;
@@ -515,14 +518,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function formatProviderAbsoluteTime(unixSeconds) {
-    if (!unixSeconds) return "从未";
+    if (!unixSeconds) return msg("popup.never");
     return new Date(unixSeconds * 1000).toLocaleString();
   }
 
   function outboundModeLabel(mode) {
-    if (mode === "direct") return "全部直连";
-    if (mode === "global") return "全局代理";
-    return "规则模式";
+    if (mode === "direct") return msg("popup.directAll");
+    if (mode === "global") return msg("popup.globalProxy");
+    return msg("popup.ruleMode");
   }
 
   function outboundPolicyNames(policies, groups, rememberedPolicy) {
@@ -563,7 +566,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ? preferred
         : currentOutboundPolicies[0];
     } else {
-      outboundPolicySelect.appendChild(el("option", { value: "" }, "无可用策略"));
+      outboundPolicySelect.appendChild(el("option", { value: "" }, msg("popup.noAvailablePolicies")));
       outboundPolicySelect.value = "";
     }
 
@@ -586,13 +589,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       unavailable || outboundBusy || currentOutboundPolicies.length === 0;
 
     if (unavailable) {
-      outboundModeState.textContent = unavailableMessage || "当前核心不支持";
+      outboundModeState.textContent = unavailableMessage || msg("popup.notSupportedCurrentCore");
       updateQuickSummaries();
       return;
     }
     outboundModeState.textContent =
       outbound.mode === "global"
-        ? `${outboundModeLabel(outbound.mode)} · ${outbound.global_policy || outboundPolicySelect.value || "未选择"}`
+        ? `${outboundModeLabel(outbound.mode)} · ${outbound.global_policy || outboundPolicySelect.value || msg("popup.notSelected")}`
         : outboundModeLabel(outbound.mode);
     updateQuickSummaries();
   }
@@ -609,31 +612,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   function formatProviderRelativeTime(unixSeconds) {
     if (!unixSeconds) return "—";
     const delta = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
-    if (delta < 60) return "刚刚";
+    if (delta < 60) return msg("popup.justNow");
     if (delta < 3600) {
       const minutes = Math.floor(delta / 60);
-      return `${minutes} 分钟前`;
+      return msg("popup.minutesMinAgo", { minutes });
     }
     if (delta < 86400) {
       const hours = Math.floor(delta / 3600);
-      return `${hours} 小时前`;
+      return msg("popup.hoursHrAgo", { hours });
     }
     const days = Math.floor(delta / 86400);
-    return `${days} 天前`;
+    return msg("popup.daysDAgo", { days });
   }
 
   function summarizeProviderRefreshTask(task) {
     const parts = [];
     if (task.providerId) {
       const target = currentProviders.find((provider) => provider.id === task.providerId);
-      parts.push(`已更新：${target ? providerDisplayName(target) : "所选资源"}`);
+      parts.push(msg("popup.updatedValue", { value: target ? providerDisplayName(target) : msg("popup.selectedResources") }));
     } else {
-      parts.push("全部外部资源更新完成");
+      parts.push(msg("popup.allResourcesUpdated"));
     }
     if (Number.isFinite(task.ready) && Number.isFinite(task.total)) {
-      parts.push(`${task.ready}/${task.total} 就绪`);
+      parts.push(msg("popup.readyTotalReady", { ready: task.ready, total: task.total }));
     }
-    if (Number(task.missing) > 0) parts.push(`${task.missing} 缺失`);
+    if (Number(task.missing) > 0) parts.push(msg("popup.missingMissing", { missing: task.missing }));
     if (task.revision) parts.push(`rev ${task.revision}`);
     return parts.join(" · ");
   }
@@ -665,17 +668,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function updateQuickSummaries() {
-    const instanceName = activeInstance?.name || "未配置";
+    const instanceName = activeInstance?.name || msg("common.notConfigured");
     quickInstanceValue.textContent = instanceName;
-    btnQuickInstance.title = `实例：${instanceName}`;
+    btnQuickInstance.title = msg("popup.instanceInstancename", { instanceName });
 
     const outboundShort = currentOutbound ? outboundModeLabel(currentOutbound.mode) : "—";
     quickOutboundValue.textContent = outboundShort;
     btnQuickOutbound.title = currentOutbound
       ? currentOutbound.mode === "global"
-        ? `${outboundShort} · ${currentOutbound.global_policy || outboundPolicySelect.value || "未选择"}`
+        ? `${outboundShort} · ${currentOutbound.global_policy || outboundPolicySelect.value || msg("popup.notSelected")}`
         : outboundShort
-      : outboundModeState.textContent || "运行模式";
+      : outboundModeState.textContent || msg("popup.runtimeMode");
 
     const profileText = currentProfileStem || profileSelect.value || "—";
     quickProfileValue.textContent = profileText;
@@ -688,7 +691,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     providersPanel.hidden = !open;
     btnRefreshProviders.setAttribute("aria-expanded", open ? "true" : "false");
     btnRefreshProviders.classList.toggle("active", open);
-    btnRefresh.title = open ? "刷新外部资源状态" : "刷新列表";
+    btnRefresh.title = open ? msg("popup.refreshResourceStatus") : msg("popup.refreshList");
     modulesPanel.hidden = true;
     btnModules.setAttribute("aria-expanded", "false");
     appContainer?.classList.toggle("dock-view", open);
@@ -727,7 +730,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       providersRefreshing = false;
       providersPanelCount.textContent = "";
       providersList.replaceChildren(
-        el("div", { className: "providers-empty" }, "未配置 Spike 实例"),
+        el("div", { className: "providers-empty" }, msg("popup.noSpikeInstanceConfigured")),
       );
       btnProvidersRefreshAll.disabled = true;
       return;
@@ -738,7 +741,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           "div",
           { className: "providers-empty" },
           el("span", { className: "mini-spinner" }),
-          el("span", {}, "正在加载外部资源…"),
+          el("span", {}, msg("popup.loadingResources")),
         ),
       );
       providersPanelCount.textContent = "";
@@ -763,7 +766,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           el(
             "div",
             { className: "providers-empty error" },
-            `加载失败: ${requestErrorText(err) || "未知错误"}`,
+            msg("popup.loadFailedError", { error: requestErrorText(err) || msg("common.unknownError") }),
           ),
         );
         btnProvidersRefreshAll.disabled = true;
@@ -841,14 +844,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         const progress = providerTaskProgress(task);
         showProvidersPanelNotice(
           statusError(task) || (progress.failed > 0
-            ? `更新失败：${progress.failed} 个资源未更新。`
-            : "外部资源更新失败。"),
+            ? msg("popup.failedResourcesFailedUpdate", { failed: progress.failed })
+            : msg("popup.externalResourceUpdateFailed")),
           "error",
         );
       } else if (task.status === "unknown" && isProvidersPanelOpen()) {
         handledProviderTaskState = stateKey;
         showProvidersPanelNotice(
-          summarizeProviderRefreshError(task.error || "无法确认外部资源更新结果。"),
+          summarizeProviderRefreshError(task.error || msg("popup.unableConfirmExternalResource")),
           "error",
         );
       }
@@ -876,10 +879,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const flashUntil = Math.min(...[...providerObservations.values()].map(row => row.updatedUntil).filter(time => time > Date.now()));
     if (Number.isFinite(flashUntil)) providerFlashTimer = setTimeout(renderProvidersList, flashUntil - Date.now() + 5);
     const count = currentProviders.length;
-    providersPanelCount.textContent = count > 0 ? `${count} 项` : "";
+    providersPanelCount.textContent = count > 0 ? msg("popup.countItems", { count }) : "";
     const headerBusy = providersRefreshing || [...providerRefreshOperations].some(operation => operation.isCurrent());
     btnProvidersRefreshAll.disabled = !activeInstance || !currentProviders.some(provider => providerRefreshState(provider) === "idle");
-    btnProvidersRefreshAll.textContent = "全部更新";
+    btnProvidersRefreshAll.textContent = msg("popup.updateAll");
     btnProvidersRefreshAll.classList.toggle("testing", headerBusy);
     setProviderRefreshIndicator(headerBusy);
 
@@ -888,7 +891,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         el(
           "div",
           { className: "providers-empty" },
-          "未配置外部资源（policy-path / RULE-SET / DOMAIN-SET）",
+          msg("popup.noResourcesConfiguredPolicy"),
         ),
       );
       return;
@@ -906,12 +909,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const safeSource = safeProviderSource(provider);
       const sourceTitle = [
         safeSource,
-        provider.group ? `组: ${provider.group}` : null,
-        `来源: ${provider.source_kind || "unknown"}`,
-        `可用性: ${provider.availability || "unknown"}`,
-        `新鲜度: ${provider.freshness || "unknown"}`,
-        `间隔: ${formatProviderInterval(provider.update_interval_seconds)}`,
-        `更新: ${formatProviderAbsoluteTime(provider.last_updated_unix)}`,
+        provider.group ? msg("popup.groupGroup", { group: provider.group }) : null,
+        msg("popup.sourceValue", { value: provider.source_kind || "unknown" }),
+        msg("popup.availabilityValue", { value: provider.availability || "unknown" }),
+        msg("popup.freshnessValue", { value: provider.freshness || "unknown" }),
+        msg("popup.intervalValue", { value: formatProviderInterval(provider.update_interval_seconds) }),
+        msg("popup.updatedValue2", { value: formatProviderAbsoluteTime(provider.last_updated_unix) }),
       ]
         .filter(Boolean)
         .join("\n");
@@ -922,22 +925,22 @@ document.addEventListener("DOMContentLoaded", async () => {
           type: "button",
           className: "btn-provider-row-update",
           disabled: !activeInstance || rowUpdating,
-          title: provider.source_kind === "local" ? "重新读取此本地资源" : "强制下载并应用此资源",
+          title: provider.source_kind === "local" ? msg("popup.reloadLocalResource") : msg("popup.downloadApplyResource"),
           onClick: (e) => {
             e.stopPropagation();
             void runProviderRefresh(provider.id);
           },
         },
-        rowUpdating ? "…" : provider.source_kind === "local" ? "重读" : "更新",
+        rowUpdating ? "…" : provider.source_kind === "local" ? msg("popup.reload") : msg("common.update"),
       );
 
       const metaParts = [];
       metaParts.push(
         provider.source_kind === "remote"
-          ? "远程"
+          ? msg("popup.remote")
           : provider.source_kind === "local"
-            ? "本地"
-            : provider.source_kind || "未知",
+            ? msg("popup.local")
+            : provider.source_kind || msg("common.unknown"),
       );
       metaParts.push(formatProviderInterval(provider.update_interval_seconds));
 
@@ -1032,7 +1035,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       if (!operation.isCurrent()) return;
       if (!response?.ok || !response.task) {
-        throw new Error(requestErrorText(response) || "无法启动外部资源更新");
+        throw new Error(requestErrorText(response) || msg("popup.unableStartResourceUpdate"));
       }
       providerRefreshTask = response.task;
 
@@ -1047,7 +1050,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       setProviderRefreshIndicator(false);
       showProvidersPanelNotice(
-        `无法启动更新：${requestErrorText(err) || "未知错误"}；当前运行配置未改变。`,
+        msg("popup.unableStartUpdateError", { error: requestErrorText(err) || msg("common.unknownError") }),
         "error",
       );
       renderProvidersList();
@@ -1192,10 +1195,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       button.classList.toggle("testing", testing || submitting);
       button.classList.toggle("cancelling", cancelling);
       button.disabled = cancelling || submitting || (groupBatch.reserved.includes(button.dataset.group) && !testing);
-      button.title = cancelling ? "正在取消该组测速" : testing ? "取消该组测速" : "测试该组延迟";
+      button.title = cancelling ? msg("popup.cancellingGroupTest") : testing ? msg("popup.cancelGroupTest") : msg("popup.testGroupLatency");
       button.setAttribute("aria-label", button.title);
       const label = button.querySelector(".group-test-action-label");
-      if (label) label.textContent = cancelling ? "取消中" : "取消";
+      if (label) label.textContent = cancelling ? msg("popup.cancelling") : msg("popup.cancel");
     });
   }
 
@@ -1391,7 +1394,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderInstanceSelector() {
     instanceSelect.replaceChildren();
     if (instances.length === 0) {
-      const opt = el("option", { value: "" }, "无可用实例");
+      const opt = el("option", { value: "" }, msg("popup.noAvailableInstances"));
       instanceSelect.appendChild(opt);
     } else {
       instances.forEach((inst) => {
@@ -1414,7 +1417,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   toggleProxy.addEventListener("change", async (e) => {
     if (!activeInstance) {
       toggleProxy.checked = false;
-      showToast("请先配置并激活 Spike 实例", "error");
+      showToast(msg("popup.configureActivateSpikeInstance"), "error");
       return;
     }
     const enabled = e.target.checked;
@@ -1426,14 +1429,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: "UPDATE_PROXY_SETTING",
       });
       if (!response || !response.ok) {
-        throw new Error(response?.error || "无法更新浏览器代理设置");
+        throw new Error(response?.error || msg("popup.unableUpdateBrowserProxy"));
       }
       toggleProxy.checked = await StorageManager.isProxyModeEnabled();
       if (response.superseded) await refreshProxyControlState();
       else renderProxyControlState(response, toggleProxy.checked);
     } catch (err) {
       toggleProxy.checked = await StorageManager.isProxyModeEnabled();
-      setProxyControlDot("blocked", `代理控制失败: ${requestErrorText(err)}`);
+      setProxyControlDot("blocked", msg("popup.proxyControlFailedError", { error: requestErrorText(err) }));
     } finally {
       toggleProxy.disabled = false;
       proxyToggleWrapper.classList.remove("busy");
@@ -1446,9 +1449,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const generation = ++instanceGeneration;
     currentSiteOperation = null;
     btnCurrentSiteCheck.disabled = false;
-    currentSiteHost.textContent = "等待检查";
+    currentSiteHost.textContent = msg("popup.notChecked");
     currentSiteHost.title = "";
-    currentSiteResult.textContent = "查看当前标签页的规则预期线路与现有连接实际线路。";
+    currentSiteResult.textContent = msg("popup.compareActiveTabS");
     profileSwitchOperation = null;
     btnProfileSwitch.disabled = true;
     profileInventoryFailed = true;
@@ -1465,7 +1468,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (generation !== instanceGeneration) return;
       if (!granted) {
         renderInstanceSelector();
-        showToast("❌ 未获得该实例的主机访问权限", "error");
+        showToast(msg("popup.hostPermissionNotGranted"), "error");
         void loadDashboard();
         return;
       }
@@ -1480,7 +1483,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       if (generation !== instanceGeneration) return;
       renderInstanceSelector();
-      showToast(requestErrorText(error) || "未知错误", "error");
+      showToast(requestErrorText(error) || msg("common.unknownError"), "error");
       void loadDashboard();
       return;
     }
@@ -1515,9 +1518,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentProfileStem = "";
     profileName.textContent = "-";
     profileName.title = "";
-    badgeGroups.textContent = "组: -";
-    badgeNodes.textContent = "节点: -";
-    badgeRules.textContent = "规则: -";
+    badgeGroups.textContent = msg("popup.groups");
+    badgeNodes.textContent = msg("popup.nodes");
+    badgeRules.textContent = msg("popup.rules");
     profileSelect.replaceChildren();
     managedBadge.hidden = true;
     renderTraffic(null);
@@ -1525,7 +1528,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     badgeDnsDelay.title = "";
     proxyListeners.replaceChildren(el("span", { className: "proxy-listener-empty" }, "-"));
     setProviderRefreshIndicator(false);
-    renderOutboundMode(null, [], "切换实例中…");
+    renderOutboundMode(null, [], msg("popup.switchingInstance"));
     chrome.runtime.sendMessage({ type: "UPDATE_PROXY_SETTING" });
     void loadDashboard();
     if (isProvidersPanelOpen()) {
@@ -1554,21 +1557,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     const scope = captureInstanceRequest();
     if (currentSiteOperation?.isCurrent()) return;
     if (!scope.instance) {
-      currentSiteResult.textContent = "请先配置并连接 Spike 实例。";
+      currentSiteResult.textContent = msg("popup.configureConnectSpikeInstance");
       return;
     }
     currentSiteOperation = scope;
     btnCurrentSiteCheck.disabled = true;
-    currentSiteHost.textContent = "等待检查";
+    currentSiteHost.textContent = msg("popup.notChecked");
     currentSiteHost.title = "";
-    currentSiteResult.textContent = "正在检查当前标签页…";
+    currentSiteResult.textContent = msg("popup.inspectingActiveTab");
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!scope.isCurrent()) return;
       const target = activeTabTarget(tab);
       if (!target) {
-        currentSiteHost.textContent = "不可检查";
-        currentSiteResult.textContent = "当前页面不是可检查的 HTTP 或 HTTPS 网站。";
+        currentSiteHost.textContent = msg("popup.unavailable2");
+        currentSiteResult.textContent = msg("popup.activePageNotInspectable");
         return;
       }
       currentSiteHost.textContent = target.host;
@@ -1580,30 +1583,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!scope.isCurrent()) return;
       const summary = summarizeCurrentSite(target, route, connections);
       currentSiteResult.replaceChildren(
-        el("span", {}, summary.resolutionError ? "预期（解析失败）：" : "预期："),
+        el("span", {}, summary.resolutionError ? msg("popup.expectedResolutionFailed") : msg("popup.expected")),
         el("strong", {}, summary.expectedPolicy),
-        el("span", {}, ` · 规则：${summary.rule}`),
+        el("span", {}, ` ${msg("popup.ruleRule", { rule: summary.rule })}`),
         ...(summary.resolutionError
           ? [el("br"), el("span", { className: "current-site-warning" }, summary.resolutionError)]
           : []),
         el("br"),
-        el("span", {}, "现有连接："),
+        el("span", {}, msg("popup.existingConnections")),
         el("strong", {}, summary.actualPolicy),
-        el("span", {}, ` · ${summary.connectionCount} 条`),
+        el("span", {}, ` ${msg("popup.connectioncountConnections", { connectionCount: summary.connectionCount })}`),
         ...(summary.reused
           ? [
               el("br"),
               el(
                 "span",
                 { className: "current-site-warning" },
-                "现有连接可能早于最近一次线路切换；只有新连接使用新决策。",
+                msg("popup.existingConnectionsMayPredate"),
               ),
             ]
           : []),
       );
     } catch (error) {
       if (!scope.isCurrent()) return;
-      currentSiteResult.textContent = `检查失败：${requestErrorText(error) || "未知错误"}`;
+      currentSiteResult.textContent = msg("popup.inspectionFailedError", { error: requestErrorText(error) || msg("common.unknownError") });
     } finally {
       if (currentSiteOperation === scope) {
         currentSiteOperation = null;
@@ -1695,12 +1698,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function openEmbeddedUi() {
     if (!activeInstance) {
-      showToast("请先配置并激活 Spike 实例", "error");
+      showToast(msg("popup.configureActivateSpikeInstance"), "error");
       return;
     }
     const url = SpikeApiClient.dashboardUrl(activeInstance);
     if (!url) {
-      showToast("当前实例没有 Control API 地址", "error");
+      showToast(msg("popup.currentInstanceNoControl"), "error");
       return;
     }
     try {
@@ -1717,7 +1720,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await chrome.tabs.create({ url });
       }
     } catch (err) {
-      showToast(`无法打开控制台: ${requestErrorText(err) || "未知错误"}`, "error");
+      showToast(msg("popup.unableOpenDashboardError", { error: requestErrorText(err) || msg("common.unknownError") }), "error");
     }
   }
 
@@ -1726,7 +1729,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   outboundPolicySelect.addEventListener("change", () => {
-    renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
+    renderOutboundMode(currentOutbound, currentOutboundPolicies, msg("popup.coreDoesNotExpose"));
   });
 
   outboundModeButtons.forEach((button) => {
@@ -1744,11 +1747,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentOutboundPolicies[0] ||
       "";
     if (mode === "global" && !policy) {
-      outboundModeState.textContent = "请选择全局策略";
+      outboundModeState.textContent = msg("popup.selectGlobalPolicy");
       return;
     }
     outboundOperation = scope;
-    renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
+    renderOutboundMode(currentOutbound, currentOutboundPolicies, msg("popup.coreDoesNotExpose"));
     let errorMessage = "";
     try {
       const outbound = await SpikeApiClient.setOutbound(
@@ -1767,12 +1770,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
     } catch (err) {
       if (!scope.isCurrent()) return;
-      errorMessage = `切换失败: ${requestErrorText(err) || "未知错误"}`;
+      errorMessage = msg("popup.switchFailedError", { error: requestErrorText(err) || msg("common.unknownError") });
     } finally {
       if (outboundOperation === scope) {
         outboundOperation = null;
         if (scope.isCurrent()) {
-          renderOutboundMode(currentOutbound, currentOutboundPolicies, "核心未暴露 /spike/outbound");
+          renderOutboundMode(currentOutbound, currentOutboundPolicies, msg("popup.coreDoesNotExpose"));
           if (errorMessage) outboundModeState.textContent = errorMessage;
         }
       }
@@ -1813,13 +1816,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!instance) {
       load.pending = false;
       btnRefresh.classList.remove("testing");
-      setStatus("offline", "未配置实例");
+      setStatus("offline", msg("popup.noInstanceConfigured"));
       profileName.textContent = "-";
       profileName.title = "";
       managedBadge.hidden = true;
-      badgeGroups.textContent = "组: -";
-      badgeNodes.textContent = "节点: -";
-      badgeRules.textContent = "规则: -";
+      badgeGroups.textContent = msg("popup.groups");
+      badgeNodes.textContent = msg("popup.nodes");
+      badgeRules.textContent = msg("popup.rules");
       badgeDnsDelay.textContent = "DNS: —";
       currentProfileStem = "";
       profileInventoryInstance = null;
@@ -1829,19 +1832,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderTraffic(null);
       publishTrafficSample(null, "no instance");
       proxyListeners.replaceChildren(el("span", { className: "proxy-listener-empty" }, "-"));
-      renderOutboundMode(null, [], "未配置实例");
+      renderOutboundMode(null, [], msg("popup.noInstanceConfigured"));
       renderNoInstanceGuidance();
       return;
     }
 
     btnRefresh.classList.add("testing");
-    setStatus("testing", "正在连接...");
+    setStatus("testing", msg("popup.connecting2"));
 
     const loadingNode = el(
       "div",
       { className: "loading-placeholder" },
       el("div", { className: "spinner" }),
-      el("span", {}, "正在加载 Spike 策略组..."),
+      el("span", {}, msg("popup.loadingSpikePolicyGroups")),
     );
     groupsContainer.replaceChildren(loadingNode);
 
@@ -1872,13 +1875,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       ]);
       if (!load.isCurrent()) return;
 
-      setStatus("online", "已连接");
+      setStatus("online", msg("common.connected"));
       profileName.textContent = status.profile || "Default";
       profileName.title = status.profile || "";
       currentProfileStem = SpikeApiClient.profileStem(status.profile || "");
-      badgeGroups.textContent = `组: ${status.groups || groupsData.groups?.length || 0}`;
-      badgeNodes.textContent = `节点: ${status.leaves || 0}`;
-      badgeRules.textContent = `规则: ${status.rules || 0}`;
+      badgeGroups.textContent = msg("popup.groupGroup", { group: status.groups || groupsData.groups?.length || 0 });
+      badgeNodes.textContent = msg("popup.nodesValue", { value: status.leaves || 0 });
+      badgeRules.textContent = msg("popup.rulesValue", { value: status.rules || 0 });
       renderProxyListeners(status);
       void refreshTraffic();
       void refreshProfileControls(status, load);
@@ -1898,7 +1901,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderOutboundMode(
         outbound,
         outboundPolicyNames(policies, currentGroupsData, outbound?.global_policy),
-        "核心未暴露 /spike/outbound",
+        msg("popup.coreDoesNotExpose"),
       );
 
       // Ingest persisted probe results from all group member_info fields
@@ -1908,24 +1911,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       void restoreRecentGroupTests();
     } catch (err) {
       if (!load.isCurrent()) return;
-      setStatus("offline", "未连接");
+      setStatus("offline", msg("popup.notConnected"));
       profileName.textContent = "-";
       profileName.title = "";
       managedBadge.hidden = true;
-      badgeGroups.textContent = "组: -";
-      badgeNodes.textContent = "节点: -";
-      badgeRules.textContent = "规则: -";
+      badgeGroups.textContent = msg("popup.groups");
+      badgeNodes.textContent = msg("popup.nodes");
+      badgeRules.textContent = msg("popup.rules");
       badgeDnsDelay.textContent = "DNS: —";
       currentProfileStem = "";
       profileSelect.replaceChildren(el("option", { value: "" }, "—"));
       renderTraffic(null);
       publishTrafficSample(null, err.message || "unreachable");
       proxyListeners.replaceChildren(el("span", { className: "proxy-listener-empty" }, "-"));
-      renderOutboundMode(null, [], "连接后可用");
+      renderOutboundMode(null, [], msg("popup.availableAfterConnecting"));
 
       if (cachedGroupsRendered) {
-        setStatus("offline", "离线 · 缓存");
-        popupInteractions.announce("实时连接不可用，正在显示缓存策略组");
+        setStatus("offline", msg("popup.offlineCached"));
+        popupInteractions.announce(msg("popup.liveConnectionUnavailableShowing"));
         scheduleOfflineRetry();
         return;
       }
@@ -1933,18 +1936,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       const retryBtn = el(
         "button",
         { id: "btn-retry", className: "icon-btn", style: { marginTop: "6px" } },
-        "重试连接",
+        msg("popup.retryConnection"),
       );
       retryBtn.addEventListener("click", () => loadDashboard());
 
       const errorNode = el(
         "div",
         { className: "empty-state" },
-        el("p", {}, "连不上这个 Spike 实例"),
+        el("p", {}, msg("popup.unableConnectSpikeInstance")),
         el(
           "p",
           { style: { fontSize: "11px", color: "var(--text-dim)" } },
-          requestErrorText(err) || "未知错误",
+          requestErrorText(err) || msg("common.unknownError"),
         ),
         retryBtn,
       );
@@ -1983,7 +1986,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const configBtn = el(
       "button",
       { type: "button", id: "btn-onboarding-config", className: "btn-onboarding-action" },
-      "前往配置实例",
+      msg("popup.configureInstance"),
     );
     configBtn.addEventListener("click", () => {
       if (chrome.runtime.openOptionsPage) {
@@ -1997,11 +2000,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       "div",
       { className: "empty-state onboarding-state" },
       iconWrapper,
-      el("h3", { className: "onboarding-title" }, "欢迎使用 SpikeDeck"),
+      el("h3", { className: "onboarding-title" }, msg("popup.welcomeSpikedeck")),
       el(
         "p",
         { className: "onboarding-desc" },
-        "添加一个 Spike 实例（控制面地址，可选密钥），就可以在这里切换节点和策略组。",
+        msg("popup.addSpikeInstanceControl"),
       ),
       configBtn,
     );
@@ -2067,7 +2070,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const listeners = proxyListenerSummary(proxyListenersFromStatus(status, activeInstance));
     if (listeners.length === 0) {
       proxyListeners.replaceChildren(
-        el("span", { className: "proxy-listener-empty" }, "未发现 HTTP / SOCKS5 / Mixed"),
+        el("span", { className: "proxy-listener-empty" }, msg("popup.noHttpSocks5Mixed")),
       );
       return;
     }
@@ -2089,10 +2092,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const state = await chrome.runtime.sendMessage({
         type: "GET_PROXY_SETTING_STATE",
       });
-      if (!state || !state.ok) throw new Error(state?.error || "无法读取 Chrome 代理状态");
+      if (!state || !state.ok) throw new Error(state?.error || msg("popup.unableReadChromeProxy"));
       renderProxyControlState(state, enabled);
     } catch (err) {
-      setProxyControlDot("blocked", `代理状态未知: ${requestErrorText(err)}`);
+      setProxyControlDot("blocked", msg("popup.proxyStatusUnknownValue", { value: requestErrorText(err) }));
     }
   }
 
@@ -2104,18 +2107,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderProxyControlState(state, enabled) {
     if (enabled && state.releasedForUnhealthy) {
-      setProxyControlDot("blocked", "Spike 不可达，已交回代理控制；恢复后将自动接管");
+      setProxyControlDot("blocked", msg("popup.spikeUnreachableProxyControl"));
       return;
     }
     if (enabled && state.controlledBySpikeDeck) {
-      setProxyControlDot("owned", "SpikeDeck 正在接管浏览器代理");
+      setProxyControlDot("owned", msg("popup.spikedeckManagingBrowserProxy"));
       return;
     }
     if (enabled && state.levelOfControl === "controlled_by_other_extensions") {
-      setProxyControlDot("blocked", "浏览器代理当前由其他扩展控制");
+      setProxyControlDot("blocked", msg("popup.anotherExtensionCurrentlyControls"));
       return;
     }
-    setProxyControlDot("", "未接管；其他代理扩展可控制浏览器");
+    setProxyControlDot("", msg("popup.notManagedOtherProxy"));
   }
 
   function groupTestTaskKey(task) {
@@ -2231,10 +2234,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       await loadDashboard({ force: true });
       if (!isCurrent()) return;
       setQuickPanel(null);
-      showToast(`已切换到 ${name}`, "success");
+      showToast(msg("popup.switchedName", { name }), "success");
     } catch (error) {
       if (!isCurrent()) return;
-      showToast(`切换 Profile 失败: ${requestErrorText(error) || "未知错误"}`, "error");
+      showToast(msg("popup.failedSwitchProfileError", { error: requestErrorText(error) || msg("common.unknownError") }), "error");
       profileSelect.value = currentProfileStem || "";
     } finally {
       if (isCurrent()) {
@@ -2268,10 +2271,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!scope) {
       currentModules = [];
       modulesPanelCount.textContent = "";
-      modulesList.replaceChildren(el("div", { className: "providers-empty" }, "未配置 Spike 实例"));
+      modulesList.replaceChildren(el("div", { className: "providers-empty" }, msg("popup.noSpikeInstanceConfigured")));
       return;
     }
-    modulesList.replaceChildren(el("div", { className: "providers-empty" }, "正在加载模块…"));
+    modulesList.replaceChildren(el("div", { className: "providers-empty" }, msg("popup.loadingModules")));
     try {
       const data = await SpikeApiClient.getModules(scope.instance);
       if (!scope.isCurrent() || read !== moduleListRead) return;
@@ -2283,14 +2286,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!scope.isCurrent() || read !== moduleListRead) return;
       currentModules = [];
       modulesList.replaceChildren(
-        el("div", { className: "providers-empty error" }, requestErrorText(error) || "加载失败"),
+        el("div", { className: "providers-empty error" }, requestErrorText(error) || msg("popup.loadFailed")),
       );
     }
   }
 
   function renderModulesList() {
     if (!currentModules.length) {
-      modulesList.replaceChildren(el("div", { className: "providers-empty" }, "没有已安装模块"));
+      modulesList.replaceChildren(el("div", { className: "providers-empty" }, msg("popup.noInstalledModules")));
       return;
     }
     modulesList.replaceChildren(
@@ -2303,13 +2306,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           el(
             "div",
             { className: "provider-row-meta" },
-            el("span", {}, module.enabled ? "已启用" : "已停用"),
+            el("span", {}, module.enabled ? msg("popup.enabled") : msg("popup.disabled")),
           ),
         );
         const toggle = el(
           "button",
           { className: "btn-provider-action", type: "button", disabled: moduleBusy },
-          module.enabled ? "停用" : "启用",
+          module.enabled ? msg("popup.disable") : msg("popup.enable"),
         );
         toggle.addEventListener("click", () => {
           void runModuleUpdate({ [module.name]: !module.enabled });
@@ -2317,7 +2320,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const uninstall = el(
           "button",
           { className: "btn-provider-action", type: "button", disabled: moduleBusy },
-          "卸载",
+          msg("popup.uninstall"),
         );
         uninstall.addEventListener("click", () => {
           if (uninstall.dataset.armed) {
@@ -2325,10 +2328,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
           }
           uninstall.dataset.armed = "true";
-          uninstall.textContent = "确认卸载";
+          uninstall.textContent = msg("popup.confirmUninstall");
           setTimeout(() => {
             delete uninstall.dataset.armed;
-            uninstall.textContent = "卸载";
+            uninstall.textContent = msg("popup.uninstall");
           }, 2500);
         });
         row.append(toggle, uninstall);
@@ -2346,7 +2349,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function showModulesUpdating() {
-    showModulesNotice("正在更新模块…", "");
+    showModulesNotice(msg("popup.updatingModules"), "");
     popupInteractions.setTaskRunning("modules", true);
   }
 
@@ -2369,13 +2372,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         body,
       });
       if (!scope.isCurrent() || epoch !== moduleEpoch) return false;
-      if (!response?.ok) throw new Error(requestErrorText(response) || "模块更新失败");
+      if (!response?.ok) throw new Error(requestErrorText(response) || msg("popup.moduleUpdateFailed"));
       if (body.url && response.task) moduleInstallPending = { ...body, id: response.task.id, taskNamespace: response.task.taskNamespace };
       applyModuleState({ task: response.task });
       return response.task?.status === "succeeded";
     } catch (error) {
       if (!scope.isCurrent() || epoch !== moduleEpoch) return false;
-      showModulesNotice(requestErrorText(error) || "模块更新失败", "error");
+      showModulesNotice(requestErrorText(error) || msg("popup.moduleUpdateFailed"), "error");
       return false;
     } finally {
       if (scope.isCurrent() && epoch === moduleEpoch) void syncModuleUpdate();
@@ -2402,7 +2405,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     hideModulesNotice();
     moduleTaskActions.hidden = true;
     delete moduleTaskDismiss.dataset.armed;
-    moduleTaskDismiss.textContent = "清除未知结果";
+    moduleTaskDismiss.textContent = msg("popup.clearUnknownResult");
     if (modulePollTimer !== null) clearTimeout(modulePollTimer);
     modulePollTimer = null;
     moduleRetryDelay = 1000;
@@ -2431,7 +2434,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       try {
         const response = await chrome.runtime.sendMessage({ type: "GET_MODULE_UPDATE", instanceId: scope.instance.id });
         if (!scope.isCurrent() || epoch !== moduleEpoch || moduleSync !== load) return;
-        if (!response?.ok) throw new Error(response?.error || "暂时无法查询模块任务，正在重试");
+        if (!response?.ok) throw new Error(response?.error || msg("common.moduleTaskQueryFailed"));
         applyModuleState(response);
         if (response.error) throw new Error(response.error);
         moduleRetryDelay = 1000;
@@ -2440,7 +2443,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         moduleBusy = true;
         moduleCanDismiss = false;
         moduleTaskActions.hidden = false;
-        showModulesNotice("暂时无法查询模块任务，正在重试", "error");
+        showModulesNotice(msg("common.moduleTaskQueryFailed"), "error");
         updateModuleControls();
         scheduleModulePoll(moduleRetryDelay);
         moduleRetryDelay = Math.min(moduleRetryDelay * 2, 30000);
@@ -2460,7 +2463,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     moduleTaskActions.hidden = !moduleBusy;
     if (previous?.id !== task?.id || previous?.sequence !== task?.sequence || task?.status !== "unknown") {
       delete moduleTaskDismiss.dataset.armed;
-      moduleTaskDismiss.textContent = "清除未知结果";
+      moduleTaskDismiss.textContent = msg("popup.clearUnknownResult");
     }
     updateModuleControls();
     if (!task) { hideModulesNotice(); return; }
@@ -2470,7 +2473,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     if (task.status === "unknown") {
-      showModulesNotice(task.error || "无法确认模块更新结果；请重新检查当前状态，勿重复提交", "error");
+      showModulesNotice(task.error || msg("popup.moduleUpdateOutcomeUnknown"), "error");
       if (previous?.id !== task.id || previous?.status !== task.status) void loadModulesList();
       if (!state.error) scheduleModulePoll(5000);
       return;
@@ -2478,7 +2481,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (task.status !== "succeeded") {
       showModulesNotice(statusError(task), "error");
     } else {
-      showModulesNotice("模块已更新", "");
+      showModulesNotice(msg("popup.modulesUpdated"), "");
       if (moduleInstallPending?.id === task.id && moduleInstallPending.taskNamespace === task.taskNamespace) {
         if (moduleNameInput.value.trim() === moduleInstallPending.name && moduleUrlInput.value.trim() === moduleInstallPending.url) {
           moduleNameInput.value = "";
@@ -2500,8 +2503,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!scope || !moduleCanDismiss || task?.status !== "unknown") return;
     if (moduleTaskDismiss.dataset.armed !== task.id) {
       moduleTaskDismiss.dataset.armed = task.id;
-      moduleTaskDismiss.textContent = "确认清除";
-      showModulesNotice("清除仅解除操作锁定，不会重放请求，也不代表上次更新成功。", "error");
+      moduleTaskDismiss.textContent = msg("popup.confirmClear");
+      showModulesNotice(msg("popup.clearingOnlyUnlocksActions"), "error");
       return;
     }
     const epoch = ++moduleEpoch;
@@ -2510,7 +2513,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const response = await chrome.runtime.sendMessage({ type: "DISMISS_UNKNOWN_MODULE_UPDATE", instanceId: scope.instance.id, taskId: task.id, taskSequence: task.sequence });
       if (!scope.isCurrent() || epoch !== moduleEpoch) return;
-      if (!response?.ok) throw new Error(response?.error || "模块任务状态已改变，请重新检查");
+      if (!response?.ok) throw new Error(response?.error || msg("popup.moduleTaskStateChanged"));
     } catch (error) {
       if (scope.isCurrent() && epoch === moduleEpoch) showModulesNotice(requestErrorText(error), "error");
     } finally {
@@ -2560,7 +2563,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         el(
           "div",
           { className: "empty-state" },
-          normalizedFilter ? "没有匹配项。换个关键字试试。" : "这个实例还没有策略组。",
+          normalizedFilter ? msg("popup.noMatchesTryAnother") : msg("popup.instanceNoPolicyGroups"),
         ),
       );
       return;
@@ -2590,7 +2593,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "button",
         {
           className: "btn-test-group",
-          title: "测试该组延迟",
+          title: msg("popup.testGroupLatency"),
           dataset: { group: group.name },
           onClick: async (e) => {
             e.stopPropagation();
@@ -2605,7 +2608,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           },
         },
         createFlashIcon(13),
-        el("span", { className: "group-test-action-label" }, "取消"),
+        el("span", { className: "group-test-action-label" }, msg("popup.cancel")),
       );
 
       const selectedSummaryEl = el(
@@ -2622,8 +2625,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         "button",
         {
           className: "btn-resume-auto",
-          title: "恢复自动选择",
-          "aria-label": "恢复自动选择",
+          title: msg("popup.resumeAutomaticSelection"),
+          "aria-label": msg("popup.resumeAutomaticSelection"),
           hidden: !isOverridden,
           onClick: async (event) => {
             event.preventDefault();
@@ -2640,8 +2643,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             "span",
             {
               className: "hidden-kind-badge",
-              title: "隐藏组",
-              "aria-label": "隐藏组",
+              title: msg("popup.hiddenGroup"),
+              "aria-label": msg("popup.hiddenGroup"),
             },
             createEyeOffIcon(11),
           )
@@ -2744,7 +2747,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               {
                 type: "button",
                 className: `avoid-toggle${avoidance.avoided ? " avoided" : ""}`,
-                title: avoidance.avoided ? "取消在自动策略组中避开" : "在自动策略组中避开",
+                title: avoidance.avoided ? msg("popup.stopAvoidingAutomaticGroups") : msg("popup.avoidAutomaticGroups"),
                 "aria-pressed": avoidance.avoided,
                 onClick: async (e) => {
                   e.stopPropagation();
@@ -2752,7 +2755,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 },
                 onKeydown: (e) => e.stopPropagation(),
               },
-              avoidance.avoided ? "已避开" : "避开",
+              avoidance.avoided ? msg("popup.avoided") : msg("popup.avoid"),
             )
           : null;
 
@@ -2778,8 +2781,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           {
             className: `member-item ${isSelected ? "selected" : ""}${isPinnedMember ? " pinned" : ""}`,
             dataset: { group: group.name, member: member },
-            title: isPinnedMember ? "再次点击可恢复自动选择" : undefined,
-            "aria-label": isPinnedMember ? "恢复自动选择" : `选择 ${member}`,
+            title: isPinnedMember ? msg("popup.clickAgainResumeAutomatic") : undefined,
+            "aria-label": isPinnedMember ? msg("popup.resumeAutomaticSelection") : msg("popup.selectMember", { member }),
             "aria-pressed": isSelected || isPinnedMember,
             tabindex: memberAction !== "none" ? "0" : undefined,
             role: memberAction !== "none" ? "button" : undefined,
@@ -2866,8 +2869,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const memberAction = groupMemberAction(group, item.dataset.member);
       item.classList.toggle("selected", isTarget);
       item.classList.toggle("pinned", isPinned);
-      item.title = isPinned ? "再次点击可恢复自动选择" : "";
-      item.setAttribute("aria-label", isPinned ? "恢复自动选择" : `选择 ${item.dataset.member}`);
+      item.title = isPinned ? msg("popup.clickAgainResumeAutomatic") : "";
+      item.setAttribute("aria-label", isPinned ? msg("popup.resumeAutomaticSelection") : msg("popup.selectMember", { member: item.dataset.member }));
       if (memberAction === "none") {
         item.removeAttribute("role");
         item.removeAttribute("tabindex");
@@ -2918,7 +2921,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       await refreshGroupsSelectionState(groupName);
     } catch (err) {
       if (!scope.isCurrent()) return;
-      showToast(`更新避开状态失败: ${requestErrorText(err) || err}`, "error");
+      showToast(msg("popup.failedUpdateAvoidanceError", { error: requestErrorText(err) || err }), "error");
     }
   }
 
@@ -2965,7 +2968,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (err) {
       if (!scope.isCurrent()) return;
-      showToast(`切换节点失败: ${requestErrorText(err) || err}`, "error");
+      showToast(msg("popup.failedSwitchNodeError", { error: requestErrorText(err) || err }), "error");
       try {
         await refreshGroupsSelectionState(groupName);
       } catch {
@@ -3004,12 +3007,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       } catch (err) {
         if (!scope.isCurrent()) return;
         updateAllLatencyBadgesDOM();
-        showToast("已恢复自动选择，但暂时无法刷新状态");
+        showToast(msg("popup.automaticSelectionResumedStatus"));
         console.warn(`Cleared override but failed to refresh groups: ${err.message}`);
       }
     } catch (err) {
       if (!scope.isCurrent()) return;
-      showToast(`恢复自动选择失败: ${requestErrorText(err) || err}`, "error");
+      showToast(msg("popup.failedResumeAutomaticSelection", { error: requestErrorText(err) || err }), "error");
     } finally {
       finishGroupSelection(groupName, scope, groupCard);
     }
@@ -3037,10 +3040,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!result?.ok) throw new Error(requestErrorText(result) || "Unable to cancel group test");
         applyGroupTestState(result.tasks);
       }
-      showToast("已请求取消测速任务", "success");
+      showToast(msg("popup.testCancellationRequested"), "success");
     } catch (err) {
       if (!scope.isCurrent()) return;
-      showToast(`取消测速失败: ${requestErrorText(err) || err}`, "error");
+      showToast(msg("popup.failedCancelTestError", { error: requestErrorText(err) || err }), "error");
       await restoreRecentGroupTests();
     } finally {
       if (cancellingGroupTests.get(groupName) === scope) {
@@ -3090,7 +3093,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       if (!scope.isCurrent()) return;
       console.error(`Group test failed: ${err.message}`);
-      showToast(`无法启动测速: ${requestErrorText(err) || err}`, "error");
+      showToast(msg("popup.unableStartTestError", { error: requestErrorText(err) || err }), "error");
       updateAllLatencyBadgesDOM();
     } finally {
       if (submittingGroupTests.get(operationKey) === scope) {
@@ -3153,7 +3156,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     badgeEl.removeAttribute("data-i18n-ignore");
     if (pending) {
       badgeEl.className = "latency-badge lat-testing";
-      badgeEl.title = "正在测速...";
+      badgeEl.title = msg("popup.testing");
       badgeEl.replaceChildren(el("span", { className: "mini-spinner" }));
       return;
     }
@@ -3163,19 +3166,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       latInfo?.udpOk === true
         ? ` · UDP ${typeof latInfo.udpMs === "number" ? `${latInfo.udpMs}ms` : "ok"}`
         : latInfo?.udpOk === false
-          ? ` · UDP ${coreError(latInfo.udp_error_code, undefined, latInfo.udpErr) || t("failed")}`
+          ? ` · UDP ${coreError(latInfo.udp_error_code, undefined, latInfo.udpErr) || msg("common.failed")}`
           : "";
     if (hasLatencyResult(latInfo) && !latInfo.ok) {
       // Failure reason only in native tooltip; badge shows a red "F".
       if (latInfo.err || latInfo.udpErr) badgeEl.setAttribute("data-i18n-ignore", "");
-      badgeEl.title = `${coreError(latInfo.error_code, undefined, latInfo.err) || t("Timeout")}${udpSummary}`;
+      badgeEl.title = `${coreError(latInfo.error_code, undefined, latInfo.err) || msg("popup.timeout")}${udpSummary}`;
     } else if (subGroupTarget) {
       const subSel = subGroupTarget.override_member || subGroupTarget.selected;
-      badgeEl.title = `子分组: ${member}${subSel ? ` (指向: ${subSel})` : ""} - 点击测试`;
+      badgeEl.title = subSel
+        ? msg("popup.subgroupTarget", { member, target: subSel })
+        : msg("popup.subgroup", { member });
     } else if (hasLatencyResult(latInfo) && latInfo.at) {
-      badgeEl.title = `测试时间: ${new Date(latInfo.at).toLocaleTimeString()}${udpSummary} - 点击重新测试`;
+      badgeEl.title = msg("popup.testedAt", { time: new Date(latInfo.at).toLocaleTimeString(), udp: udpSummary });
     } else {
-      badgeEl.title = "点击单独测试该节点";
+      badgeEl.title = msg("popup.testNode");
     }
 
     if (!hasLatencyResult(latInfo)) {
@@ -3209,7 +3214,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function applyEventAction(hash) {
     switch (hash) {
       case '#event-providers':
-        void openProvidersPanel().catch(() => showToast('无法打开外部资源，请重试。', 'error'));
+        void openProvidersPanel().catch(() => showToast(msg("popup.unableOpenExternalResources"), 'error'));
         return true;
       case '#event-config':
         setQuickPanel('profile'); quickPanelProfile.scrollIntoView({ block: 'start' }); return true;

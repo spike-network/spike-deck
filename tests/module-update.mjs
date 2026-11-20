@@ -1,3 +1,4 @@
+import "./helpers/lang-zh-cn.mjs";
 import assert from "node:assert/strict";
 
 const storage = {
@@ -10,6 +11,7 @@ const storage = {
 const notices = [];
 let failWrite = () => false;
 globalThis.chrome = {
+  i18n: { getUILanguage: () => "zh-CN" },
   runtime: {
     async sendMessage(value) {
       notices.push(structuredClone(value));

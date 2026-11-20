@@ -1,3 +1,4 @@
+import "./helpers/lang-zh-cn.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 

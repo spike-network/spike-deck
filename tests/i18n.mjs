@@ -35,6 +35,7 @@ const {
   getCurrentLanguage,
   initializeI18n,
   messageMatches,
+  onLanguageChange,
   resolvePreferredLanguage,
   setCurrentLanguage,
   translateForLanguage,
@@ -108,6 +109,22 @@ assert.equal(getCurrentLanguage(), "zh-CN");
 assert.equal(await setCurrentLanguage("en"), "en");
 assert.equal(stored[UI_LANGUAGE_KEY], "en");
 await assert.rejects(() => setCurrentLanguage("fr"), /Unsupported UI language/);
+
+{
+  let changes = 0;
+  onLanguageChange(() => {
+    changes += 1;
+  });
+  await setCurrentLanguage("zh-CN");
+  assert.equal(changes, 1);
+  // A storage event that does not change the language is ignored.
+  for (const listener of changeListeners) {
+    listener({ [UI_LANGUAGE_KEY]: { newValue: "zh-CN" } }, "local");
+  }
+  assert.equal(changes, 1);
+  await setCurrentLanguage("en");
+  assert.equal(changes, 2);
+}
 
 for (const page of ["popup.html", "options.html", "tools.html"]) {
   const html = await readFile(new URL(`../${page}`, import.meta.url), "utf8");

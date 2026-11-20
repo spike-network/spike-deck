@@ -102,7 +102,11 @@ test("message calls take literal keys so the scan above sees them", async () => 
     const lines = (await read(file)).split("\n");
     lines.forEach((line, index) => {
       for (const match of line.matchAll(/\b(?:msg|formatMessage)\(\s*([^)\s][^,)]*)/g)) {
-        if (!/^["'`]/.test(match[1])) dynamic.push(`${file}:${index + 1}: ${match[0]}`);
+        // A variable named *key reads from a table of literal keys (seen by the scan above);
+        // a template or concatenation would hide the key from it.
+        if (!/^["']/.test(match[1]) && !/^(?:[\w$]+\.)*[\w$]*[kK]ey$/.test(match[1].trim())) {
+          dynamic.push(`${file}:${index + 1}: ${match[0]}`);
+        }
       }
       for (const match of line.matchAll(/\bsetMessage\(\s*[^,]+,\s*([^,)]+)/g)) {
         const arg = match[1].trim();

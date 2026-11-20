@@ -1,4 +1,6 @@
+import './helpers/lang-zh-cn.mjs';
 import assert from 'node:assert/strict';
+import { msg } from '../lib/i18n.js';
 import { readFileSync } from 'node:fs';
 const tools = readFileSync(new URL('../tools.js', import.meta.url), 'utf8');
 const popup = readFileSync(new URL('../popup.js', import.meta.url), 'utf8');
@@ -26,11 +28,11 @@ for (const target of ['unknown', 'https://example.test/', 'javascript:mock', '__
 const calls = [];
 let providerFailure = false;
 const notices = [];
-const route = new Function('openProvidersPanel', 'setQuickPanel', 'quickPanelProfile', 'groupsContainer', 'window', 'showToast',
+const route = new Function('openProvidersPanel', 'setQuickPanel', 'quickPanelProfile', 'groupsContainer', 'window', 'showToast', 'msg',
   popup.slice(popup.indexOf('  function applyEventAction('), popup.indexOf('  // Initial load')) + '\nreturn applyEventAction;')(
   async () => { calls.push('providers'); if (providerFailure) throw new Error('mock-secret'); }, value => calls.push(value),
   { scrollIntoView: () => calls.push('profile-scroll') }, { scrollIntoView: () => calls.push('groups-scroll') },
-  { scrollTo: (...args) => calls.push(args) }, message => notices.push(message));
+  { scrollTo: (...args) => calls.push(args) }, message => notices.push(message), msg);
 for (const hash of ['#event-providers', '#event-config', '#event-groups', '#event-overview']) assert.equal(route(hash), true);
 assert.deepEqual(calls, ['providers', 'profile', 'profile-scroll', 'groups-scroll', [0, 0]]);
 for (const hash of ['#unknown', '#event-https://example.test/', undefined]) assert.equal(route(hash), false);

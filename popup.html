@@ -20,32 +20,32 @@
           <span class="title">SpikeDeck</span>
           <div class="status-indicator" id="status-indicator" role="status" aria-live="polite">
             <span class="status-dot offline" id="status-dot"></span>
-            <span class="status-text" id="status-text">未连接</span>
+            <span class="status-text" id="status-text" data-i18n="popup.notConnected">未连接</span>
           </div>
         </div>
       </div>
       
       <div class="header-actions">
-        <button id="btn-refresh" class="icon-btn" title="刷新列表">
+        <button id="btn-refresh" class="icon-btn" title="刷新列表" data-i18n-title="popup.refreshList">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
             <polyline points="21 3 21 9 15 9"></polyline>
           </svg>
         </button>
-        <button id="btn-current-site-toggle" class="icon-btn" title="当前网站线路" aria-label="当前网站线路" aria-expanded="false" aria-controls="current-site-panel">
+        <button id="btn-current-site-toggle" class="icon-btn" title="当前网站线路" data-i18n-title="popup.currentSiteRoute" aria-label="当前网站线路" data-i18n-aria-label="popup.currentSiteRoute" aria-expanded="false" aria-controls="current-site-panel">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <path d="m16.2 7.8-2.4 6-6 2.4 2.4-6 6-2.4z"></path>
           </svg>
         </button>
-        <button id="btn-refresh-providers" class="icon-btn provider-refresh-btn" title="外部资源" aria-label="外部资源" aria-expanded="false" aria-controls="providers-panel">
+        <button id="btn-refresh-providers" class="icon-btn provider-refresh-btn" title="外部资源" data-i18n-title="common.resources" aria-label="外部资源" data-i18n-aria-label="common.resources" aria-expanded="false" aria-controls="providers-panel">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
             <path d="M12 12v9"></path>
             <path d="m8 17 4 4 4-4"></path>
           </svg>
         </button>
-        <button id="btn-modules" class="icon-btn modules-btn" title="模块" aria-label="模块" aria-expanded="false" aria-controls="modules-panel">
+        <button id="btn-modules" class="icon-btn modules-btn" title="模块" data-i18n-title="common.modules" aria-label="模块" data-i18n-aria-label="common.modules" aria-expanded="false" aria-controls="modules-panel">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="7" height="7"></rect>
             <rect x="14" y="3" width="7" height="7"></rect>
@@ -53,7 +53,7 @@
             <rect x="3" y="14" width="7" height="7"></rect>
           </svg>
         </button>
-        <a href="tools.html" target="_blank" class="icon-btn" title="运行工具" aria-label="运行工具">
+        <a href="tools.html" target="_blank" class="icon-btn" title="运行工具" data-i18n-title="common.runtimeTools" aria-label="运行工具" data-i18n-aria-label="common.runtimeTools">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a4 4 0 0 0-5-5L7.4 3.6l3 3 2.3-2.3a4 4 0 0 0 2 2z"></path>
             <path d="m5 13-3.5 3.5a2.1 2.1 0 0 0 3 3L8 16"></path>
@@ -61,14 +61,14 @@
             <path d="m14 10 6.5 6.5a2.1 2.1 0 0 1-3 3L11 13"></path>
           </svg>
         </a>
-        <button id="btn-embedded-ui" class="icon-btn" title="打开控制台" aria-label="打开控制台">
+        <button id="btn-embedded-ui" class="icon-btn" title="打开控制台" data-i18n-title="popup.openDashboard" aria-label="打开控制台" data-i18n-aria-label="popup.openDashboard">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
             <polyline points="15 3 21 3 21 9"></polyline>
             <line x1="10" y1="14" x2="21" y2="3"></line>
           </svg>
         </button>
-        <button id="btn-options" class="icon-btn" title="管理实例与设置">
+        <button id="btn-options" class="icon-btn" title="管理实例与设置" data-i18n-title="popup.manageInstancesSettings">
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -80,23 +80,23 @@
     <section id="modules-panel" class="providers-panel" hidden aria-labelledby="modules-panel-title">
       <div class="providers-panel-header">
         <div class="providers-panel-title-group">
-          <span id="modules-panel-title" class="providers-panel-title">模块</span>
+          <span id="modules-panel-title" class="providers-panel-title" data-i18n="common.modules">模块</span>
           <span id="modules-panel-count" class="providers-panel-count"></span>
         </div>
-        <button type="button" id="btn-modules-close" class="btn-provider-action" title="关闭">关闭</button>
+        <button type="button" id="btn-modules-close" class="btn-provider-action" title="关闭" data-i18n-title="popup.close" data-i18n="popup.close">关闭</button>
       </div>
       <div id="modules-panel-notice" class="providers-panel-notice" role="status" aria-live="polite" hidden></div>
       <div class="providers-panel-actions" id="module-task-actions" hidden>
-        <button type="button" id="btn-module-task-check" class="btn-provider-action">重新检查</button>
-        <button type="button" id="btn-module-task-dismiss" class="btn-provider-action" hidden>清除未知结果</button>
+        <button type="button" id="btn-module-task-check" class="btn-provider-action" data-i18n="common.checkAgain">重新检查</button>
+        <button type="button" id="btn-module-task-dismiss" class="btn-provider-action" hidden data-i18n="popup.clearUnknownResult">清除未知结果</button>
       </div>
       <form id="module-install-form" class="module-install-form">
-        <input id="module-name-input" type="text" placeholder="名称" required>
+        <input id="module-name-input" type="text" placeholder="名称" data-i18n-placeholder="popup.name" required>
         <input id="module-url-input" type="url" placeholder="https://modules.example.test/a.sgmodule" required>
-        <button type="submit" id="btn-module-install" class="btn-provider-action primary">安装</button>
+        <button type="submit" id="btn-module-install" class="btn-provider-action primary" data-i18n="popup.install">安装</button>
       </form>
       <div id="modules-list" class="providers-list">
-        <div class="providers-empty">点击加载已安装模块…</div>
+        <div class="providers-empty" data-i18n="popup.clickLoadInstalledModules">点击加载已安装模块…</div>
       </div>
     </section>
 
@@ -104,32 +104,32 @@
     <section id="providers-panel" class="providers-panel" hidden aria-labelledby="providers-panel-title">
       <div class="providers-panel-header">
         <div class="providers-panel-title-group">
-          <span id="providers-panel-title" class="providers-panel-title">外部资源</span>
+          <span id="providers-panel-title" class="providers-panel-title" data-i18n="common.resources">外部资源</span>
           <span id="providers-panel-count" class="providers-panel-count"></span>
         </div>
         <div class="providers-panel-actions">
-          <button type="button" id="btn-providers-refresh-all" class="btn-provider-action primary" title="强制刷新全部外部资源">
+          <button type="button" id="btn-providers-refresh-all" class="btn-provider-action primary" title="强制刷新全部外部资源" data-i18n-title="popup.forceRefreshAllResources" data-i18n="popup.updateAll">
             全部更新
           </button>
-          <button type="button" id="btn-providers-close" class="btn-provider-action" title="关闭">
+          <button type="button" id="btn-providers-close" class="btn-provider-action" title="关闭" data-i18n-title="popup.close" data-i18n="popup.close">
             关闭
           </button>
         </div>
       </div>
       <div id="providers-panel-notice" class="providers-panel-notice" role="status" aria-live="polite" hidden></div>
       <div id="providers-list" class="providers-list">
-        <div class="providers-empty">点击加载外部资源…</div>
+        <div class="providers-empty" data-i18n="popup.clickLoadResources">点击加载外部资源…</div>
       </div>
     </section>
 
-    <section class="quick-bar" aria-label="实例、运行模式与 Profile">
+    <section class="quick-bar" aria-label="实例、运行模式与 Profile" data-i18n-aria-label="popup.instanceRuntimeModeProfile">
       <div class="quick-tabs">
         <button type="button" class="quick-tab" id="btn-quick-instance" aria-expanded="false" aria-controls="quick-panel-instance">
-          <span class="quick-tab-kicker">实例</span>
+          <span class="quick-tab-kicker" data-i18n="common.instance">实例</span>
           <span class="quick-tab-value" id="quick-instance-value">—</span>
         </button>
         <button type="button" class="quick-tab" id="btn-quick-outbound" aria-expanded="false" aria-controls="outbound-mode-card">
-          <span class="quick-tab-kicker">模式</span>
+          <span class="quick-tab-kicker" data-i18n="popup.mode">模式</span>
           <span class="quick-tab-value" id="quick-outbound-value">—</span>
         </button>
         <button type="button" class="quick-tab" id="btn-quick-profile" aria-expanded="false" aria-controls="quick-panel-profile">
@@ -140,61 +140,61 @@
 
       <div id="quick-panel-instance" class="quick-panel" hidden>
         <div class="quick-panel-header">
-          <span>切换实例</span>
-          <button type="button" class="btn-provider-action" data-quick-close title="关闭">关闭</button>
+          <span data-i18n="popup.switchInstance">切换实例</span>
+          <button type="button" class="btn-provider-action" data-quick-close title="关闭" data-i18n-title="popup.close" data-i18n="popup.close">关闭</button>
         </div>
-        <label for="instance-select" class="selector-label">实例</label>
-        <select id="instance-select" class="instance-select" aria-label="切换实例">
+        <label for="instance-select" class="selector-label" data-i18n="common.instance">实例</label>
+        <select id="instance-select" class="instance-select" aria-label="切换实例" data-i18n-aria-label="popup.switchInstance">
           <!-- Populated dynamically -->
         </select>
       </div>
 
-      <section id="outbound-mode-card" class="quick-panel outbound-mode-card" hidden aria-label="Spike 运行模式">
+      <section id="outbound-mode-card" class="quick-panel outbound-mode-card" hidden aria-label="Spike 运行模式" data-i18n-aria-label="popup.spikeRuntimeMode">
         <div class="quick-panel-header">
-          <span>运行模式</span>
-          <small id="outbound-mode-state">检测中…</small>
-          <button type="button" class="btn-provider-action" data-quick-close title="关闭">关闭</button>
+          <span data-i18n="popup.runtimeMode">运行模式</span>
+          <small id="outbound-mode-state" data-i18n="popup.checking">检测中…</small>
+          <button type="button" class="btn-provider-action" data-quick-close title="关闭" data-i18n-title="popup.close" data-i18n="popup.close">关闭</button>
         </div>
         <div class="outbound-mode-controls">
-          <button type="button" class="btn-outbound-mode" data-mode="rule">规则</button>
-          <button type="button" class="btn-outbound-mode" data-mode="direct">直连</button>
-          <button type="button" class="btn-outbound-mode" data-mode="global">全局</button>
-          <select id="outbound-policy-select" class="outbound-policy-select" aria-label="全局代理策略">
-            <option value="">加载策略…</option>
+          <button type="button" class="btn-outbound-mode" data-mode="rule" data-i18n="popup.rule">规则</button>
+          <button type="button" class="btn-outbound-mode" data-mode="direct" data-i18n="popup.direct">直连</button>
+          <button type="button" class="btn-outbound-mode" data-mode="global" data-i18n="popup.global">全局</button>
+          <select id="outbound-policy-select" class="outbound-policy-select" aria-label="全局代理策略" data-i18n-aria-label="popup.globalProxyPolicy">
+            <option value="" data-i18n="popup.loadingPolicies">加载策略…</option>
           </select>
         </div>
       </section>
 
       <div id="quick-panel-profile" class="quick-panel" hidden>
         <div class="quick-panel-header">
-          <span>切换 Profile</span>
-          <button type="button" class="btn-provider-action" data-quick-close title="关闭">关闭</button>
+          <span data-i18n="popup.switchProfile">切换 Profile</span>
+          <button type="button" class="btn-provider-action" data-quick-close title="关闭" data-i18n-title="popup.close" data-i18n="popup.close">关闭</button>
         </div>
         <div class="profile-switch-row">
           <label for="profile-select" class="selector-label">Profile</label>
-          <select id="profile-select" class="instance-select" aria-label="切换 Profile">
+          <select id="profile-select" class="instance-select" aria-label="切换 Profile" data-i18n-aria-label="popup.switchProfile">
             <option value="">—</option>
           </select>
-          <button type="button" id="btn-profile-switch" class="btn-section-action">切换</button>
+          <button type="button" id="btn-profile-switch" class="btn-section-action" data-i18n="popup.switch">切换</button>
         </div>
         <div id="profile-list-error" class="interaction-banner" role="alert" hidden>
-          <span>无法读取配置列表，请重试。</span>
-          <button type="button" id="btn-profile-retry" class="btn-task-action">重试配置列表</button>
+          <span data-i18n="popup.unableLoadProfilesRetry">无法读取配置列表，请重试。</span>
+          <button type="button" id="btn-profile-retry" class="btn-task-action" data-i18n="popup.retryProfileList">重试配置列表</button>
         </div>
         <div class="profile-details">
           <div class="info-row">
-            <span class="info-label">路径:</span>
+            <span class="info-label" data-i18n="popup.path">路径:</span>
             <span class="info-value" id="profile-name">-</span>
             <span class="managed-badge" id="managed-badge" hidden>Managed</span>
           </div>
           <div class="info-meta" id="info-meta">
-            <span class="badge" id="badge-groups">组: -</span>
-            <span class="badge" id="badge-nodes">节点: -</span>
-            <span class="badge" id="badge-rules">规则: -</span>
+            <span class="badge" id="badge-groups" data-i18n="popup.groups">组: -</span>
+            <span class="badge" id="badge-nodes" data-i18n="popup.nodes">节点: -</span>
+            <span class="badge" id="badge-rules" data-i18n="popup.rules">规则: -</span>
             <span class="badge" id="badge-dns-delay">DNS: —</span>
           </div>
           <div class="proxy-listener-section">
-            <span class="info-label">代理监听:</span>
+            <span class="info-label" data-i18n="popup.proxyListeners">代理监听:</span>
             <div class="proxy-listeners" id="proxy-listeners">
               <span class="proxy-listener-empty">-</span>
             </div>
@@ -206,12 +206,12 @@
     <section id="current-site-panel" class="current-site-panel" hidden aria-labelledby="current-site-title">
       <div class="current-site-head">
         <div class="current-site-heading">
-          <span id="current-site-title">当前网站线路</span>
-          <span id="current-site-host" class="current-site-host">等待检查</span>
+          <span id="current-site-title" data-i18n="popup.currentSiteRoute">当前网站线路</span>
+          <span id="current-site-host" class="current-site-host" data-i18n="popup.notChecked">等待检查</span>
         </div>
-        <button type="button" id="btn-current-site-check" class="btn-provider-action">检查</button>
+        <button type="button" id="btn-current-site-check" class="btn-provider-action" data-i18n="common.inspect">检查</button>
       </div>
-      <div id="current-site-result" class="current-site-result" aria-live="polite">
+      <div id="current-site-result" class="current-site-result" aria-live="polite" data-i18n="popup.compareActiveTabS">
         查看当前标签页的规则预期线路与现有连接实际线路。
       </div>
     </section>
@@ -219,17 +219,17 @@
     <div class="status-bar" id="status-bar">
       <div class="status-bar-main">
         <div class="proxy-toggle-wrapper" id="proxy-toggle-wrapper">
-          <label class="switch-label" title="开启后由 SpikeDeck 使用当前实例监听地址接管 Chrome 代理；关闭后释放给其他扩展">
+          <label class="switch-label" title="开启后由 SpikeDeck 使用当前实例监听地址接管 Chrome 代理；关闭后释放给其他扩展" data-i18n-title="popup.whenEnabledSpikedeckManages">
             <input type="checkbox" id="toggle-chrome-proxy">
             <span class="slider"></span>
-            <span class="switch-text">接管代理</span>
+            <span class="switch-text" data-i18n="popup.manageProxy">接管代理</span>
           </label>
-          <span class="proxy-control-dot" id="proxy-control-state" role="status" aria-live="polite" title="未接管；其他代理扩展可控制浏览器" aria-label="未接管；其他代理扩展可控制浏览器"></span>
+          <span class="proxy-control-dot" id="proxy-control-state" role="status" aria-live="polite" title="未接管；其他代理扩展可控制浏览器" data-i18n-title="popup.notManagedOtherProxy" aria-label="未接管；其他代理扩展可控制浏览器" data-i18n-aria-label="popup.notManagedOtherProxy"></span>
         </div>
-        <div class="traffic-row" id="traffic-row" aria-label="实时速度">
+        <div class="traffic-row" id="traffic-row" aria-label="实时速度" data-i18n-aria-label="popup.liveTraffic">
           <span class="traffic-down" id="traffic-down">↓ —</span>
           <span class="traffic-up" id="traffic-up">↑ —</span>
-          <span class="traffic-total" id="traffic-total" aria-label="累计流量"></span>
+          <span class="traffic-total" id="traffic-total" aria-label="累计流量" data-i18n-aria-label="popup.totalTraffic"></span>
         </div>
       </div>
     </div>
@@ -237,21 +237,21 @@
     <!-- Policy Groups Section -->
     <main class="main-content">
       <div class="section-title">
-        <span>策略组</span>
+        <span data-i18n="common.policyGroups">策略组</span>
         <div class="section-actions">
-          <button type="button" id="btn-expand-all" class="btn-section-action" title="全部展开" aria-label="全部展开">
+          <button type="button" id="btn-expand-all" class="btn-section-action" title="全部展开" data-i18n-title="popup.expandAll" aria-label="全部展开" data-i18n-aria-label="popup.expandAll">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
               <polyline points="7 13 12 18 17 13"></polyline>
               <polyline points="7 6 12 11 17 6"></polyline>
             </svg>
           </button>
-          <button type="button" id="btn-collapse-all" class="btn-section-action" title="全部收起" aria-label="全部收起">
+          <button type="button" id="btn-collapse-all" class="btn-section-action" title="全部收起" data-i18n-title="popup.collapseAll" aria-label="全部收起" data-i18n-aria-label="popup.collapseAll">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
               <polyline points="7 11 12 6 17 11"></polyline>
               <polyline points="7 18 12 13 17 18"></polyline>
             </svg>
           </button>
-          <button type="button" id="btn-toggle-hidden" class="btn-toggle-hidden" title="隐藏组已隐藏 · 点击切换为智能展示" aria-label="隐藏组展示：已隐藏">
+          <button type="button" id="btn-toggle-hidden" class="btn-toggle-hidden" title="隐藏组已隐藏 · 点击切换为智能展示" data-i18n-title="popup.hiddenGroupsHiddenClick" aria-label="隐藏组展示：已隐藏" data-i18n-aria-label="popup.hiddenGroupsHidden">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
               <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
@@ -259,7 +259,7 @@
               <path d="M1 1l22 22"></path>
             </svg>
           </button>
-          <button type="button" id="btn-filter" class="btn-section-action" title="筛选策略组 / 节点（快捷键 /）" aria-label="筛选策略组 / 节点" aria-keyshortcuts="/" aria-expanded="false" aria-controls="filter-bar">
+          <button type="button" id="btn-filter" class="btn-section-action" title="筛选策略组 / 节点（快捷键 /）" data-i18n-title="popup.filterPolicyGroupsNodes" aria-label="筛选策略组 / 节点" data-i18n-aria-label="popup.filterPolicyGroupsNodes2" aria-keyshortcuts="/" aria-expanded="false" aria-controls="filter-bar">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -268,39 +268,39 @@
         </div>
       </div>
 
-      <section class="group-batch-controls" aria-label="跨组测速">
+      <section class="group-batch-controls" aria-label="跨组测速" data-i18n-aria-label="popup.crossGroupTests">
         <div class="group-batch-actions">
-          <button type="button" id="group-batch-start" class="btn-task-action" disabled>测试匹配的组</button>
-          <button type="button" id="group-batch-cancel" class="btn-task-action" hidden>取消批量测速</button>
-          <button type="button" id="group-batch-retry" class="btn-task-action" hidden>重试查询状态</button>
-          <button type="button" id="group-batch-forget" class="btn-task-action" hidden>停止观察</button>
-          <button type="button" id="group-batch-reload" class="btn-task-action" disabled>重新读取组目录</button>
+          <button type="button" id="group-batch-start" class="btn-task-action" disabled data-i18n="popup.testMatchingGroups">测试匹配的组</button>
+          <button type="button" id="group-batch-cancel" class="btn-task-action" hidden data-i18n="popup.cancelBatch">取消批量测速</button>
+          <button type="button" id="group-batch-retry" class="btn-task-action" hidden data-i18n="popup.retryStatus">重试查询状态</button>
+          <button type="button" id="group-batch-forget" class="btn-task-action" hidden data-i18n="popup.stopObserving">停止观察</button>
+          <button type="button" id="group-batch-reload" class="btn-task-action" disabled data-i18n="popup.reloadGroupCatalog">重新读取组目录</button>
         </div>
-        <small>依次测试每个匹配组的全部成员。关闭弹窗会停止排队，已接受的测试可能继续在引擎中运行。</small>
+        <small data-i18n="popup.testsMatchingGroupsFull">依次测试每个匹配组的全部成员。关闭弹窗会停止排队，已接受的测试可能继续在引擎中运行。</small>
         <div id="group-batch-status" role="status" aria-live="polite"></div>
       </section>
 
-      <section class="runtime-task-hub" id="runtime-task-hub" aria-label="运行中的任务" hidden>
-        <div class="runtime-task-title">运行中的任务</div>
+      <section class="runtime-task-hub" id="runtime-task-hub" aria-label="运行中的任务" data-i18n-aria-label="popup.activeTasks" hidden>
+        <div class="runtime-task-title" data-i18n="popup.activeTasks">运行中的任务</div>
         <div id="runtime-task-list" class="runtime-task-list"></div>
       </section>
 
       <section class="interaction-banner" id="outbound-safety-banner" role="status" hidden>
         <span id="outbound-safety-label"></span>
-        <button type="button" id="btn-restore-rule-mode" class="btn-task-action">恢复规则模式</button>
+        <button type="button" id="btn-restore-rule-mode" class="btn-task-action" data-i18n="popup.restoreRuleMode">恢复规则模式</button>
       </section>
 
       <section class="interaction-banner" id="selection-impact-banner" role="status" hidden>
         <span id="selection-impact-message"></span>
         <div class="interaction-banner-actions">
-          <a href="tools.html#connections" target="_blank">查看连接</a>
-          <button type="button" id="btn-undo-selection" class="btn-task-action">撤销</button>
+          <a href="tools.html#connections" target="_blank" data-i18n="popup.viewConnections">查看连接</a>
+          <button type="button" id="btn-undo-selection" class="btn-task-action" data-i18n="popup.undo">撤销</button>
         </div>
       </section>
 
       <div class="filter-bar" id="filter-bar" hidden>
-        <input type="text" id="group-filter" class="filter-input" placeholder="筛选策略组 / 节点" autocomplete="off" spellcheck="false" aria-label="筛选策略组或节点">
-        <button type="button" id="btn-filter-clear" class="filter-clear" title="清除筛选" aria-label="清除筛选">&times;</button>
+        <input type="text" id="group-filter" class="filter-input" placeholder="筛选策略组 / 节点" data-i18n-placeholder="popup.filterPolicyGroupsNodes2" autocomplete="off" spellcheck="false" aria-label="筛选策略组或节点" data-i18n-aria-label="popup.filterPolicyGroupsNodes3">
+        <button type="button" id="btn-filter-clear" class="filter-clear" title="清除筛选" data-i18n-title="popup.clearFilter" aria-label="清除筛选" data-i18n-aria-label="popup.clearFilter">&times;</button>
       </div>
       <div class="filter-summary" id="filter-summary" aria-live="polite" hidden></div>
 
@@ -308,7 +308,7 @@
         <!-- Skeleton loading or dynamic groups -->
         <div class="loading-placeholder">
           <div class="spinner"></div>
-          <span>正在连接…</span>
+          <span data-i18n="popup.connecting">正在连接…</span>
         </div>
       </div>
     </main>
