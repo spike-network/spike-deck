@@ -1,4 +1,6 @@
+import './helpers/lang-zh-cn.mjs';
 import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { msg } from '../lib/i18n.js';
 import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -29,7 +31,7 @@ const context = vm.createContext({ coreError, requestErrorText, statusError, isR
   window: { confirm: () => true, setInterval() {}, clearInterval() {}, setTimeout() {}, addEventListener() {} },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } },
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => instance },
-  initializeI18n: async () => {}, t: value => value, confirmAction: async () => true, formatConnectionTrace: () => '', connectionDetailFields, connectionMethod,
+  initializeI18n: async () => {}, msg, onLanguageChange() {}, confirmAction: async () => true, formatConnectionTrace: () => '', connectionDetailFields, connectionMethod,
   filterRuntimeLogs: entries => entries, sortRuntimeLogs: entries => entries, formatRuntimeLogs: () => '',
 });
 const source = fs.readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
@@ -47,7 +49,7 @@ assert.match(content(), /Mock Outer → Mock Leaf/);
 assert.match(content(), /1.2 ms/);
 const visit = item => [item, ...(item?.children || []).flatMap(visit)];
 const detailsOf = id => visit(nodes.get('connections')).find(item => item?.children?.[0]?.textContent === String(id))
-  ?.children[4].children.find(item => item.children?.[0]?.textContent === 'Details');
+  ?.children[4].children.find(item => item.children?.[0]?.textContent === msg('common.details'));
 const opened = detailsOf(11); opened.open = true;
 query.value = '192.0.2'; query.listeners.input();
 assert.equal(detailsOf(11).open, true, 're-rendering keeps opened connection details open');
@@ -66,7 +68,7 @@ assert.equal(nodes.get('connections-count').textContent, '3 / 3');
 assert.equal(reads, initialReads, 'filtering must use the cached snapshot');
 assert.deepEqual(kills, [], 'filtering must not mutate any connection');
 query.value = 'beta'; query.listeners.input();
-const kill = visit(nodes.get('connections')).find(item => item?.textContent === 'Kill');
+const kill = visit(nodes.get('connections')).find(item => item?.textContent === msg('tools.kill'));
 await kill.listeners.click();
 assert.deepEqual(kills, [22], 'filtered actions use the original connection ID');
 query.value = ''; query.listeners.input();
@@ -77,12 +79,12 @@ assert.equal(detailsOf(11).open, false, 'collapse is captured even before a nati
 detailsOf(11).open = true;
 const finished = live.splice(live.findIndex(row => row.id === 11), 1)[0];
 recent.unshift(finished);
-await visit(nodes.get('connections')).find(item => item?.textContent === 'Kill').listeners.click();
+await visit(nodes.get('connections')).find(item => item?.textContent === msg('tools.kill')).listeners.click();
 assert.equal(detailsOf(11).open, true, 'completion keeps the details expanded');
 recent.splice(recent.indexOf(finished), 1);
-await visit(nodes.get('connections')).find(item => item?.textContent === 'Kill').listeners.click();
+await visit(nodes.get('connections')).find(item => item?.textContent === msg('tools.kill')).listeners.click();
 assert.equal(detailsOf(11), undefined);
 recent.unshift(finished);
-await visit(nodes.get('connections')).find(item => item?.textContent === 'Kill').listeners.click();
+await visit(nodes.get('connections')).find(item => item?.textContent === msg('tools.kill')).listeners.click();
 assert.equal(detailsOf(11).open, false, 'expired IDs release their expansion state');
 console.log('Actual Tools search/state handlers preserve cached snapshots, counts and live action IDs');

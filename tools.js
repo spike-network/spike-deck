@@ -1,7 +1,7 @@
 import { SpikeApiClient } from './lib/spike-client.js';
 import { confirmAction } from './lib/confirm-dialog.js';
 import { StorageManager } from './lib/storage.js';
-import { initializeI18n, t } from './lib/i18n.js';
+import { initializeI18n, msg, onLanguageChange } from './lib/i18n.js';
 import {
   filterRuntimeLogs,
   formatRuntimeLogs,
@@ -18,6 +18,8 @@ import { isRejectPolicy } from './lib/group-selection.js';
 import { reloadView, reloadStatusView } from './lib/reload-view.js';
 
 await initializeI18n();
+// Text built in script is not re-translated in place; reload so every label is rendered again.
+onLanguageChange(() => window.location.reload());
 
 let instance = null;
 let logEntries = [];
@@ -61,7 +63,7 @@ function adoptEventNamespace(namespace) {
     byId('reload-preview-output').textContent = '';
     byId('reload-result-output').textContent = '';
     byId('reload-operation-status').textContent = '';
-    byId('reload-operation-error').textContent = t('Runtime changed. Check current status before reloading.');
+    byId('reload-operation-error').textContent = msg("tools.runtimeChangedCheckCurrent");
     updateReloadControls();
   }
   if (probeNamespace && probeNamespace !== namespace) {
@@ -69,7 +71,7 @@ function adoptEventNamespace(namespace) {
     byId('policy-probe-start').disabled = true;
     byId('policy-probe-policies').disabled = byId('policy-probe-url').disabled = false;
     byId('policy-probe-results').replaceChildren();
-    byId('policy-probe-error').textContent = t('Runtime identity unavailable. Reload the policy list before probing.');
+    byId('policy-probe-error').textContent = msg("tools.runtimeIdentityUnavailableReload");
   } else if (probeNamespace === namespace && !probeBusy) {
     byId('policy-probe-start').disabled = false;
     byId('policy-probe-error').textContent = '';
@@ -134,7 +136,8 @@ function transferBytes(bytes) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${units[index]}`;
 }
 
-function transferLabel(value) { return t(value[0].toUpperCase() + value.slice(1)); }
+const TRANSFER_LABEL_KEYS = { queued: 'tools.transferQueued', running: 'tools.transferRunning', completed: 'tools.transferCompleted', failed: 'tools.failed', cancelled: 'tools.transferCancelled', download: 'tools.transferDownload', upload: 'tools.transferUpload' };
+function transferLabel(value) { const key = Object.hasOwn(TRANSFER_LABEL_KEYS, value) ? TRANSFER_LABEL_KEYS[value] : null; return key ? msg(key) : String(value); }
 
 function renderTransfer() {
   const busy = transfer.busy || transfer.reading;
@@ -143,39 +146,39 @@ function renderTransfer() {
   byId('throughput-cancel').disabled = !transfer.busy || transfer.uncertain || transfer.cancelling || transfer.starting && transfer.cancelRequested;
   byId('throughput-reload').disabled = transfer.reading || transfer.starting || transfer.cancelling;
   const rows = [];
-  if (transfer.starting) rows.push(text('p', t(transfer.cancelRequested ? 'Cancellation will be sent when the task starts.' : 'Starting throughput test…')));
+  if (transfer.starting) rows.push(text('p', transfer.cancelRequested ? msg("tools.cancellationWillSentWhen") : msg("tools.startingThroughputTest")));
   if (transfer.error || transfer.uncertain) {
-    const error = text('p', transfer.detail || t(transfer.error || 'Start result is unconfirmed. Check recent tasks before starting again.'), undefined, !!transfer.detail); error.role = 'alert'; rows.push(error);
+    const error = text('p', transfer.detail || transfer.error || msg("tools.startResultUnconfirmedCheck"), undefined, !!transfer.detail); error.role = 'alert'; rows.push(error);
   }
   if (transfer.uncertain) {
-    const dismiss = text('button', t('Forget unconfirmed start'));
-    dismiss.addEventListener('click', async () => { if (await confirmAction('Forget unconfirmed start', 'Forget the unconfirmed start? This does not cancel or confirm any Core task.')) transfer.dismissUnconfirmed(); }); rows.push(dismiss);
+    const dismiss = text('button', msg("tools.forgetUnconfirmedStart"));
+    dismiss.addEventListener('click', async () => { if (await confirmAction(msg("tools.forgetUnconfirmedStart"), msg("tools.forgetUnconfirmedStartDoes"))) transfer.dismissUnconfirmed(); }); rows.push(dismiss);
   }
   if (transfer.task) {
     const task = transfer.task;
     rows.push(text('p', `${transferLabel(task.status)} · ${transferLabel(task.direction)} · ${transferBytes(task.bytes_per_second)}/s · ${transferBytes(task.bytes)} / ${transferBytes(task.byte_limit)}`));
     rows.push(text('p', task.policy, undefined, true));
     const progress = document.createElement('progress'); progress.max = Math.max(1, task.byte_limit); progress.value = Math.min(task.bytes, task.byte_limit);
-    progress.setAttribute('aria-label', t('Transferred bytes')); rows.push(progress);
-    if (task.status === 'failed') rows.push(text('p', statusError(task) || t('Throughput test failed. Check the policy and configured Testing URL.'), undefined, true));
-    if (task.cancel_requested && ['queued', 'running'].includes(task.status)) rows.push(text('p', t('Cancellation requested')));
-    const check = text('button', t('Check task status')); check.disabled = transfer.polling || transfer.starting || transfer.cancelling;
+    progress.setAttribute('aria-label', msg("tools.transferredBytes")); rows.push(progress);
+    if (task.status === 'failed') rows.push(text('p', statusError(task) || msg("tools.throughputTestFailedCheck"), undefined, true));
+    if (task.cancel_requested && ['queued', 'running'].includes(task.status)) rows.push(text('p', msg("tools.cancellationRequested")));
+    const check = text('button', msg("tools.checkTaskStatus")); check.disabled = transfer.polling || transfer.starting || transfer.cancelling;
     check.addEventListener('click', () => transfer.check()); rows.push(check);
-    const stop = text('button', t('Stop observing')); stop.disabled = transfer.starting || transfer.cancelling;
-    stop.addEventListener('click', async () => { if (await confirmAction('Stop observing', 'Stop observing this task? It may continue in Core.')) transfer.stopObserving(); }); rows.push(stop);
+    const stop = text('button', msg("tools.stopObserving")); stop.disabled = transfer.starting || transfer.cancelling;
+    stop.addEventListener('click', async () => { if (await confirmAction(msg("tools.stopObserving"), msg("tools.stopObservingTaskMay"))) transfer.stopObserving(); }); rows.push(stop);
   }
-  if (transfer.reading) rows.push(text('p', t('Reading throughput tasks…')));
+  if (transfer.reading) rows.push(text('p', msg("tools.readingThroughputTasks")));
   byId('throughput-result').replaceChildren(...rows);
   const history = transfer.tasks.map(task => {
     const row = document.createElement('tr');
     row.append(text('td', new Date(task.created_at_unix_ms).toLocaleString()), text('td', task.policy, undefined, true),
       text('td', transferLabel(task.direction)), text('td', transferLabel(task.status)), text('td', `${transferBytes(task.bytes)} · ${transferBytes(task.bytes_per_second)}/s`));
-    const action = text('td', ''); const observe = text('button', t('Observe'));
-    observe.setAttribute('aria-label', `${t('Observe throughput task')} ${task.id}`);
+    const action = text('td', ''); const observe = text('button', msg("common.observe"));
+    observe.setAttribute('aria-label', `${msg("tools.observeThroughputTask")} ${task.id}`);
     observe.disabled = transfer.reading || transfer.starting || transfer.cancelling || !transfer.namespace;
     observe.addEventListener('click', () => transfer.observe(task)); action.append(observe); row.append(action); return row;
   });
-  byId('throughput-history').replaceChildren(history.length ? makeTable(['Time', 'Policy', 'Direction', 'Status', 'Transfer', 'Action'], history) : text('p', t(transfer.reading ? 'Reading throughput tasks…' : 'No recent throughput tests')));
+  byId('throughput-history').replaceChildren(history.length ? makeTable([msg("common.time"), msg("common.policy"), msg("tools.direction"), msg("common.status2"), msg("tools.transfer"), msg("common.action")], history) : text('p', transfer.reading ? msg("tools.readingThroughputTasks") : msg("tools.noRecentThroughputTests")));
 }
 
 async function loadTransferPolicies() {
@@ -195,7 +198,7 @@ async function loadTransferPolicies() {
       const option = text('option', name, undefined, true); option.value = name; option.selected = previouslySelected.has(name); return option;
     }));
     byId('policy-probe-results').replaceChildren();
-    byId('policy-probe-error').textContent = usable ? '' : t('Runtime identity unavailable. Reload the policy list before probing.');
+    byId('policy-probe-error').textContent = usable ? '' : msg("tools.runtimeIdentityUnavailableReload");
     byId('policy-probe-start').disabled = !usable;
     const names = [...new Set([...probePolicies, selected])];
     byId('throughput-policy').replaceChildren(...names.map(name => {
@@ -211,8 +214,8 @@ async function loadTransferPolicies() {
   } catch {
     if (!probeLive || read !== probeCatalogRead) return;
     if (probeBusy) { probeCatalogDeferred = true; return; }
-    byId('throughput-policy-error').textContent = t('Unable to load throughput policies. Refresh the status list to retry.');
-    byId('policy-probe-error').textContent = t('Unable to load probe policies. Refresh the status list to retry.');
+    byId('throughput-policy-error').textContent = msg("tools.unableLoadThroughputPolicies");
+    byId('policy-probe-error').textContent = msg("tools.unableLoadProbePolicies");
     byId('policy-probe-start').disabled = true;
   }
 }
@@ -222,11 +225,11 @@ async function runPolicyProbe(event) {
   if (!probeLive || probeBusy || !probeNamespace || (eventNamespace && probeNamespace !== eventNamespace)) return;
   let body;
   try { body = policyProbeRequest(Array.from(byId('policy-probe-policies').selectedOptions || [], option => option.value), byId('policy-probe-url').value, probePolicies); }
-  catch (error) { byId('policy-probe-error').textContent = t(error.message); return; }
+  catch (error) { byId('policy-probe-error').textContent = error.message; return; }
   const generation = ++probeGeneration, namespace = probeNamespace;
   probeBusy = true; byId('policy-probe-start').disabled = true;
   byId('policy-probe-policies').disabled = byId('policy-probe-url').disabled = true;
-  byId('policy-probe-error').textContent = ''; byId('policy-probe-results').replaceChildren(text('p', t('Probing policies…')));
+  byId('policy-probe-error').textContent = ''; byId('policy-probe-results').replaceChildren(text('p', msg("tools.probingPolicies")));
   try {
     let received;
     const result = await SpikeApiClient.probePolicies(instance, body, { runtimeNamespace: namespace, onRuntime: value => { received = value; } });
@@ -238,16 +241,16 @@ async function runPolicyProbe(event) {
     const rows = body.policy_names.map(name => {
       const value = result.results.find(row => row.policy === name);
       const row = document.createElement('tr');
-      row.append(text('td', name, undefined, true), text('td', !value ? t('No result') : value.ok ? t('OK') :
-        [t('Failed'), value.error_code && statusError(value)].filter(Boolean).join(' · '), undefined, true),
+      row.append(text('td', name, undefined, true), text('td', !value ? msg("tools.noResult") : value.ok ? msg("tools.ok") :
+        [msg("tools.failed"), value.error_code && statusError(value)].filter(Boolean).join(' · '), undefined, true),
         text('td', value?.ok && Number.isFinite(value.latency_ms) ? `${value.latency_ms} ms` : '—'));
       return row;
     });
-    byId('policy-probe-results').replaceChildren(makeTable(['Policy', 'Status', 'Latency'], rows));
+    byId('policy-probe-results').replaceChildren(makeTable([msg("common.policy"), msg("common.status2"), msg("common.latency")], rows));
   } catch (error) {
     if (!probeLive || generation !== probeGeneration) return;
     byId('policy-probe-results').replaceChildren();
-    byId('policy-probe-error').textContent = (error?.code && requestErrorText(error)) || t('Policy probe failed. Check the URL, policy selection and runtime, then retry.');
+    byId('policy-probe-error').textContent = (error?.code && requestErrorText(error)) || msg("tools.policyProbeFailedCheck");
   } finally {
     if (probeLive && generation === probeGeneration) {
       probeBusy = false; byId('policy-probe-start').disabled = !probeNamespace;
@@ -260,9 +263,9 @@ async function runPolicyProbe(event) {
 function renderPanels() {
   byId('panels-refresh').disabled = panels.loading || panels.pending.size > 0;
   const cards = [];
-  if (panels.loading) cards.push(text('p', t('正在读取面板…')));
-  if (panels.error) { const error = text('p', t('无法读取面板，请重试状态查询。')); error.role = 'alert'; cards.push(error); }
-  if (panels.loaded && !panels.loading && !panels.panels.length) cards.push(text('p', t('未配置面板')));
+  if (panels.loading) cards.push(text('p', msg("tools.loadingPanels")));
+  if (panels.error) { const error = text('p', msg("tools.unableLoadPanelsRetry")); error.role = 'alert'; cards.push(error); }
+  if (panels.loaded && !panels.loading && !panels.panels.length) cards.push(text('p', msg("tools.noPanelsConfigured")));
   for (const panel of panels.panels) {
     const card = document.createElement('article'); card.className = 'information-panel';
     card.dataset.style = ['good', 'alert', 'error'].includes(panel.style) ? panel.style : 'info';
@@ -274,18 +277,18 @@ function renderPanels() {
     heading.append(icon);
     heading.append(text('h3', panel.title, undefined, true));
     if (panel.script_name != null) {
-      const button = text('button', t('刷新'));
-      button.setAttribute('aria-label', `${t('刷新面板')} ${panel.name}`);
+      const button = text('button', msg("common.refresh"));
+      button.setAttribute('aria-label', `${msg("tools.refreshPanel")} ${panel.name}`);
       button.disabled = panels.loading || panels.pending.has(panel.name) || panel.refreshing;
       button.addEventListener('click', () => panels.refresh(panel.name));
       heading.append(button);
     }
     card.append(heading, text('pre', panel.content, 'information-panel-content', true));
     if (panels.errors.has(panel.name) || panel.error) {
-      const error = text('p', t('面板刷新失败，已保留原有内容。')); error.role = 'alert'; card.append(error);
+      const error = text('p', msg("tools.panelRefreshFailedPrevious")); error.role = 'alert'; card.append(error);
     }
-    if (panels.pending.has(panel.name) || panel.refreshing) card.append(text('p', t('正在刷新…')));
-    else if (panel.last_updated_at_unix != null) card.append(text('small', `${t('上次更新')} ${new Date(panel.last_updated_at_unix * 1000).toLocaleString()}`));
+    if (panels.pending.has(panel.name) || panel.refreshing) card.append(text('p', msg("tools.refreshing")));
+    else if (panel.last_updated_at_unix != null) card.append(text('small', `${msg("common.lastUpdated")} ${new Date(panel.last_updated_at_unix * 1000).toLocaleString()}`));
     cards.push(card);
   }
   byId('panels').replaceChildren(...cards);
@@ -309,9 +312,9 @@ function connectionRow(row, live) {
         const details = document.createElement('details');
         details.open = openConnectionDetails.has(row.id);
         connectionDisclosures.set(row.id, details);
-        details.append(text('summary', 'Details'));
+        details.append(text('summary', msg("common.details")));
         const fields = document.createElement('dl');
-        for (const field of connectionDetailFields(row, t, live)) {
+        for (const field of connectionDetailFields(row, live)) {
           fields.append(text('dt', field.label), text('dd', field.value, 'connection-detail-value', true));
         }
         details.append(fields);
@@ -319,13 +322,13 @@ function connectionRow(row, live) {
       }
       tr.append(cell);
     });
-  tr.append(text('td', row.ok === false ? statusError(row) || t('failed') : t(live ? 'live' : 'finished'), undefined, true));
+  tr.append(text('td', row.ok === false ? statusError(row) || msg("common.failed") : live ? msg("common.live") : msg("common.finished"), undefined, true));
   const action = document.createElement('td');
   if (live) {
-    const button = text('button', 'Kill');
+    const button = text('button', msg("tools.kill"));
     button.addEventListener('click', async () => {
       const targetInstance = instance;
-      if (!(await confirmAction('Terminate connection', `Terminate connection #${row.id}?`))) return;
+      if (!(await confirmAction(msg("tools.terminateConnection"), msg("tools.terminateConnectionId", { id: row.id })))) return;
       if (instance !== targetInstance) return;
       await SpikeApiClient.killConnection(targetInstance, row.id);
       await loadConnections();
@@ -364,8 +367,8 @@ function renderConnections() {
   ];
   byId('connections-count').textContent = `${rows.length} / ${connectionSnapshot.live.length + connectionSnapshot.recent.length}`;
   byId('connections').replaceChildren(rows.length
-    ? makeTable(['ID', 'Peer', 'Target', 'Policy', 'Decision', 'Method', 'Kind', 'Status', 'Action'], rows)
-    : text('p', connectionSnapshot.live.length + connectionSnapshot.recent.length ? '暂无匹配连接' : '暂无连接'));
+    ? makeTable(['ID', msg("tools.peer"), msg("common.target"), msg("common.policy"), 'Decision', msg("tools.method"), msg("common.kind"), msg("common.status2"), msg("common.action")], rows)
+    : text('p', connectionSnapshot.live.length + connectionSnapshot.recent.length ? msg("common.noMatchingConnections") : msg("tools.noConnections")));
 }
 
 async function loadReadiness() {
@@ -375,18 +378,18 @@ async function loadReadiness() {
   try {
     const report = await SpikeApiClient.getReadiness(target);
     if (instance !== target || sequence !== readinessSequence) return;
-    const labels = { ready: '就绪', degraded: '已降级', not_ready: '未就绪' };
+    const labels = { ready: msg("common.ready"), degraded: msg("tools.degraded"), not_ready: msg("tools.notReady") };
     const rows = report.checks.map(check => {
       const row = document.createElement('tr');
-      row.append(text('td', check.name, undefined, true), text('td', t(labels[check.status])),
+      row.append(text('td', check.name, undefined, true), text('td', labels[check.status]),
         text('td', check.reason, undefined, true), text('td', `${check.active ?? '—'} / ${check.expected ?? '—'}`));
       return row;
     });
-    byId('readiness').replaceChildren(text('p', t(labels[report.status])),
-      makeTable(['检查项', '状态', '原因', '活动 / 预期'], rows));
+    byId('readiness').replaceChildren(text('p', labels[report.status]),
+      makeTable([msg("tools.check"), msg("common.status"), msg("tools.reason"), msg("tools.activeExpected")], rows));
   } catch (error) {
     if (instance !== target || sequence !== readinessSequence) return;
-    const message = text('p', t(error?.status === 404 ? '当前运行时不支持就绪检查。' : '无法读取就绪检查，请重试。'));
+    const message = text('p', error?.status === 404 ? msg("tools.readinessChecksUnavailableRuntime") : msg("tools.unableReadReadinessChecks"));
     message.role = 'alert';
     byId('readiness').replaceChildren(message);
   } finally {
@@ -410,8 +413,8 @@ async function loadSessionPools() {
     return tr;
   });
   byId('session-pools').replaceChildren(rows.length
-    ? makeTable(['池', '占用', '活跃', '复用 / 未命中', '创建 / 重建 / 淘汰', '失败'], rows)
-    : text('p', '暂无会话池指标'));
+    ? makeTable([msg("tools.pool"), msg("tools.occupancy"), msg("tools.active"), msg("tools.reuseMiss"), msg("tools.createdRebuiltEvicted"), msg("common.failures")], rows)
+    : text('p', msg("tools.noSessionPoolMetrics")));
 }
 
 function loadLogs() {
@@ -431,14 +434,14 @@ async function readLogs() {
 
 function eventDestination(target) {
   switch (target) {
-    case 'overview': return { href: 'popup.html#event-overview', label: '打开概览' };
-    case 'groups': return { href: 'popup.html#event-groups', label: '打开策略组' };
-    case 'providers': return { href: 'popup.html#event-providers', label: '打开外部资源' };
-    case 'config': return { href: 'popup.html#event-config', label: '打开配置文件' };
-    case 'connections': return { href: '#connections', label: '打开连接' };
-    case 'diagnostics': return { href: '#route-form', label: '打开诊断' };
-    case 'events': return { href: '#events', label: '打开事件' };
-    case 'logs': return { href: '#logs-output', label: '打开日志' };
+    case 'overview': return { href: 'popup.html#event-overview', label: msg("tools.openOverview") };
+    case 'groups': return { href: 'popup.html#event-groups', label: msg("tools.openGroups") };
+    case 'providers': return { href: 'popup.html#event-providers', label: msg("common.openProviders") };
+    case 'config': return { href: 'popup.html#event-config', label: msg("tools.openConfig") };
+    case 'connections': return { href: '#connections', label: msg("tools.openConnections") };
+    case 'diagnostics': return { href: '#route-form', label: msg("tools.openDiagnostics") };
+    case 'events': return { href: '#events', label: msg("tools.openEvents") };
+    case 'logs': return { href: '#logs-output', label: msg("tools.openLogs") };
     default: return null;
   }
 }
@@ -456,7 +459,7 @@ function eventRow(entry) {
   const action = text('td', '');
   const destination = eventDestination(entry.action?.target);
   if (destination) {
-    const link = text('a', t(destination.label));
+    const link = text('a', destination.label);
     link.href = destination.href;
     if (!destination.href.startsWith('#')) { link.target = '_blank'; link.rel = 'noopener'; }
     action.append(link);
@@ -487,12 +490,12 @@ function renderEvents() {
   const filtered = visibleEvents();
   const source = frozenEvents ?? eventEntries;
   byId('events-filter-count').textContent = `${filtered.length} / ${source.length}`;
-  byId('events-pause').textContent = t(frozenEvents ? '继续观察' : '暂停观察');
+  byId('events-pause').textContent = frozenEvents ? msg("tools.resumeObservation") : msg("tools.pauseObservation");
   byId('events-view-clear').disabled = !source.length;
   byId('events-export-jsonl').disabled = byId('events-export-text').disabled = !filtered.length;
   byId('events').replaceChildren(filtered.length
-    ? makeTable(['Time', 'Severity', 'Category', 'Event', 'Kind', 'Action'], filtered.map(eventRow))
-    : text('p', '暂无匹配事件'));
+    ? makeTable([msg("common.time"), msg("tools.severity"), msg("tools.category"), msg("common.event"), msg("common.kind"), msg("common.action")], filtered.map(eventRow))
+    : text('p', msg("tools.noMatchingEvents")));
 }
 
 function mergeLogEntries(entries) {
@@ -522,25 +525,25 @@ function renderLogs() {
   byId('logs-output').textContent = visibleEntries.length
     ? formatRuntimeLogs(visibleEntries)
     : source.length
-      ? t('无匹配日志')
-      : t('暂无运行日志');
+      ? msg("tools.noMatchingLogs")
+      : msg("tools.noRuntimeLogs");
   byId('logs-filter-count').textContent = `${visibleEntries.length} / ${source.length}`;
   byId('logs-filter-clear').disabled = !byId('logs-filter').value && !byId('logs-filter-exclude').value;
-  byId('logs-pause').textContent = t(frozenLogs ? '继续观察' : '暂停观察');
+  byId('logs-pause').textContent = frozenLogs ? msg("tools.resumeObservation") : msg("tools.pauseObservation");
   byId('logs-view-clear').disabled = !source.length;
   byId('logs-export-jsonl').disabled = byId('logs-export-text').disabled = !visibleEntries.length;
 }
 
 function setLogStreamState(status) {
   const labels = {
-    connecting: '实时日志连接中…',
-    live: '实时日志已连接',
-    retrying: '实时日志重连中…',
-    gap: '部分历史日志已过期，正在接收新日志',
-    idle: '等待活动实例'
+    connecting: msg("tools.connectingLiveLogs"),
+    live: msg("tools.liveLogsConnected"),
+    retrying: msg("tools.reconnectingLiveLogs"),
+    gap: msg("tools.someLogHistoryExpired"),
+    idle: msg("tools.waitingActiveInstance")
   };
   const node = byId('logs-stream-state');
-  node.textContent = t(labels[status] || labels.connecting);
+  node.textContent = labels[status] || labels.connecting;
   node.dataset.state = status || 'connecting';
 }
 
@@ -606,8 +609,8 @@ async function loadDnsCache() {
     return tr;
   });
   byId('dns-cache').replaceChildren(rows.length
-    ? makeTable(['Domain', 'Address', 'Expires'], rows)
-    : text('p', 'DNS cache 为空'));
+    ? makeTable([msg("tools.domain"), msg("common.address"), msg("tools.expires")], rows)
+    : text('p', msg("tools.dnsCacheEmpty")));
 }
 
 async function runScript(body, cron = false) {
@@ -624,11 +627,11 @@ async function loadScripts() {
     [script.name, script.type, script.cronexp || script.event_name || '—']
       .forEach((value) => tr.append(text('td', value, undefined, true)));
     const action = document.createElement('td');
-    const evaluate = text('button', 'Evaluate');
+    const evaluate = text('button', msg("tools.evaluate"));
     evaluate.addEventListener('click', () => runScript({ name: script.name }).catch(handleError));
     action.append(evaluate);
     if (script.type === 'cron') {
-      const cron = text('button', 'Run cron');
+      const cron = text('button', msg("tools.runCron"));
       cron.addEventListener('click', () => runScript({ script_name: script.name }, true).catch(handleError));
       action.append(' ', cron);
     }
@@ -636,8 +639,8 @@ async function loadScripts() {
     return tr;
   });
   byId('scripts').replaceChildren(rows.length
-    ? makeTable(['Name', 'Type', 'Schedule / event', 'Action'], rows)
-    : text('p', '没有已配置脚本'));
+    ? makeTable([msg("common.name"), msg("common.type"), msg("tools.scheduleEvent"), msg("common.action")], rows)
+    : text('p', msg("tools.noConfiguredScripts")));
 }
 
 function handleError(error) {
@@ -682,7 +685,7 @@ for (const [kind, visible] of [['logs', visibleLogs], ['events', visibleEvents]]
   for (const [format, json] of [['jsonl', true], ['text', false]]) {
     byId(`${kind}-export-${format}`).addEventListener('click', () => {
       try { downloadJournal(visible(), json, `spike-${kind}`); }
-      catch { showNotice(t('无法导出选定的记录。')); }
+      catch { showNotice(msg("tools.unableExportSelectedRecords")); }
     });
   }
 }
@@ -707,7 +710,7 @@ byId('logs-view-clear').addEventListener('click', () => {
   logEntries = logEntries.filter(entry=>entry.sequence > clearedLogSequence);
   if (frozenLogs) frozenLogs = [];
   renderLogs();
-  showNotice(t('当前视图日志已清空'));
+  showNotice(msg("tools.logsClearedCurrentView"));
 });
 function updateReloadControls() {
   const disabled = !instance || !reloadLive || reloadBusy;
@@ -723,19 +726,19 @@ async function runReload(mode) {
   reloadBusy = true;
   if (mode === 'preview') byId('reload-preview-output').textContent = '';
   byId('reload-operation-error').textContent = '';
-  byId('reload-operation-status').textContent = t('Reading runtime status…');
+  byId('reload-operation-status').textContent = msg("tools.readingRuntimeStatus");
   updateReloadControls();
   try {
     let namespace = null;
     const before = await SpikeApiClient.getStatus(target, {onRuntime: value => { namespace = value; }});
     if (!current()) return;
     if (!namespace) throw new Error('Runtime identity unavailable');
-    const status = reloadStatusView(before, t);
+    const status = reloadStatusView(before);
     reloadNamespace = namespace;
     if (mode === 'check') {
       output('reload-result-output', status);
       reloadUnconfirmed = false;
-      byId('reload-operation-status').textContent = t('Runtime status checked. Retry reload explicitly if needed.');
+      byId('reload-operation-status').textContent = msg("tools.runtimeStatusCheckedRetry");
       return;
     }
     let received = null;
@@ -744,26 +747,26 @@ async function runReload(mode) {
       const result = await SpikeApiClient.previewReload(target, options);
       if (!current()) return;
       if (received !== namespace || result.current_revision !== before.revision) throw new Error('Preview context changed');
-      output('reload-preview-output', reloadView(result, true, t));
-      byId('reload-operation-status').textContent = t('Preview only. No configuration was applied.');
+      output('reload-preview-output', reloadView(result, true));
+      byId('reload-operation-status').textContent = msg("tools.previewOnlyNoConfiguration");
     } else {
       reloadUnconfirmed = true;
       const result = await SpikeApiClient.reloadRuntime(target, options);
       if (!current()) return;
       if (received !== namespace || result.revision < before.revision) throw new Error('Reload context changed');
-      output('reload-result-output', reloadView(result, false, t));
+      output('reload-result-output', reloadView(result, false));
       byId('reload-preview-output').textContent = '';
       reloadUnconfirmed = false;
-      byId('reload-operation-status').textContent = t(result.restart_required?.length
-        ? 'Profile reloaded. Restart-required changes remain pending.' : 'Profile reloaded.');
+      byId('reload-operation-status').textContent = result.restart_required?.length
+        ? msg("tools.profileReloadedRestartRequired") : msg("tools.profileReloaded");
       void loadAll();
     }
   } catch (error) {
     if (current()) {
       byId('reload-operation-status').textContent = '';
-      byId('reload-operation-error').textContent = t(reloadUnconfirmed
-        ? 'Reload result is unconfirmed. Check runtime status before trying again.'
-        : 'Unable to read reload information. Check runtime status and configuration.')
+      byId('reload-operation-error').textContent = reloadUnconfirmed
+        ? msg("tools.reloadResultUnconfirmedCheck")
+        : msg("tools.unableReadReloadInformation")
         + (error?.status ? '\n' + requestErrorText(error) : '');
     }
   } finally {
@@ -793,7 +796,7 @@ byId('route-form').addEventListener('submit', async (event) => {
       process_path: byId('route-process-path').value, process_cgroup: byId('route-process-cgroup').value});
     output('route-output', await SpikeApiClient.explainRoute(instance, body));
   } catch (error) {
-    if (error.field) showNotice(`${t('路由上下文无效，请检查填写的字段。')} ${t(error.field)}`);
+    if (error.field) showNotice(`${msg("tools.invalidRouteContextCheck")} ${error.field}`);
     else handleError(error);
   }
 });
@@ -822,7 +825,7 @@ byId('script-form').addEventListener('submit', async (event) => {
 try {
   await StorageManager.init();
   instance = await StorageManager.getActiveInstance();
-  if (!instance) throw new Error('请先在 SpikeDeck 设置中添加并选择实例');
+  if (!instance) throw new Error(msg("tools.addSelectInstanceSpikedeck"));
   updateReloadControls();
   byId('instance-label').textContent = `${instance.name} · ${instance.baseUrl}`;
   connectLogStream();
@@ -843,5 +846,5 @@ try {
   await loadAll();
 } catch (error) {
   handleError(error);
-  byId('instance-label').textContent = '活动实例不可用';
+  byId('instance-label').textContent = msg("tools.activeInstanceUnavailable");
 }

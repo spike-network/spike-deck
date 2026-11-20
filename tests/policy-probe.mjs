@@ -1,4 +1,6 @@
+import './helpers/lang-en.mjs';
 import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { msg } from '../lib/i18n.js';
 import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -48,7 +50,7 @@ const api = new Proxy({}, { get: (_, method) => async (_instance, ...args) => {
   assert.ok(method.startsWith('get')); return {};
 } });
 const context = vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy, document, console, policyProbeRequest, ThroughputSession, PanelObservation, chronological, filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs,
-  SpikeApiClient: api, initializeI18n: async () => {}, t: value => value,
+  SpikeApiClient: api, initializeI18n: async () => {}, msg, onLanguageChange() {},
   StorageManager: { init: async () => {}, getActiveInstance: async () => ({ id: 'mock-instance', baseUrl: 'https://example.test' }) },
   window: { setInterval() {}, clearInterval() {}, setTimeout() {}, addEventListener(type, callback) { if (type === 'pagehide') pagehide.push(callback); } },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } } });

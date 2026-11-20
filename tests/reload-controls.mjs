@@ -1,3 +1,4 @@
+import './helpers/lang-en.mjs';
 import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
 import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from "node:assert/strict";
@@ -8,7 +9,7 @@ import { PanelObservation } from "../lib/panels.js";
 import { ThroughputSession } from "../lib/throughput.js";
 import { chronological } from "../lib/journal-export.js";
 import { reloadView, reloadStatusView } from "../lib/reload-view.js";
-import { translateForLanguage } from "../lib/i18n.js";
+import { msg, translateForLanguage } from "../lib/i18n.js";
 const nodes = new Map();
 const node = () => ({
   value: "",
@@ -134,7 +135,7 @@ const context = vm.createContext({ coreError, requestErrorText, statusError, isR
     }),
   },
   initializeI18n: async () => {},
-  t: (value) => value,
+  msg, onLanguageChange() {},
   filterRuntimeLogs: (entries) => entries,
   sortRuntimeLogs: (entries) => entries,
   formatRuntimeLogs: () => "",

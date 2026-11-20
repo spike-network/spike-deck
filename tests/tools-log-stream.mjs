@@ -1,4 +1,6 @@
+import './helpers/lang-zh-cn.mjs';
 import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { msg } from '../lib/i18n.js';
 import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -39,7 +41,7 @@ const context = vm.createContext({ coreError, requestErrorText, statusError, isR
   chrome: { runtime: { onMessage: { addListener() {} }, connect: makePort,
     sendMessage: async (message) => { requests.push(message.type); return { ok: true }; } } },
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => ({ id: 'fixture' }) },
-  initializeI18n: async () => {}, t: (value) => value,
+  initializeI18n: async () => {}, msg, onLanguageChange() {},
   filterRuntimeLogs: (entries) => entries, sortRuntimeLogs: (entries) => entries,
   formatRuntimeLogs: (entries) => entries.map((entry) => entry.message).join('\n'),
   chronological, PanelObservation, ThroughputSession,

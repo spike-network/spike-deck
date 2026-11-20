@@ -1,4 +1,6 @@
+import './helpers/lang-zh-cn.mjs';
 import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { msg } from '../lib/i18n.js';
 import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -34,7 +36,7 @@ async function harness(namespace='mock-runtime') {
     window:{setInterval(){},clearInterval(){},setTimeout(){},addEventListener(){}},
     chrome:{runtime:{onMessage:{addListener(){}},sendMessage:async()=>{throw new Error('mock stream unavailable');}}},
     SpikeApiClient:api,StorageManager:{init:async()=>{},getActiveInstance:async()=>({id:'mock-instance',baseUrl:'https://example.test',secret:'mock-secret'})},
-    initializeI18n:async()=>{},t:value=>value});
+    initializeI18n:async()=>{},msg, onLanguageChange() {}});
   await vm.runInContext(`(async()=>{${source}})()`,context);
   return {data,nodes,click:id=>nodes.get(id).listeners.click(),input:(id,value)=>{document.getElementById(id).value=value;nodes.get(id).listeners.input();},
     change:(id,value)=>{document.getElementById(id).value=value;nodes.get(id).listeners.change();}};

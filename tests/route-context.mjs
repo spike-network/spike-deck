@@ -1,4 +1,6 @@
+import './helpers/lang-zh-cn.mjs';
 import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { msg } from '../lib/i18n.js';
 import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +22,7 @@ const context = vm.createContext({ coreError, requestErrorText, statusError, isR
   chrome:{runtime:{onMessage:{addListener(){}},sendMessage:async()=>{throw new Error('mock stream unavailable');}}},
   StorageManager:{init:async()=>{},getActiveInstance:async()=>({baseUrl:'https://example.test',secret:'mock-secret'})},
   SpikeApiClient:new Proxy({},{get:(_,key)=>key==='explainRoute'?async(_,body)=>{requests.push(body);return {ok:true};}:async()=>({})}),
-  initializeI18n:async()=>{},t:value=>value,filterRuntimeLogs:entries=>entries,sortRuntimeLogs:entries=>entries,formatRuntimeLogs:()=>''
+  initializeI18n:async()=>{},msg, onLanguageChange() {},filterRuntimeLogs:entries=>entries,sortRuntimeLogs:entries=>entries,formatRuntimeLogs:()=>''
 });
 const source=fs.readFileSync(new URL('../tools.js',import.meta.url),'utf8').replace(/^import[\s\S]*?;\n/gm,'');
 context.chronological = chronological;

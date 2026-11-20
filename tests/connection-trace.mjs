@@ -1,3 +1,4 @@
+import './helpers/lang-en.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { formatConnectionTrace, connectionDetailFields, connectionMethod } from '../lib/connection-trace.js';
@@ -59,18 +60,18 @@ test('localized phase labels never translate user process or policy names', () =
   const fields = connectionDetailFields({process:{name:'Active'},
     decision_trace:{route:{group_steps:[{group:'Pinned',selected:'Active',manual:true}]}},
     timeline:[{phase:'active',duration_us:1000,elapsed_us:1000,category:'mock',message:'mock event'}]
-  }, value => ({Active:'活动',Pinned:'已固定'})[value] || value);
+  });
   assert.equal(fields.find(field => field.label === 'Process').value, 'Active');
-  assert.equal(fields.find(field => field.label === 'Group decisions').value, 'Pinned → Active · 已固定');
-  assert.equal(fields.find(field => field.label === 'Phase timings').value, '活动: 1.0 ms');
+  assert.equal(fields.find(field => field.label === 'Group decisions').value, 'Pinned → Active · Pinned');
+  assert.equal(fields.find(field => field.label === 'Phase timings').value, 'Active: 1.0 ms');
 });
 
 test('live active duration follows the runtime clock after establishment', () => {
   const row = {duration_ms:600,timeline:[{phase:'establish',elapsed_us:1234,duration_us:1234}]};
-  const fields = connectionDetailFields(row, value => value, true);
+  const fields = connectionDetailFields(row, true);
   assert.match(fields.find(field => field.label === 'Phase timings').value,/Active: 598.8 ms/);
   row.timeline.push({phase:'active',elapsed_us:2000,duration_us:1000});
-  const observed = connectionDetailFields(row, value => value, true).find(field => field.label === 'Phase timings').value;
+  const observed = connectionDetailFields(row, true).find(field => field.label === 'Phase timings').value;
   assert.equal(observed.split('Active:').length,2,'an explicit active phase must not be duplicated');
 });
 

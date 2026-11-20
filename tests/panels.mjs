@@ -1,3 +1,5 @@
+import './helpers/lang-zh-cn.mjs';
+import { msg } from '../lib/i18n.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PanelObservation } from '../lib/panels.js';
@@ -25,9 +27,9 @@ const panels = new PanelObservation({
     if (hold) await hold; return response;
   }
 }, () => { updates++; render(); });
-render = new Function('panels', 'byId', 'text', 'document', 't',
+render = new Function('panels', 'byId', 'text', 'document', 'msg',
   source.slice(source.indexOf('function renderPanels('), source.indexOf('function connectionRow(')) + '\nreturn renderPanels;')(
-  panels, byId, text, { createElement: node }, value => value);
+  panels, byId, text, { createElement: node }, msg);
 const buttons = () => descendants(byId('panels')).filter(item => item.tag === 'button');
 const button = name => buttons().find(item => item.attrs['aria-label'] === `刷新面板 ${name}`);
 await panels.load();

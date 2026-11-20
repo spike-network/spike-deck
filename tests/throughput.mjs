@@ -1,4 +1,6 @@
+import './helpers/lang-en.mjs';
 import { coreError, requestErrorText, statusError } from "../lib/core-error.js";
+import { msg } from '../lib/i18n.js';
 import { isRejectPolicy } from "../lib/group-selection.js";
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -121,7 +123,7 @@ const api = new Proxy({}, { get: (_, method) => async (_instance, ...args) => {
 const source = readFileSync(new URL('../tools.js', import.meta.url), 'utf8').replace(/^import[\s\S]*?;\n/gm, '');
 const context = vm.createContext({ coreError, requestErrorText, statusError, isRejectPolicy, document, console, ThroughputSession, PanelObservation, chronological, filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs,
   SpikeApiClient: api, StorageManager: { init: async () => {}, getActiveInstance: async () => ({ id: 'mock-instance', baseUrl: 'https://example.test' }) },
-  initializeI18n: async () => {}, t: value => value, confirmAction: async () => data.acceptConfirm, window: { setInterval() {}, clearInterval() {}, setTimeout() {},
+  initializeI18n: async () => {}, msg, onLanguageChange() {}, confirmAction: async () => data.acceptConfirm, window: { setInterval() {}, clearInterval() {}, setTimeout() {},
     addEventListener(type, callback) { if (type === 'pagehide') pagehide.push(callback); } },
   chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async () => { throw new Error('mock stream unavailable'); } } } });
 const descendants = root => [root, ...root.children.flatMap(descendants)];

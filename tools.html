@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SpikeDeck 运行工具</title>
+  <title data-i18n="tools.spikedeckRuntimeTools">SpikeDeck 运行工具</title>
   <link rel="stylesheet" href="tools.css">
   <link rel="stylesheet" href="interaction.css">
   <link rel="stylesheet" href="theme.css">
@@ -13,93 +13,93 @@
   <header class="hero">
     <div>
       <p class="eyebrow">SPIKEDECK</p>
-      <h1>运行工具</h1>
-      <p id="instance-label">正在连接活动实例…</p>
+      <h1 data-i18n="common.runtimeTools">运行工具</h1>
+      <p id="instance-label" data-i18n="tools.connectingActiveInstance">正在连接活动实例…</p>
     </div>
     <div class="log-actions">
-      <button id="refresh-all" class="primary">刷新全部</button>
+      <button id="refresh-all" class="primary" data-i18n="common.refreshAll">刷新全部</button>
     </div>
   </header>
 
   <main>
-    <section class="panel wide" aria-label="Custom URL policy probe">
-      <div class="panel-head"><h2>Custom URL policy probe</h2></div>
-      <p>Probe 1–16 known policies without changing the profile test URL.</p>
+    <section class="panel wide" aria-label="Custom URL policy probe" data-i18n-aria-label="tools.customUrlPolicyProbe">
+      <div class="panel-head"><h2 data-i18n="tools.customUrlPolicyProbe">自定义 URL 策略探测</h2></div>
+      <p data-i18n="tools.probe116Known">探测 1–16 个已知策略，不修改配置中的测速 URL。</p>
       <form id="policy-probe-form" class="form-grid">
-        <label>Probe URL<input id="policy-probe-url" type="url" placeholder="https://example.test/mock" required></label>
-        <label>Policies<select id="policy-probe-policies" multiple size="6"></select></label>
-        <button id="policy-probe-start" type="submit" disabled>Probe selected policies</button>
+        <label><span data-i18n="tools.probeUrl">探测 URL</span><input id="policy-probe-url" type="url" placeholder="https://example.test/mock" required></label>
+        <label><span data-i18n="common.policies">策略</span><select id="policy-probe-policies" multiple size="6"></select></label>
+        <button id="policy-probe-start" type="submit" disabled data-i18n="tools.probeSelectedPolicies">探测所选策略</button>
       </form>
       <p id="policy-probe-error" role="alert"></p><div id="policy-probe-results" aria-live="polite"></div>
     </section>
-    <section class="panel wide" aria-label="Policy throughput test">
-      <div class="panel-head"><h2>Policy throughput test</h2><button id="throughput-reload">Reload recent tests</button></div>
-      <p>Measure bounded transfer throughput using the configured Testing URL. Tests continue in Core when this page closes.</p>
+    <section class="panel wide" aria-label="Policy throughput test" data-i18n-aria-label="tools.policyThroughputTest">
+      <div class="panel-head"><h2 data-i18n="tools.policyThroughputTest">策略吞吐测试</h2><button id="throughput-reload" data-i18n="tools.reloadRecentTests">重新读取最近任务</button></div>
+      <p data-i18n="tools.measureBoundedTransferThroughput">使用配置中 Testing 的 URL 进行有界吞吐测试。关闭此页后，测试仍在 Core 中继续。</p>
       <form id="throughput-form" class="form-grid">
-        <label>Direction<select id="throughput-direction"><option value="download">Download</option><option value="upload">Upload</option></select></label>
-        <label>Policy<select id="throughput-policy"><option data-i18n-ignore>DIRECT</option></select></label>
-        <button id="throughput-start" type="submit" disabled>Start throughput test</button>
-        <button id="throughput-cancel" type="button" disabled>Cancel throughput test</button>
+        <label><span data-i18n="tools.direction">方向</span><select id="throughput-direction"><option value="download" data-i18n="tools.download">下载</option><option value="upload" data-i18n="tools.upload">上传</option></select></label>
+        <label><span data-i18n="common.policy">策略</span><select id="throughput-policy"><option data-i18n-ignore>DIRECT</option></select></label>
+        <button id="throughput-start" type="submit" disabled data-i18n="tools.startThroughputTest">开始吞吐测试</button>
+        <button id="throughput-cancel" type="button" disabled data-i18n="tools.cancelThroughputTest">取消吞吐测试</button>
       </form>
       <p id="throughput-policy-error" role="alert"></p>
       <div id="throughput-result" aria-live="polite"></div>
-      <details><summary>Recent throughput tests</summary><div id="throughput-history" class="table-wrap"></div></details>
+      <details><summary data-i18n="tools.recentThroughputTests">最近的吞吐测试</summary><div id="throughput-history" class="table-wrap"></div></details>
     </section>
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">INFORMATION</p><h2>信息面板</h2></div><button id="panels-refresh">重新读取面板列表</button></div>
-      <p class="panel-description">当前配置的只读信息。刷新只运行所选面板的脚本。</p>
+      <div class="panel-head"><div><p class="eyebrow" data-i18n="tools.information">INFORMATION</p><h2 data-i18n="tools.informationPanels">信息面板</h2></div><button id="panels-refresh" data-i18n="tools.reloadPanelList">重新读取面板列表</button></div>
+      <p class="panel-description" data-i18n="tools.readOnlyInformationActive">当前配置的只读信息。刷新只运行所选面板的脚本。</p>
       <div id="panels"></div>
     </section>
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">READINESS</p><h2>就绪检查</h2></div><button id="readiness-refresh">重新检查</button></div>
+      <div class="panel-head"><div><p class="eyebrow" data-i18n="common.readiness">READINESS</p><h2 data-i18n="tools.readinessChecks">就绪检查</h2></div><button id="readiness-refresh" data-i18n="common.checkAgain">重新检查</button></div>
       <div id="readiness" class="table-wrap" role="status"></div>
     </section>
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">TRAFFIC</p><h2>连接</h2></div></div>
+      <div class="panel-head"><div><p class="eyebrow">TRAFFIC</p><h2 data-i18n="common.connections">连接</h2></div></div>
       <div class="event-filter">
-        <label>筛选连接<input id="connections-filter" type="search" placeholder="筛选主机、客户端、策略或类型" autocomplete="off"></label>
-        <label>连接状态<select id="connections-state"><option value="all">全部连接</option><option value="live">活动连接</option><option value="recent">连接历史</option><option value="failed">失败连接</option></select></label>
+        <label><span data-i18n="tools.filterConnections">筛选连接</span><input id="connections-filter" type="search" placeholder="筛选主机、客户端、策略或类型" data-i18n-placeholder="tools.filterHostClientPolicy" autocomplete="off"></label>
+        <label><span data-i18n="tools.connectionState">连接状态</span><select id="connections-state"><option value="all" data-i18n="tools.allConnections">全部连接</option><option value="live" data-i18n="tools.liveConnections">活动连接</option><option value="recent" data-i18n="tools.connectionHistory">连接历史</option><option value="failed" data-i18n="tools.failedConnections">失败连接</option></select></label>
         <span id="connections-count" class="muted" aria-live="polite">0 / 0</span>
       </div>
       <div id="connections" class="table-wrap"></div>
     </section>
 
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">BOUNDED REUSE</p><h2>会话池</h2></div></div>
-      <p class="panel-description">当前保留的有界复用会话与生命周期计数。</p>
+      <div class="panel-head"><div><p class="eyebrow">BOUNDED REUSE</p><h2 data-i18n="tools.sessionPools">会话池</h2></div></div>
+      <p class="panel-description" data-i18n="tools.boundedReusableSessionsLifecycle">当前保留的有界复用会话与生命周期计数。</p>
       <div id="session-pools" class="table-wrap"></div>
     </section>
 
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">OBSERVABILITY</p><h2>运行日志</h2></div><div class="log-actions"><span id="logs-stream-state" data-state="connecting">实时日志连接中…</span><button id="logs-refresh">刷新</button><button id="logs-pause">暂停观察</button><button id="logs-view-clear" type="button">清空当前视图</button><button id="logs-export-jsonl">导出 JSONL</button><button id="logs-export-text">导出文本</button></div></div>
+      <div class="panel-head"><div><p class="eyebrow">OBSERVABILITY</p><h2 data-i18n="tools.runtimeLogs">运行日志</h2></div><div class="log-actions"><span id="logs-stream-state" data-state="connecting" data-i18n="tools.connectingLiveLogs">实时日志连接中…</span><button id="logs-refresh" data-i18n="common.refresh">刷新</button><button id="logs-pause" data-i18n="tools.pauseObservation">暂停观察</button><button id="logs-view-clear" type="button" data-i18n="tools.clearCurrentView">清空当前视图</button><button id="logs-export-jsonl" data-i18n="tools.exportJsonl">导出 JSONL</button><button id="logs-export-text" data-i18n="tools.exportText">导出文本</button></div></div>
       <div class="log-filter">
-        <label>包含关键字<input id="logs-filter" type="search" placeholder="包含消息、目标或字段" autocomplete="off"></label>
-        <label>排除关键字<input id="logs-filter-exclude" type="search" placeholder="排除消息、目标或字段" autocomplete="off"></label>
-        <label>时间顺序<select id="logs-sort"><option value="asc">时间升序</option><option value="desc">时间降序</option></select></label>
+        <label><span data-i18n="tools.includeKeyword">包含关键字</span><input id="logs-filter" type="search" placeholder="包含消息、目标或字段" data-i18n-placeholder="tools.includeMessageTargetFields" autocomplete="off"></label>
+        <label><span data-i18n="tools.excludeKeyword">排除关键字</span><input id="logs-filter-exclude" type="search" placeholder="排除消息、目标或字段" data-i18n-placeholder="tools.excludeMessageTargetFields" autocomplete="off"></label>
+        <label><span data-i18n="tools.timeOrder">时间顺序</span><select id="logs-sort"><option value="asc" data-i18n="tools.oldestFirst">时间升序</option><option value="desc" data-i18n="tools.newestFirst">时间降序</option></select></label>
         <span id="logs-filter-count" class="muted" aria-live="polite">0 / 0</span>
-        <button id="logs-filter-clear" type="button">重置筛选</button>
+        <button id="logs-filter-clear" type="button" data-i18n="tools.resetFilters">重置筛选</button>
       </div>
       <pre id="logs-output" class="runtime-logs" data-i18n-ignore></pre>
     </section>
 
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">OPERATIONS</p><h2>事件中心</h2></div><div class="log-actions"><button id="events-refresh">刷新</button><button id="events-pause">暂停观察</button><button id="events-view-clear">清空当前视图</button><button id="events-export-jsonl">导出 JSONL</button><button id="events-export-text">导出文本</button></div></div>
-      <p class="panel-description">由 Core 分类的有界操作事件；原始运行日志保留在上方面板。</p>
+      <div class="panel-head"><div><p class="eyebrow">OPERATIONS</p><h2 data-i18n="tools.eventCenter">事件中心</h2></div><div class="log-actions"><button id="events-refresh" data-i18n="common.refresh">刷新</button><button id="events-pause" data-i18n="tools.pauseObservation">暂停观察</button><button id="events-view-clear" data-i18n="tools.clearCurrentView">清空当前视图</button><button id="events-export-jsonl" data-i18n="tools.exportJsonl">导出 JSONL</button><button id="events-export-text" data-i18n="tools.exportText">导出文本</button></div></div>
+      <p class="panel-description" data-i18n="tools.boundedOperationalTimelineClassified">由 Core 分类的有界操作事件；原始运行日志保留在上方面板。</p>
       <div class="event-filter">
-        <input id="events-filter" type="search" placeholder="筛选分类、类型或摘要" autocomplete="off">
-        <select id="events-severity"><option value="all">全部严重性</option><option value="info">Info</option><option value="warning">Warning</option><option value="error">Error</option></select>
-        <label>时间顺序<select id="events-sort"><option value="desc">时间降序</option><option value="asc">时间升序</option></select></label>
+        <input id="events-filter" type="search" placeholder="筛选分类、类型或摘要" data-i18n-placeholder="tools.filterCategoryKindSummary" autocomplete="off">
+        <select id="events-severity"><option value="all" data-i18n="tools.allSeverities">全部严重性</option><option value="info">Info</option><option value="warning">Warning</option><option value="error" data-i18n="common.error">错误</option></select>
+        <label><span data-i18n="tools.timeOrder">时间顺序</span><select id="events-sort"><option value="desc" data-i18n="tools.newestFirst">时间降序</option><option value="asc" data-i18n="tools.oldestFirst">时间升序</option></select></label>
         <span id="events-filter-count" class="muted">0 / 0</span>
       </div>
       <div id="events" class="table-wrap"></div>
     </section>
 
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">CONFIG SAFETY</p><h2>重载预览</h2></div><button id="reload-preview" class="primary" disabled>预览</button></div>
-      <p class="panel-description">预览只检查当前配置，不应用更改。重新加载会再次读取当前配置文件，不会重启引擎。</p>
+      <div class="panel-head"><div><p class="eyebrow">CONFIG SAFETY</p><h2 data-i18n="tools.reloadPreview">重载预览</h2></div><button id="reload-preview" class="primary" disabled data-i18n="tools.preview">预览</button></div>
+      <p class="panel-description" data-i18n="tools.previewChecksActiveProfile">预览只检查当前配置，不应用更改。重新加载会再次读取当前配置文件，不会重启引擎。</p>
       <div class="filter-bar">
-        <button id="reload-apply" disabled>重新加载配置</button>
-        <button id="reload-check" disabled>检查运行时状态</button>
+        <button id="reload-apply" disabled data-i18n="tools.reloadActiveProfile">重新加载配置</button>
+        <button id="reload-check" disabled data-i18n="tools.checkRuntimeStatus">检查运行时状态</button>
       </div>
       <p id="reload-operation-status" role="status"></p>
       <p id="reload-operation-error" role="alert"></p>
@@ -108,38 +108,38 @@
     </section>
 
     <section class="panel">
-      <div class="panel-head"><div><p class="eyebrow">ROUTER</p><h2>路由解释</h2></div></div>
+      <div class="panel-head"><div><p class="eyebrow">ROUTER</p><h2 data-i18n="tools.routeExplanation">路由解释</h2></div></div>
       <form id="route-form" class="form-grid">
-        <label>Host<input id="route-host" required placeholder="example.test"></label>
-        <label>Port<input id="route-port" type="number" min="1" max="65535" value="443"></label>
-        <label>Protocol<select id="route-protocol"><option>TCP</option><option>UDP</option></select></label>
-        <label>Source IP<input id="route-source" placeholder="可选"></label>
-        <label>Source port<input id="route-source-port" type="number" min="1" max="65535" placeholder="可选"></label>
-        <label>Inbound port<input id="route-in-port" type="number" min="1" max="65535" placeholder="可选"></label>
-        <label>Destination IP<input id="route-destination" placeholder="可选"></label>
-        <label>Request URL<input id="route-url" placeholder="可选"></label>
-        <label>User-Agent<input id="route-user-agent" placeholder="可选"></label>
-        <label>Process name<input id="route-process-name" placeholder="可选"></label>
-        <label>Process path<input id="route-process-path" placeholder="可选"></label>
-        <label>Process cgroup<input id="route-process-cgroup" placeholder="可选"></label>
-        <button class="primary">解释</button>
+        <label><span data-i18n="common.host">主机</span><input id="route-host" required placeholder="example.test"></label>
+        <label><span data-i18n="common.port">端口</span><input id="route-port" type="number" min="1" max="65535" value="443"></label>
+        <label><span data-i18n="tools.protocol">协议</span><select id="route-protocol"><option>TCP</option><option>UDP</option></select></label>
+        <label><span data-i18n="tools.sourceIp">来源 IP</span><input id="route-source" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <label><span data-i18n="tools.sourcePort">来源端口</span><input id="route-source-port" type="number" min="1" max="65535" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <label><span data-i18n="tools.inboundPort">入站端口</span><input id="route-in-port" type="number" min="1" max="65535" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <label><span data-i18n="tools.destinationIp">目标 IP</span><input id="route-destination" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <label><span data-i18n="tools.requestUrl">请求 URL</span><input id="route-url" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <label><span data-i18n="tools.userAgent">用户代理</span><input id="route-user-agent" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <label><span data-i18n="tools.processName">进程名称</span><input id="route-process-name" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <label><span data-i18n="tools.processPath">进程路径</span><input id="route-process-path" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <label><span data-i18n="tools.processCgroup">进程控制组</span><input id="route-process-cgroup" placeholder="可选" data-i18n-placeholder="common.optional"></label>
+        <button class="primary" data-i18n="tools.explain">解释</button>
       </form>
       <pre id="route-output"></pre>
     </section>
 
     <section class="panel">
-      <div class="panel-head"><div><p class="eyebrow">RESOLVER</p><h2>DNS 查询</h2></div><button id="dns-flush" class="danger">清空缓存</button></div>
+      <div class="panel-head"><div><p class="eyebrow">RESOLVER</p><h2 data-i18n="tools.dnsQuery">DNS 查询</h2></div><button id="dns-flush" class="danger" data-i18n="tools.flushCache">清空缓存</button></div>
       <form id="dns-form" class="form-grid">
-        <label>Name<input id="dns-name" required placeholder="example.com"></label>
-        <label>Type<select id="dns-type"><option>A</option><option>AAAA</option></select></label>
+        <label><span data-i18n="common.name">名称</span><input id="dns-name" required placeholder="example.com"></label>
+        <label><span data-i18n="common.type">类型</span><select id="dns-type"><option>A</option><option>AAAA</option></select></label>
         <label class="check"><input id="dns-client" type="checkbox"> Client / fake-IP</label>
-        <button class="primary">查询</button>
+        <button class="primary" data-i18n="common.query">查询</button>
       </form>
       <pre id="dns-output"></pre>
     </section>
 
     <section class="panel wide">
-      <div class="panel-head"><div><p class="eyebrow">CACHE</p><h2>DNS Cache</h2></div><button id="dns-cache-refresh">刷新</button></div>
+      <div class="panel-head"><div><p class="eyebrow">CACHE</p><h2>DNS Cache</h2></div><button id="dns-cache-refresh" data-i18n="common.refresh">刷新</button></div>
       <div id="dns-cache" class="table-wrap"></div>
     </section>
 
@@ -148,8 +148,8 @@
       <div id="scripts" class="table-wrap"></div>
       <form id="script-form" class="script-form">
         <label>mock_type<select id="script-mock"><option>cron</option><option>generic</option><option>http-request</option><option>http-response</option><option>rule</option><option>dns</option><option>event</option></select></label>
-        <label>临时脚本<textarea id="script-text" rows="6">$done({trigger: $trigger, cron: $cronexp});</textarea></label>
-        <button class="primary">执行文本</button>
+        <label><span data-i18n="tools.temporaryScript">临时脚本</span><textarea id="script-text" rows="6">$done({trigger: $trigger, cron: $cronexp});</textarea></label>
+        <button class="primary" data-i18n="tools.runText">执行文本</button>
       </form>
       <pre id="script-output"></pre>
     </section>
