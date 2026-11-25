@@ -1879,7 +1879,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       profileName.textContent = status.profile || "Default";
       profileName.title = status.profile || "";
       currentProfileStem = SpikeApiClient.profileStem(status.profile || "");
-      badgeGroups.textContent = msg("popup.groupGroup", { group: status.groups || groupsData.groups?.length || 0 });
+      badgeGroups.textContent = msg("popup.groupsValue", { value: status.groups || groupsData.groups?.length || 0 });
       badgeNodes.textContent = msg("popup.nodesValue", { value: status.leaves || 0 });
       badgeRules.textContent = msg("popup.rulesValue", { value: status.rules || 0 });
       renderProxyListeners(status);
