@@ -7,10 +7,18 @@ import { chromium } from 'playwright';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const tools = (await readFile(resolve(root, 'tools.js'), 'utf8')).replace(/^import[\s\S]*?;\n/gm, '');
 const html = `<!doctype html><body><script type="module">
-import { chronological } from '/lib/journal-export.js';
+import { msg } from '/lib/i18n.js';
+import { filterRuntimeLogs, formatRuntimeLogs, sortRuntimeLogs } from '/lib/runtime-logs.js';
+import { formatConnectionTrace, connectionDetailFields, connectionMethod } from '/lib/connection-trace.js';
+import { routeContext } from '/lib/route-context.js';
+import { chronological, downloadJournal } from '/lib/journal-export.js';
 import { PanelObservation } from '/lib/panels.js';
 import { ThroughputSession } from '/lib/throughput.js';
-import { connectionDetailFields, connectionMethod } from '/lib/connection-trace.js';
+import { policyProbeRequest } from '/lib/policy-probe.js';
+import { coreError, requestErrorText, statusError } from '/lib/core-error.js';
+import { isRejectPolicy } from '/lib/group-selection.js';
+import { ConnectionMirror } from '/lib/connection-mirror.js';
+import { reloadView, reloadStatusView } from '/lib/reload-view.js';
 const getElement = document.getElementById.bind(document);
 document.getElementById = id => {
  let node = getElement(id);
@@ -24,8 +32,7 @@ const item={id:11,host:'example.test',peer:'192.0.2.1',port:443,kind:'tcp',ok:tr
 window.mockSnapshot={live:[item],recent:[]};
 const SpikeApiClient=new Proxy({},{get:(_,key)=>key==='getConnections'?async()=>window.mockSnapshot:async()=>({})});
 const StorageManager={init:async()=>{},getActiveInstance:async()=>mockInstance};
-const initializeI18n=async()=>{},t=value=>value,confirmAction=async()=>true;
-const formatConnectionTrace=()=>'',filterRuntimeLogs=entries=>entries,sortRuntimeLogs=entries=>entries,formatRuntimeLogs=()=>'';
+const initializeI18n=async()=>{},onLanguageChange=()=>{},confirmAction=async()=>true;
 ${tools}
 window.refreshMockConnections=loadConnections;
 window.rerenderMockConnections=renderConnections;
