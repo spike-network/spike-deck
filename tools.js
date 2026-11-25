@@ -472,7 +472,7 @@ function renderConnections() {
   ];
   byId('connections-count').textContent = `${rows.length} / ${connectionSnapshot.live.length + connectionSnapshot.recent.length}`;
   byId('connections').replaceChildren(rows.length
-    ? makeTable(['ID', msg("tools.peer"), msg("common.target"), msg("common.policy"), 'Decision', msg("tools.method"), msg("common.kind"), msg("common.status2"), msg("common.action")], rows)
+    ? makeTable(['ID', msg("tools.peer"), msg("common.target"), msg("common.policy"), msg("tools.decision"), msg("tools.method"), msg("common.kind"), msg("common.status2"), msg("common.action")], rows)
     : text('p', connectionSnapshot.live.length + connectionSnapshot.recent.length ? msg("common.noMatchingConnections") : msg("tools.noConnections")));
 }
 
