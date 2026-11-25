@@ -349,8 +349,9 @@ async function useIncrementalConnections(target) {
     const flag = (await SpikeApiClient.getApiInfo(target))?.features?.refresh_model;
     connectionsIncremental = Number.isInteger(flag) && flag >= 1;
     if (connectionsIncremental) connectionMirror ??= new ConnectionMirror();
-  } catch {
-    connectionsIncremental = false;
+  } catch (error) {
+    if (error?.status === 404 || error?.status === 405) connectionsIncremental = false;
+    return false;
   }
   return connectionsIncremental;
 }
@@ -358,20 +359,31 @@ async function useIncrementalConnections(target) {
 async function loadConnections() {
   const target = instance;
   const sequence = ++connectionsSequence;
-  if (await useIncrementalConnections(target)) {
+  const incremental = await useIncrementalConnections(target);
+  if (instance !== target || sequence !== connectionsSequence) return;
+  if (incremental) {
     try {
-      const changes = await SpikeApiClient.getConnectionsChanges(target, connectionMirror.cursor);
+      let changes = await SpikeApiClient.getConnectionsChanges(target, connectionMirror.cursor);
       if (instance !== target || sequence !== connectionsSequence) return;
       // A refresh that changed no record keeps the rendered table, and its
       // open details, as they are.
-      const changed = connectionMirror.apply(changes);
-      if (!changed && connectionSnapshot.sequence !== undefined) return;
+      let changed = connectionMirror.apply(changes);
+      let resynced = false;
+      if (changed === null) {
+        connectionMirror.reset();
+        changes = await SpikeApiClient.getConnectionsChanges(target, '');
+        if (instance !== target || sequence !== connectionsSequence) return;
+        changed = connectionMirror.apply(changes);
+        if (changed === null) throw new Error('Incomplete connections snapshot');
+        resynced = true;
+      }
+      if (!changed && !resynced && connectionSnapshot.sequence !== undefined) return;
       connectionSnapshot = connectionMirror.snapshot();
       renderConnections();
       return;
     } catch (error) {
       // The cursor may belong to a failed read; start from a full copy next time.
-      connectionMirror.reset();
+      if (instance === target && sequence === connectionsSequence) connectionMirror.reset();
       throw error;
     }
   }
