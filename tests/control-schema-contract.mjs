@@ -351,10 +351,38 @@ const READS = {
   },
   ControlEvents: { event_namespace: 'string', next_sequence: 'integer' },
   ControlConnections: {
+    sequence: 'integer',
     'live[].id': 'integer', 'live[].host': 'string', 'live[].port': 'integer', 'live[].peer': 'string',
     'live[].policy': 'string', 'live[].kind': 'string', 'live[].ok': 'boolean', 'live[].started_unix_ms': 'integer',
-    'live[].duration_ms': 'integer', 'live[].protocol': 'string', 'live[].application': 'string',
-    'live[].error': 'string', 'live[].end_reason': 'string', 'recent[].id': 'integer', 'recent[].host': 'string'
+    'live[].duration_ms': 'integer', 'live[].upload_bytes': 'integer', 'live[].download_bytes': 'integer',
+    'live[].modified': 'boolean', 'live[].protocol': 'string', 'live[].application': 'string',
+    'live[].http.method': 'string', 'live[].error': 'string', 'live[].error_code': 'string', 'live[].end_reason': 'string',
+    'live[].process.name': 'string', 'live[].process.pid': 'integer', 'live[].process.path': 'string',
+    'live[].process.container': 'string', 'live[].process.lookup': 'string',
+    'live[].decision_trace.rule': 'string', 'live[].decision_trace.rule_policy': 'string',
+    'live[].decision_trace.dns.mode': 'string', 'live[].decision_trace.dns.addresses[]': 'string',
+    'live[].decision_trace.route.policy_chain[]': 'string', 'live[].decision_trace.route.underlying_chain[]': 'string',
+    'live[].decision_trace.route.group_steps[].group': 'string', 'live[].decision_trace.route.group_steps[].selected': 'string',
+    'live[].decision_trace.route.group_steps[].stage': 'string', 'live[].decision_trace.route.group_steps[].manual': 'boolean',
+    'live[].timeline[].elapsed_us': 'integer', 'live[].timeline[].phase': 'string',
+    'live[].timeline[].duration_us': 'integer', 'live[].timeline[].category': 'string', 'live[].timeline[].message': 'string',
+    'recent[].id': 'integer', 'recent[].host': 'string', 'recent[].ok': 'boolean',
+    'recent[].error_code': 'string', 'recent[].end_reason': 'string'
+  },
+  ControlConnectionsChanges: {
+    reset: 'boolean', cursor: 'string', revision: 'integer',
+    'removed_live_ids[]': 'integer',
+    'live[].id': 'integer', 'live[].upload_bytes': 'integer', 'live[].download_bytes': 'integer',
+    'live[].duration_ms': 'integer', 'live[].modified': 'boolean',
+    'live_stats[].id': 'integer', 'live_stats[].upload_bytes': 'integer', 'live_stats[].download_bytes': 'integer',
+    'live_stats[].duration_ms': 'integer', 'live_stats[].modified': 'boolean',
+    'recent[].id': 'integer', 'recent_ids[]': 'integer'
+  },
+  ControlRefreshSummary: {
+    schema_version: 'integer', ok: 'boolean', runtime_revision: 'integer',
+    event_namespace: 'string', event_sequence: 'integer',
+    'connections.revision': 'integer', 'connections.live': 'integer', 'connections.recent': 'integer',
+    'http_capture.revision': 'integer', 'http_capture.enabled': 'boolean'
   },
   ControlRouteExplanation: {
     ok: 'boolean', rule_policy: 'string', 'matched_rule.id': 'string',
