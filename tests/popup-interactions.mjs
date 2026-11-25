@@ -39,16 +39,18 @@ assert.match(
 );
 
 // Task hub: driven by setTaskRunning, no DOM scraping and no observers.
-function fakeElement(id = "") {
+function fakeElement(id = "", tagName = "") {
   return {
     id,
+    tagName,
     hidden: true,
     className: "",
+    textContent: "",
     children: [],
     listeners: {},
     replaceCount: 0,
-    set innerHTML(html) {
-      this.text = html.replace(/<[^>]*>/g, "");
+    set innerHTML(_html) {
+      throw new Error("task hub must not use innerHTML");
     },
     append(...nodes) {
       this.children.push(...nodes);
@@ -77,7 +79,7 @@ function hubHarness() {
     }
   };
   globalThis.document = {
-    createElement: () => fakeElement(),
+    createElement: (tag) => fakeElement("", tag),
     getElementById: (id) =>
       ({
         "runtime-task-hub": hub,
@@ -95,7 +97,7 @@ function hubHarness() {
 
 {
   const { hub, list, clicks, setTaskRunning } = hubHarness();
-  const labels = () => list.children.map((row) => row.text);
+  const labels = () => list.children.map((row) => row.children[0].textContent);
   assert.equal(hub.hidden, true);
   assert.deepEqual(labels(), []);
 
@@ -103,9 +105,11 @@ function hubHarness() {
   assert.equal(hub.hidden, false);
   assert.deepEqual(labels(), ["资源更新 · 运行中"]);
   assert.equal(list.children[0].className, "runtime-task-item");
-  assert.equal(list.children[0].children[0].className, "btn-task-action");
-  assert.equal(list.children[0].children[0].textContent, "查看");
-  list.children[0].children[0].listeners.click();
+  assert.equal(list.children[0].children[0].tagName, "span");
+  assert.equal(list.children[0].children[1].tagName, "button");
+  assert.equal(list.children[0].children[1].className, "btn-task-action");
+  assert.equal(list.children[0].children[1].textContent, "查看");
+  list.children[0].children[1].listeners.click();
   assert.deepEqual(clicks, ["providers-panel"]);
 
   const renders = list.replaceCount;
@@ -114,7 +118,7 @@ function hubHarness() {
 
   setTaskRunning("modules", true);
   assert.deepEqual(labels(), ["资源更新 · 运行中", "模块更新 · 运行中"]);
-  list.children[1].children[0].listeners.click();
+  list.children[1].children[1].listeners.click();
   assert.deepEqual(clicks, ["providers-panel", "modules-panel"]);
 
   setTaskRunning("providers", false);
