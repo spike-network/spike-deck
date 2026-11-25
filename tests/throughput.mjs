@@ -144,7 +144,7 @@ try {
   assert.ok(descendants(output).some(node => /Cancelled · Upload/.test(node.textContent)));
   assert.equal(calls.filter(method => method === 'cancelThroughputTest').length, 1);
   assert.ok(descendants(output).some(node => node.tag === 'progress' && node.attrs['aria-label'] === 'Transferred bytes'));
-  assert.ok(descendants(output).some(node => node.dataset.i18nIgnore === '' && node.textContent === 'Mock Policy'));
+  assert.ok(descendants(output).some(node => node.textContent === 'Mock Policy'));
   const stop = descendants(output).find(node => node.textContent === 'Stop observing');
   data.acceptConfirm = false; await stop.listeners.click(); assert.ok(descendants(output).some(node => node.tag === 'progress'));
   data.acceptConfirm = true; await stop.listeners.click(); assert.ok(!descendants(output).some(node => node.tag === 'progress'));

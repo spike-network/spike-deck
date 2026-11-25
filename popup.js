@@ -3168,7 +3168,6 @@ document.addEventListener("DOMContentLoaded", async () => {
    * Paint a member latency badge: spinner / result text / empty (hover flash).
    */
   function applyLatencyBadge(badgeEl, latInfo, { member = "", pending = false } = {}) {
-    badgeEl.removeAttribute("data-i18n-ignore");
     if (pending) {
       badgeEl.className = "latency-badge lat-testing";
       badgeEl.title = msg("popup.testing");
@@ -3185,7 +3184,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           : "";
     if (hasLatencyResult(latInfo) && !latInfo.ok) {
       // Failure reason only in native tooltip; badge shows a red "F".
-      if (latInfo.err || latInfo.udpErr) badgeEl.setAttribute("data-i18n-ignore", "");
       badgeEl.title = `${coreError(latInfo.error_code, undefined, latInfo.err) || msg("popup.timeout")}${udpSummary}`;
     } else if (subGroupTarget) {
       const subSel = subGroupTarget.override_member || subGroupTarget.selected;

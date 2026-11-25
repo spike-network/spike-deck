@@ -106,10 +106,9 @@ const panels = new PanelObservation({
   read: onRuntime => SpikeApiClient.getPanels(instance, { onRuntime }),
   refresh: (name, onRuntime) => SpikeApiClient.refreshPanel(instance, name, { onRuntime, runtimeNamespace: panels.namespace })
 }, renderPanels);
-const text = (tag, value, className, userContent = false) => {
+const text = (tag, value, className) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (userContent) node.dataset.i18nIgnore = '';
   node.textContent = value == null ? '—' : String(value);
   return node;
 };
