@@ -2866,6 +2866,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const memberName =
       group.override_member || group.selected || (group.members && group.members[0]) || "-";
     const isOverridden = Boolean(group.override_member);
+    const memberInfoMap = new Map();
+    if (Array.isArray(group.member_info)) {
+      group.member_info.forEach((info) => {
+        if (info && info.name) memberInfoMap.set(info.name, info);
+      });
+    }
     groupCard.classList.toggle("overridden", isOverridden);
     groupCard.querySelectorAll(".member-item").forEach((item) => {
       const isTarget = item.dataset.member === memberName;
@@ -2933,7 +2939,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       await SpikeApiClient.setPolicyAvoidance(scope.instance, memberName, avoid);
       if (!scope.isCurrent()) return;
-      await refreshGroupsSelectionState(groupName);
+      await refreshGroupsSelectionState(null);
     } catch (err) {
       if (!scope.isCurrent()) return;
       showToast(msg("popup.failedUpdateAvoidanceError", { error: requestErrorText(err) || err }), "error");
