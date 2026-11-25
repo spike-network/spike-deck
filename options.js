@@ -14,6 +14,7 @@ import {
   getCurrentLanguage,
   initializeI18n,
   msg,
+  onLanguageChange,
   setCurrentLanguage,
   setMessage,
   setPlainText,
@@ -71,6 +72,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Load preferences
   prefLanguageSelect.value = getCurrentLanguage();
+  onLanguageChange((language) => {
+    prefLanguageSelect.value = language;
+  });
   prefLanguageSelect.addEventListener("change", async (event) => {
     await setCurrentLanguage(event.target.value);
   });
