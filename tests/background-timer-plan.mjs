@@ -162,6 +162,16 @@ reachable = true;
 await tick('SPIKE_TRAFFIC_TICK');
 assert.deepEqual(lastPlan(), [5000, 1000]);
 
+// TRAFFIC_SAMPLE records reachability before painting the badge title.
+for (let i = 0; i < 3; i += 1) {
+  listeners.message({ type: 'TRAFFIC_SAMPLE', traffic: null, error: 'Spike server not responding' }, {}, () => {});
+}
+assert.match(titles.at(-1), /Spike server not responding · retrying every 2s/);
+await settle();
+listeners.message({ type: 'TRAFFIC_SAMPLE', traffic: { upload_rate: 1, download_rate: 2 } }, {}, () => {});
+await settle();
+assert.deepEqual(lastPlan(), [5000, 1000]);
+
 // A user action (settings change) also resets the backoff.
 reachable = false;
 for (let i = 0; i < 4; i += 1) await tick('SPIKE_TRAFFIC_TICK');
@@ -177,5 +187,39 @@ storage.enableProxyMode = false;
 changeStorage({ enableProxyMode: { newValue: false } });
 await settle();
 assert.deepEqual(lastPlan(), [null, 3000]);
+
+// Cold wake: live idle/focus/port events wait for timer facts and win over stale async queries.
+{
+  storage.enableProxyMode = true;
+  storage.trafficRefreshInterval = 1;
+  plans.length = 0;
+  let resolveIdle;
+  let resolveFocus;
+  const idlePending = new Promise((resolve) => { resolveIdle = resolve; });
+  const focusPending = new Promise((resolve) => { resolveFocus = resolve; });
+  chrome.idle.queryState = () => idlePending;
+  chrome.windows.getLastFocused = () => focusPending;
+
+  await import('../background.js?cold-race=1');
+  const coldDisconnect = [];
+  listeners.idle('locked');
+  listeners.focus(-1);
+  listeners.connect({
+    name: 'traffic-watch',
+    onMessage: { addListener() {} },
+    onDisconnect: { addListener: (listener) => coldDisconnect.push(listener) }
+  });
+  coldDisconnect.forEach((listener) => listener());
+  assert.equal(plans.length, 0, 'cold wake must not publish a premature plan before timer facts load');
+
+  resolveIdle('active');
+  resolveFocus({ focused: true, state: 'normal' });
+  await settle();
+  assert.deepEqual(lastPlan(), [null, null], 'live locked event must not be overwritten by stale idle query');
+
+  listeners.idle('active');
+  await settle();
+  assert.deepEqual(lastPlan(), [5000, null], 'live unfocused event must not be overwritten by stale focus query');
+}
 
 console.log('background timer plan tests passed');

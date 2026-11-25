@@ -32,6 +32,9 @@ const groupTestPollTimers = new Map();
 const groupTestOperations = new Map();
 let trafficWatchPorts = 0;
 let isWindowFocused = true;
+let idleStateGeneration = 0;
+let windowFocusGeneration = 0;
+let timerFactsLoaded = false;
 
 // Inputs to the offscreen timer plan (lib/background-timers.js). Storage-backed
 // facts are reloaded when the worker wakes and when the settings change.
@@ -70,6 +73,7 @@ async function queryIdleState() {
 }
 
 async function loadTimerFacts() {
+  const idleGeneration = idleStateGeneration;
   const [proxyEnabled, instance, healthSeconds, trafficSeconds, idleState] = await Promise.all([
     StorageManager.isProxyModeEnabled(),
     StorageManager.getActiveInstance(),
@@ -83,8 +87,9 @@ async function loadTimerFacts() {
     hasInstance: Boolean(instance),
     healthIntervalMs: healthSeconds * 1000,
     trafficIntervalMs: trafficSeconds * 1000,
-    idleState
+    ...(idleGeneration === idleStateGeneration ? { idleState } : {})
   });
+  timerFactsLoaded = true;
 }
 
 function ensureTimerFacts() {
@@ -115,6 +120,11 @@ function publishTimerPlan({ force = false } = {}) {
   return plan;
 }
 
+function publishTimerPlanWhenReady(options) {
+  if (timerFactsLoaded) return publishTimerPlan(options);
+  return ensureTimerFacts().then(() => publishTimerPlan(options));
+}
+
 async function refreshTimerPlan(options) {
   timerFactsLoad = null;
   await ensureTimerFacts();
@@ -131,7 +141,7 @@ function recordReachability(ok) {
   } else if (ok && before >= UNREACHABLE_GRACE_FAILURES) {
     console.info('Spike reachable again; checks resume at the configured intervals');
   }
-  if (before !== timerFacts.failures) publishTimerPlan();
+  if (before !== timerFacts.failures) void publishTimerPlanWhenReady();
 }
 
 // Someone is back (unlocked, input, focus, popup): drop any backoff and check
@@ -147,9 +157,10 @@ async function resumeTimersNow() {
 if (chrome.idle?.onStateChanged) {
   chrome.idle.setDetectionInterval?.(IDLE_DETECTION_SECONDS);
   chrome.idle.onStateChanged.addListener((state) => {
+    idleStateGeneration += 1;
     timerFacts.idleState = state;
     if (state === 'active') void resumeTimersNow();
-    else publishTimerPlan();
+    else void publishTimerPlanWhenReady();
   });
 }
 
@@ -157,23 +168,27 @@ void ensureTimerFacts().then(() => publishTimerPlan());
 
 async function updateWindowFocusState() {
   if (!chrome.windows?.getLastFocused) return;
+  const generation = windowFocusGeneration;
   try {
     const win = await chrome.windows.getLastFocused();
+    if (generation !== windowFocusGeneration) return;
     isWindowFocused = Boolean(win && win.focused && win.state !== 'minimized');
   } catch {
+    if (generation !== windowFocusGeneration) return;
     isWindowFocused = true;
   }
 }
 
 if (chrome.windows?.onFocusChanged) {
   chrome.windows.onFocusChanged.addListener((windowId) => {
+    windowFocusGeneration += 1;
     const wasFocused = isWindowFocused;
     isWindowFocused = (windowId !== chrome.windows.WINDOW_ID_NONE);
     if (!wasFocused && isWindowFocused && trafficWatchPorts === 0) {
       void resumeTimersNow();
       return;
     }
-    publishTimerPlan();
+    void publishTimerPlanWhenReady();
   });
 }
 
@@ -230,17 +245,17 @@ if (chrome.runtime?.onConnect?.addListener) {
     trafficWatchPorts += 1;
     // Opening the popup is a user action; it samples traffic itself.
     timerFacts.failures = 0;
-    publishTimerPlan();
+    void publishTimerPlanWhenReady();
     port.onMessage.addListener((message) => {
       if (message?.type === 'TRAFFIC_SAMPLE') {
-        applyTrafficBadge(message.traffic, message.error);
         recordReachability(!message.error);
+        applyTrafficBadge(message.traffic, message.error);
         void onTrafficSampleHealth(message);
       }
     });
     port.onDisconnect.addListener(() => {
       trafficWatchPorts = Math.max(0, trafficWatchPorts - 1);
-      publishTimerPlan();
+      void publishTimerPlanWhenReady();
     });
   });
 }
@@ -364,8 +379,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === 'TRAFFIC_SAMPLE') {
-    applyTrafficBadge(message.traffic, message.error);
     recordReachability(!message.error);
+    applyTrafficBadge(message.traffic, message.error);
     void onTrafficSampleHealth(message);
     sendResponse({ ok: true });
     return false;
