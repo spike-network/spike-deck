@@ -2748,10 +2748,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                 type: "button",
                 className: `avoid-toggle${avoidance.avoided ? " avoided" : ""}`,
                 title: avoidance.avoided ? msg("popup.stopAvoidingAutomaticGroups") : msg("popup.avoidAutomaticGroups"),
-                "aria-pressed": avoidance.avoided,
+                "aria-pressed": String(avoidance.avoided),
                 onClick: async (e) => {
                   e.stopPropagation();
-                  await toggleAvoidance(group.name, member, !avoidance.avoided);
+                  await toggleAvoidance(
+                    group.name,
+                    member,
+                    !e.currentTarget.classList.contains("avoided"),
+                  );
                 },
                 onKeydown: (e) => e.stopPropagation(),
               },
@@ -2888,6 +2892,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             ? el("span", { className: "pin-icon", "aria-hidden": "true" })
             : document.createTextNode(isTarget ? "✓" : ""),
         );
+      }
+      const avoidToggle = item.querySelector(".avoid-toggle");
+      if (avoidToggle) {
+        const avoidance = groupMemberAvoidance(group, memberInfoMap.get(item.dataset.member));
+        const isAvoided = Boolean(avoidance?.avoided);
+        avoidToggle.classList.toggle("avoided", isAvoided);
+        avoidToggle.title = isAvoided
+          ? msg("popup.stopAvoidingAutomaticGroups")
+          : msg("popup.avoidAutomaticGroups");
+        avoidToggle.setAttribute("aria-pressed", String(isAvoided));
+        avoidToggle.textContent = isAvoided ? msg("popup.avoided") : msg("popup.avoid");
       }
     });
     const selectedSummary = groupCard.querySelector(".current-selected");

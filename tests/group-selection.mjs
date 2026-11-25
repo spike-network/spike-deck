@@ -84,5 +84,12 @@ assert.match(popup, /selectedSummaryChildren\(currentSelected\)/);
 assert.match(popup, /selectedSummary\.replaceChildren\(\.\.\.selectedSummaryChildren\(memberName\)\)/);
 assert.match(popup, /shouldCollapseGroupAfterSelection\(collapseGroupAfterSelection, event\)/);
 assert.match(popup, /persistGroupExpandState\(group\.name, false\)/);
+assert.match(popup, /async function toggleAvoidance[\s\S]*?await refreshGroupsSelectionState\(null\)/);
+assert.match(popup, /!e\.currentTarget\.classList\.contains\("avoided"\)/);
+assert.doesNotMatch(popup, /toggleAvoidance\([^)]*!avoidance\.avoided/);
+assert.match(
+  popup,
+  /function paintSelection\(groupCard, group\)[\s\S]*?const avoidToggle = item\.querySelector\("\.avoid-toggle"\)/,
+);
 
 console.log("group selection tests passed");
